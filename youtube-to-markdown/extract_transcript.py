@@ -6,101 +6,237 @@ Output: SUCCESS: youtube_{VIDEO_ID}_transcript.vtt or ERROR: No subtitles availa
 """
 
 import sys
-import os
-import subprocess
-import re
-import glob
+from pathlib import Path
 
-def extract_video_id(url):
-    """Extract video ID from YouTube URL"""
-    # Handle youtu.be format
-    if 'youtu.be/' in url:
-        video_id = url.split('youtu.be/')[-1].split('?')[0]
-        return video_id
+from shared_types import (
+    FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
+    extract_video_id, CommandNotFoundError, TranscriptNotAvailableError,
+    FileOperationError
+)
 
-    # Handle youtube.com format with v= parameter
-    match = re.search(r'[?&]v=([^&]+)', url)
-    if match:
-        return match.group(1)
 
-    return None
+class TranscriptExtractor:
+    """Extracts transcript/subtitles from YouTube videos."""
 
-def check_yt_dlp():
-    """Check if yt-dlp is installed"""
-    try:
-        subprocess.run(['yt-dlp', '--version'], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("ERROR: yt-dlp is not installed", file=sys.stderr)
-        sys.exit(1)
+    def __init__(
+        self,
+        fs: FileSystem = RealFileSystem(),
+        cmd: CommandRunner = RealCommandRunner()
+    ):
+        """
+        Initialize extractor with dependencies.
 
-def get_video_language(youtube_url):
-    """Get video language from YouTube"""
-    result = subprocess.run(
-        ['yt-dlp', '--print', '%(language)s', youtube_url],
-        capture_output=True,
-        text=True
-    )
-    video_lang = result.stdout.strip() if result.returncode == 0 else "unknown"
-    print(f"Video language: {video_lang}")
-    return video_lang
+        Args:
+            fs: File system implementation
+            cmd: Command runner implementation
+        """
+        self.fs = fs
+        self.cmd = cmd
 
-def download_manual_subtitles(youtube_url, subtitle_lang, output_name):
-    """Try to download manual subtitles"""
-    subprocess.run(
-        ['yt-dlp', '--write-sub', '--sub-langs', subtitle_lang, '--skip-download', '--output', output_name, youtube_url],
-        capture_output=True
-    )
-    temp_files = glob.glob(f"{output_name}.*.vtt")
-    if temp_files:
-        print(f"Manual subtitles downloaded ({subtitle_lang})")
-        return temp_files[0]
-    return None
+    def check_yt_dlp(self) -> None:
+        """
+        Check if yt-dlp is installed.
 
-def download_auto_subtitles(youtube_url, subtitle_lang, output_name):
-    """Try to download auto-generated subtitles"""
-    subprocess.run(
-        ['yt-dlp', '--write-auto-sub', '--sub-langs', subtitle_lang, '--skip-download', '--output', output_name, youtube_url],
-        capture_output=True
-    )
-    temp_files = glob.glob(f"{output_name}.*.vtt")
-    if temp_files:
-        print(f"Auto-generated subtitles downloaded ({subtitle_lang})")
-        return temp_files[0]
-    return None
+        Raises:
+            CommandNotFoundError: If yt-dlp is not installed
+        """
+        try:
+            self.cmd.run(['yt-dlp', '--version'], capture_output=True, check=True)
+        except Exception:
+            raise CommandNotFoundError("yt-dlp is not installed")
 
-def download_subtitles(youtube_url, subtitle_lang, output_name):
-    """Download subtitles, trying manual first then auto-generated"""
-    # Try manual subtitles first
-    subtitle_file = download_manual_subtitles(youtube_url, subtitle_lang, output_name)
-    if subtitle_file:
-        return subtitle_file
+    def get_video_language(self, youtube_url: str) -> str:
+        """
+        Get video language from YouTube.
 
-    # Fall back to auto-generated
-    subtitle_file = download_auto_subtitles(youtube_url, subtitle_lang, output_name)
-    if subtitle_file:
-        return subtitle_file
+        Args:
+            youtube_url: YouTube URL
 
-    print(f"ERROR: No subtitles available for language: {subtitle_lang}", file=sys.stderr)
-    sys.exit(1)
+        Returns:
+            Language code (e.g., 'en', 'es') or 'unknown'
+        """
+        result = self.cmd.run(
+            ['yt-dlp', '--print', '%(language)s', youtube_url],
+            capture_output=True,
+            text=True
+        )
+        video_lang = result.stdout.strip() if result.returncode == 0 else "unknown"
+        print(f"Video language: {video_lang}")
+        return video_lang
 
-def rename_subtitle_file(temp_file, final_output):
-    """Rename temporary subtitle file to final output name"""
-    try:
-        os.rename(temp_file, final_output)
-    except Exception as e:
-        print(f"ERROR: Failed to rename transcript file: {e}", file=sys.stderr)
-        sys.exit(1)
+    def download_manual_subtitles(
+        self,
+        youtube_url: str,
+        subtitle_lang: str,
+        output_name: Path
+    ) -> Path | None:
+        """
+        Try to download manual subtitles.
 
-    if not os.path.exists(final_output):
-        print(f"ERROR: {final_output} not created", file=sys.stderr)
-        sys.exit(1)
+        Args:
+            youtube_url: YouTube URL
+            subtitle_lang: Subtitle language code
+            output_name: Output path without extension
 
-    return final_output
+        Returns:
+            Path to downloaded subtitle file, or None if not available
+        """
+        self.cmd.run(
+            ['yt-dlp', '--write-sub', '--sub-langs', subtitle_lang,
+             '--skip-download', '--output', str(output_name), youtube_url],
+            capture_output=True
+        )
 
-def main():
+        # Find the created VTT file
+        temp_files = self.fs.glob(f"{output_name.name}.*.vtt", output_name.parent)
+        if temp_files:
+            print(f"Manual subtitles downloaded ({subtitle_lang})")
+            return temp_files[0]
+        return None
+
+    def download_auto_subtitles(
+        self,
+        youtube_url: str,
+        subtitle_lang: str,
+        output_name: Path
+    ) -> Path | None:
+        """
+        Try to download auto-generated subtitles.
+
+        Args:
+            youtube_url: YouTube URL
+            subtitle_lang: Subtitle language code
+            output_name: Output path without extension
+
+        Returns:
+            Path to downloaded subtitle file, or None if not available
+        """
+        self.cmd.run(
+            ['yt-dlp', '--write-auto-sub', '--sub-langs', subtitle_lang,
+             '--skip-download', '--output', str(output_name), youtube_url],
+            capture_output=True
+        )
+
+        # Find the created VTT file
+        temp_files = self.fs.glob(f"{output_name.name}.*.vtt", output_name.parent)
+        if temp_files:
+            print(f"Auto-generated subtitles downloaded ({subtitle_lang})")
+            return temp_files[0]
+        return None
+
+    def download_subtitles(
+        self,
+        youtube_url: str,
+        subtitle_lang: str,
+        output_name: Path
+    ) -> Path:
+        """
+        Download subtitles, trying manual first then auto-generated.
+
+        Args:
+            youtube_url: YouTube URL
+            subtitle_lang: Subtitle language code
+            output_name: Output path without extension
+
+        Returns:
+            Path to downloaded subtitle file
+
+        Raises:
+            TranscriptNotAvailableError: If no subtitles are available
+        """
+        # Try manual subtitles first
+        subtitle_file = self.download_manual_subtitles(
+            youtube_url, subtitle_lang, output_name
+        )
+        if subtitle_file:
+            return subtitle_file
+
+        # Fall back to auto-generated
+        subtitle_file = self.download_auto_subtitles(
+            youtube_url, subtitle_lang, output_name
+        )
+        if subtitle_file:
+            return subtitle_file
+
+        raise TranscriptNotAvailableError(
+            f"No subtitles available for language: {subtitle_lang}"
+        )
+
+    def rename_subtitle_file(self, temp_file: Path, final_output: Path) -> Path:
+        """
+        Rename temporary subtitle file to final output name.
+
+        Args:
+            temp_file: Temporary file path
+            final_output: Final output path
+
+        Returns:
+            Path to final file
+
+        Raises:
+            FileOperationError: If rename fails
+        """
+        try:
+            # Use Path.rename which works across the same filesystem
+            temp_file.rename(final_output)
+        except Exception as e:
+            raise FileOperationError(f"Failed to rename transcript file: {e}")
+
+        if not self.fs.exists(final_output):
+            raise FileOperationError(f"{final_output} not created")
+
+        return final_output
+
+    def extract_transcript(
+        self,
+        youtube_url: str,
+        output_dir: Path,
+        subtitle_lang: str = "en"
+    ) -> Path:
+        """
+        Extract transcript from YouTube video.
+
+        Args:
+            youtube_url: YouTube URL
+            output_dir: Output directory
+            subtitle_lang: Subtitle language code (default: 'en')
+
+        Returns:
+            Path to created transcript file
+
+        Raises:
+            Various exceptions from component methods
+        """
+        # Check dependencies
+        self.check_yt_dlp()
+
+        # Extract video ID
+        video_id = extract_video_id(youtube_url)
+        base_name = f"youtube_{video_id}"
+
+        # Create output directory
+        self.fs.mkdir(output_dir)
+
+        # Get video language (informational)
+        self.get_video_language(youtube_url)
+
+        # Download subtitles
+        output_name = output_dir / f"{base_name}_transcript_temp"
+        final_output = output_dir / f"{base_name}_transcript.vtt"
+        temp_file = self.download_subtitles(youtube_url, subtitle_lang, output_name)
+
+        # Rename to final filename
+        final_file = self.rename_subtitle_file(temp_file, final_output)
+
+        print(f"SUCCESS: {final_file}")
+        return final_file
+
+
+def main() -> None:
+    """CLI entry point."""
     # Parse arguments
     youtube_url = sys.argv[1] if len(sys.argv) > 1 else None
-    output_dir = sys.argv[2] if len(sys.argv) > 2 else "."
+    output_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else Path(".")
     subtitle_lang = sys.argv[3] if len(sys.argv) > 3 else "en"
 
     # Validate arguments
@@ -108,36 +244,13 @@ def main():
         print("ERROR: No YouTube URL provided", file=sys.stderr)
         sys.exit(1)
 
-    # Check required commands
-    check_yt_dlp()
-
-    # Extract video ID from URL
-    video_id = extract_video_id(youtube_url)
-    if not video_id:
-        print("ERROR: Could not extract video ID from URL", file=sys.stderr)
-        sys.exit(1)
-
-    base_name = f"youtube_{video_id}"
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Get video language
-    get_video_language(youtube_url)
-
-    # Download subtitles
-    output_name = os.path.join(output_dir, f"{base_name}_transcript_temp")
-    final_output = os.path.join(output_dir, f"{base_name}_transcript.vtt")
-    temp_file = download_subtitles(youtube_url, subtitle_lang, output_name)
-
-    # Rename to final filename
-    final_file = rename_subtitle_file(temp_file, final_output)
-
-    print(f"SUCCESS: {final_file}")
-
-if __name__ == "__main__":
     try:
-        main()
+        extractor = TranscriptExtractor()
+        extractor.extract_transcript(youtube_url, output_dir, subtitle_lang)
     except Exception as e:
         print(f"ERROR: {str(e)}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
