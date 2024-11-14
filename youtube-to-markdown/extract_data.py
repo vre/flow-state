@@ -7,199 +7,287 @@ Output: Creates youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.m
 
 import json
 import sys
-import os
-import subprocess
-import re
+from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
-def extract_video_id(url):
-    """Extract video ID from YouTube URL"""
-    # Handle youtu.be format
-    if 'youtu.be/' in url:
-        video_id = url.split('youtu.be/')[-1].split('?')[0]
-        return video_id
+from shared_types import (
+    FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
+    VideoMetadata, extract_video_id, format_upload_date, format_subscribers,
+    format_duration, CommandNotFoundError, FileOperationError
+)
 
-    # Handle youtube.com format with v= parameter
-    match = re.search(r'[?&]v=([^&]+)', url)
-    if match:
-        return match.group(1)
 
-    return None
+class YouTubeDataExtractor:
+    """Extracts and processes YouTube video data."""
 
-def check_yt_dlp():
-    """Check if yt-dlp is installed"""
-    try:
-        subprocess.run(['yt-dlp', '--version'], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        print("ERROR: yt-dlp is not installed", file=sys.stderr)
-        print("Install options:", file=sys.stderr)
-        print("  - macOS: brew install yt-dlp", file=sys.stderr)
-        print("  - Ubuntu/Debian: sudo apt update && sudo apt install -y yt-dlp", file=sys.stderr)
-        print("  - All systems: pip3 install yt-dlp", file=sys.stderr)
-        sys.exit(1)
+    def __init__(
+        self,
+        fs: FileSystem = RealFileSystem(),
+        cmd: CommandRunner = RealCommandRunner()
+    ):
+        """
+        Initialize extractor with dependencies.
 
-def fetch_video_data(video_url, output_dir):
-    """Fetch video metadata from YouTube"""
-    temp_json = os.path.join(output_dir, "video_data.json")
-    try:
-        with open(temp_json, 'w') as f:
-            result = subprocess.run(
-                ['yt-dlp', '--dump-single-json', '--skip-download', video_url],
-                stdout=f,
-                stderr=subprocess.PIPE,
-                text=True
+        Args:
+            fs: File system implementation
+            cmd: Command runner implementation
+        """
+        self.fs = fs
+        self.cmd = cmd
+
+    def check_yt_dlp(self) -> None:
+        """
+        Check if yt-dlp is installed.
+
+        Raises:
+            CommandNotFoundError: If yt-dlp is not installed
+        """
+        try:
+            result = self.cmd.run(['yt-dlp', '--version'], capture_output=True, check=True)
+        except Exception:
+            raise CommandNotFoundError(
+                "yt-dlp is not installed\n"
+                "Install options:\n"
+                "  - macOS: brew install yt-dlp\n"
+                "  - Ubuntu/Debian: sudo apt update && sudo apt install -y yt-dlp\n"
+                "  - All systems: pip3 install yt-dlp"
             )
+
+    def fetch_video_data(self, video_url: str, output_dir: Path) -> dict:
+        """
+        Fetch video metadata from YouTube.
+
+        Args:
+            video_url: YouTube URL
+            output_dir: Directory for temporary files
+
+        Returns:
+            Dictionary containing video metadata
+
+        Raises:
+            FileOperationError: If metadata extraction fails
+        """
+        temp_json = output_dir / "video_data.json"
+
+        try:
+            # Run yt-dlp and write JSON to temp file
+            with open(temp_json, 'w') as f:
+                result = self.cmd.run(
+                    ['yt-dlp', '--dump-single-json', '--skip-download', video_url],
+                    stdout=f,
+                    stderr=None,
+                    text=True
+                )
+
             if result.returncode != 0:
-                print("ERROR: Failed to extract video metadata", file=sys.stderr)
-                if os.path.exists(temp_json):
-                    os.remove(temp_json)
-                sys.exit(1)
-    except Exception as e:
-        print(f"ERROR: Failed to extract video metadata: {e}", file=sys.stderr)
-        if os.path.exists(temp_json):
-            os.remove(temp_json)
-        sys.exit(1)
+                raise FileOperationError("Failed to extract video metadata")
 
-    try:
-        with open(temp_json, 'r') as f:
-            data = json.load(f)
-    except Exception as e:
-        print(f"ERROR: Failed to read JSON: {e}", file=sys.stderr)
-        if os.path.exists(temp_json):
-            os.remove(temp_json)
-        sys.exit(1)
-    finally:
-        if os.path.exists(temp_json):
-            os.remove(temp_json)
+            # Read and parse JSON
+            data_str = self.fs.read_text(temp_json)
+            data = json.loads(data_str)
 
-    return data
+            return data
 
-def format_upload_date(upload_date):
-    """Format upload date from YYYYMMDD to YYYY-MM-DD"""
-    if upload_date != 'Unknown' and len(str(upload_date)) == 8:
-        return f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
-    return upload_date
+        except json.JSONDecodeError as e:
+            raise FileOperationError(f"Failed to parse JSON: {e}")
+        except Exception as e:
+            raise FileOperationError(f"Failed to extract video metadata: {e}")
+        finally:
+            # Clean up temp file
+            if self.fs.exists(temp_json):
+                self.fs.remove(temp_json)
 
-def format_subscribers(subscribers):
-    """Format subscriber count"""
-    if isinstance(subscribers, int):
-        return f"{subscribers:,} subscribers"
-    return f"{subscribers} subscribers"
+    def parse_video_metadata(self, data: dict, video_id: str) -> VideoMetadata:
+        """
+        Parse raw video data into VideoMetadata object.
 
-def format_duration(duration):
-    """Format duration from seconds to HH:MM:SS or MM:SS"""
-    if duration:
-        hours = duration // 3600
-        minutes = (duration % 3600) // 60
-        seconds = duration % 60
-        if hours > 0:
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        Args:
+            data: Raw data from yt-dlp
+            video_id: Video ID
+
+        Returns:
+            VideoMetadata object
+        """
+        return VideoMetadata(
+            video_id=video_id,
+            title=data.get('title', 'Untitled'),
+            webpage_url=data.get('webpage_url', 'N/A'),
+            uploader=data.get('uploader', 'Unknown'),
+            channel_url=data.get('channel_url', data.get('uploader_url', '')),
+            channel_follower_count=data.get('channel_follower_count'),
+            upload_date=data.get('upload_date', 'Unknown'),
+            view_count=data.get('view_count', 0),
+            like_count=data.get('like_count', 0),
+            duration=data.get('duration', 0),
+            description=data.get('description', 'No description'),
+            chapters=data.get('chapters', []),
+            language=data.get('language', 'unknown')
+        )
+
+    def create_metadata_file(
+        self,
+        metadata: VideoMetadata,
+        base_name: str,
+        output_dir: Path
+    ) -> Path:
+        """
+        Create metadata markdown file.
+
+        Args:
+            metadata: Video metadata
+            base_name: Base filename (youtube_{VIDEO_ID})
+            output_dir: Output directory
+
+        Returns:
+            Path to created metadata file
+        """
+        filename = output_dir / f"{base_name}_metadata.md"
+
+        # Save title to separate file for finalize.py
+        title_file = output_dir / f"{base_name}_title.txt"
+        self.fs.write_text(title_file, metadata.title)
+
+        # Format values
+        upload_date = format_upload_date(metadata.upload_date)
+        extraction_date = datetime.now().strftime('%Y-%m-%d')
+        sub_text = format_subscribers(metadata.channel_follower_count)
+        duration_text = format_duration(metadata.duration)
+        views_text = f"{metadata.view_count:,}" if metadata.view_count else "0"
+        likes_text = f"{metadata.like_count:,}" if metadata.like_count else "0"
+
+        # Build content
+        lines = [
+            f"- **Title:** [{metadata.title}]({metadata.webpage_url})"
+        ]
+
+        if metadata.channel_url:
+            lines.append(
+                f"- **Channel:** [{metadata.uploader}]({metadata.channel_url}) ({sub_text})"
+            )
         else:
-            return f"{minutes:02d}:{seconds:02d}"
-    return "Unknown"
+            lines.append(f"- **Channel:** {metadata.uploader} ({sub_text})")
 
-def create_metadata_file(data, base_name, output_dir):
-    """Create metadata file with video origin info"""
-    filename = os.path.join(output_dir, f"{base_name}_metadata.md")
-    title = data.get('title', 'Untitled')
+        lines.extend([
+            f"- **Views:** {views_text} | Likes: {likes_text} | Duration: {duration_text}",
+            f"- **Published:** {upload_date} | Extracted: {extraction_date}"
+        ])
 
-    # Save title to separate file for finalize.py to use in filename
-    title_file = os.path.join(output_dir, f"{base_name}_title.txt")
-    with open(title_file, 'w', encoding='utf-8') as tf:
-        tf.write(title)
-    link = data.get('webpage_url', 'N/A')
-    channel = data.get('uploader', 'Unknown')
-    channel_url = data.get('channel_url', data.get('uploader_url', ''))
-    subscribers = data.get('channel_follower_count', 'N/A')
-    upload_date = data.get('upload_date', 'Unknown')
-    view_count = data.get('view_count', 0)
-    like_count = data.get('like_count', 0)
-    duration = data.get('duration', 0)
+        content = '\n'.join(lines)
+        self.fs.write_text(filename, content)
 
-    upload_date = format_upload_date(upload_date)
-    extraction_date = datetime.now().strftime('%Y-%m-%d')
-    sub_text = format_subscribers(subscribers)
-    duration_text = format_duration(duration)
-    views_text = f"{view_count:,}" if view_count else "0"
-    likes_text = f"{like_count:,}" if like_count else "0"
+        print(f"SUCCESS: {filename}")
+        return filename
 
-    with open(filename, 'w', encoding='utf-8') as md:
-        md.write(f"- **Title:** [{title}]({link})\n")
-        if channel_url:
-            md.write(f"- **Channel:** [{channel}]({channel_url}) ({sub_text})\n")
+    def create_description_file(
+        self,
+        metadata: VideoMetadata,
+        base_name: str,
+        output_dir: Path
+    ) -> Path:
+        """
+        Create description markdown file.
+
+        Args:
+            metadata: Video metadata
+            base_name: Base filename
+            output_dir: Output directory
+
+        Returns:
+            Path to created description file
+        """
+        filename = output_dir / f"{base_name}_description.md"
+        self.fs.write_text(filename, metadata.description)
+
+        print(f"SUCCESS: {filename}")
+        return filename
+
+    def create_chapters_file(
+        self,
+        metadata: VideoMetadata,
+        base_name: str,
+        output_dir: Path
+    ) -> Path:
+        """
+        Create chapters JSON file.
+
+        Args:
+            metadata: Video metadata
+            base_name: Base filename
+            output_dir: Output directory
+
+        Returns:
+            Path to created chapters file
+        """
+        chapters_file = output_dir / f"{base_name}_chapters.json"
+        chapters_json = json.dumps(metadata.chapters, indent=2)
+        self.fs.write_text(chapters_file, chapters_json)
+
+        if metadata.chapters:
+            print(f"CHAPTERS: {chapters_file}")
         else:
-            md.write(f"- **Channel:** {channel} ({sub_text})\n")
-        md.write(f"- **Views:** {views_text} | Likes: {likes_text} | Duration: {duration_text}\n")
-        md.write(f"- **Published:** {upload_date} | Extracted: {extraction_date}\n")
+            print(f"CHAPTERS: {chapters_file} (no chapters in video)")
 
-    print(f"SUCCESS: {filename}")
-    return filename
+        return chapters_file
 
-def create_description_file(data, base_name, output_dir):
-    """Create description file"""
-    filename = os.path.join(output_dir, f"{base_name}_description.md")
-    description = data.get('description', 'No description')
+    def extract_all(self, video_url: str, output_dir: Path) -> tuple[Path, Path, Path]:
+        """
+        Extract all video data (metadata, description, chapters).
 
-    with open(filename, 'w', encoding='utf-8') as f:
-        f.write(description)
+        Args:
+            video_url: YouTube URL
+            output_dir: Output directory
 
-    print(f"SUCCESS: {filename}")
-    return filename
+        Returns:
+            Tuple of (metadata_file, description_file, chapters_file)
 
-def create_chapters_file(data, base_name, output_dir):
-    """Create chapters JSON file"""
-    chapters = data.get('chapters', [])
-    chapters_file = os.path.join(output_dir, f"{base_name}_chapters.json")
+        Raises:
+            Various exceptions from component methods
+        """
+        # Check dependencies
+        self.check_yt_dlp()
 
-    with open(chapters_file, 'w', encoding='utf-8') as cf:
-        json.dump(chapters if chapters else [], cf, indent=2)
+        # Extract video ID
+        video_id = extract_video_id(video_url)
+        base_name = f"youtube_{video_id}"
 
-    if chapters:
-        print(f"CHAPTERS: {chapters_file}")
-    else:
-        print(f"CHAPTERS: {chapters_file} (no chapters in video)")
+        # Create output directory
+        self.fs.mkdir(output_dir)
 
-    return chapters_file
+        # Fetch and parse data
+        raw_data = self.fetch_video_data(video_url, output_dir)
+        metadata = self.parse_video_metadata(raw_data, video_id)
 
-def main():
+        # Create output files
+        metadata_file = self.create_metadata_file(metadata, base_name, output_dir)
+        description_file = self.create_description_file(metadata, base_name, output_dir)
+        chapters_file = self.create_chapters_file(metadata, base_name, output_dir)
+
+        return metadata_file, description_file, chapters_file
+
+
+def main() -> None:
+    """CLI entry point."""
     # Parse arguments
     if len(sys.argv) != 3:
         print("Usage: extract_data.py <YOUTUBE_URL> <OUTPUT_DIR>", file=sys.stderr)
         sys.exit(1)
 
     video_url = sys.argv[1]
-    output_dir = sys.argv[2]
+    output_dir = Path(sys.argv[2])
 
     # Validate arguments
     if not video_url:
         print("ERROR: No YouTube URL provided", file=sys.stderr)
         sys.exit(1)
 
-    # Check required commands
-    check_yt_dlp()
-
-    # Extract video ID from URL
-    video_id = extract_video_id(video_url)
-    if not video_id:
-        print("ERROR: Could not extract video ID from URL", file=sys.stderr)
-        sys.exit(1)
-
-    base_name = f"youtube_{video_id}"
-
-    # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Fetch video data from YouTube
-    data = fetch_video_data(video_url, output_dir)
-
-    # Create output files
-    create_metadata_file(data, base_name, output_dir)
-    create_description_file(data, base_name, output_dir)
-    create_chapters_file(data, base_name, output_dir)
-
-if __name__ == "__main__":
     try:
-        main()
+        extractor = YouTubeDataExtractor()
+        extractor.extract_all(video_url, output_dir)
     except Exception as e:
         print(f"ERROR: {str(e)}", file=sys.stderr)
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

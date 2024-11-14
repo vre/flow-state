@@ -1,116 +1,269 @@
 #!/usr/bin/env python3
 """
-Creates final comment analysis markdown file from template and component files, cleans up intermediate work files
+Creates final comment analysis markdown file from template and component files.
+
 Usage: finalize_comments.py <BASE_NAME> <OUTPUT_DIR> [--debug]
 Keeps: {BASE_NAME}_comment_analysis.md
 Removes: _name.txt, _comments.md, _comments_cleaned.md, _comment_gold.md (unless --debug)
 """
 
-import sys
-import os
 import re
+import sys
+from pathlib import Path
 
-def clean_title_for_filename(title, max_length=60):
-    """Clean title for use in filename"""
+from types_and_exceptions import FileSystem, TemplateNotFoundError
+
+
+# Business logic functions (pure, testable)
+def clean_title_for_filename(title: str, max_length: int = 60) -> str:
+    """
+    Clean title for use in filename.
+
+    Args:
+        title: Video title
+        max_length: Maximum length for filename
+
+    Returns:
+        Cleaned title suitable for filename
+    """
     # Remove or replace problematic characters
-    cleaned = re.sub(r'[<>:"/\\|?*]', '', title)  # Remove invalid filename chars
-    cleaned = re.sub(r'\s+', ' ', cleaned)  # Normalize whitespace
+    cleaned = re.sub(r'[<>:"/\\|?*]', "", title)  # Remove invalid filename chars
+    cleaned = re.sub(r"\s+", " ", cleaned)  # Normalize whitespace
     cleaned = cleaned.strip()
 
     # Truncate if too long
     if len(cleaned) > max_length:
-        cleaned = cleaned[:max_length].rsplit(' ', 1)[0]  # Cut at word boundary
+        cleaned = cleaned[:max_length].rsplit(" ", 1)[0]  # Cut at word boundary
 
     return cleaned
 
-def read_file_or_empty(file_path):
-    """Read file content or return empty string if file doesn't exist"""
-    if os.path.exists(file_path):
-        with open(file_path, 'r', encoding='utf-8') as f:
-            return f.read()
-    return ""
 
-def main():
-    # Parse options
+def generate_final_filename(video_name: str, video_id: str) -> str:
+    """
+    Generate final filename from video name and ID.
+
+    Args:
+        video_name: Video title
+        video_id: Video ID (without youtube_ prefix)
+
+    Returns:
+        Final filename
+    """
+    if video_name.strip():
+        cleaned_title = clean_title_for_filename(video_name.strip())
+        return f"youtube - {cleaned_title} - comments ({video_id}).md"
+    else:
+        # Fallback to base_name format if title not found
+        return f"youtube_{video_id}_comment_analysis.md"
+
+
+def fill_template(template: str, video_name: str, comment_gold: str, comments: str) -> str:
+    """
+    Fill template with component content.
+
+    Args:
+        template: Template content with placeholders
+        video_name: Video title
+        comment_gold: Golden comments content
+        comments: Cleaned comments content
+
+    Returns:
+        Final content with placeholders replaced
+    """
+    content = template.replace("{video_name}", video_name.strip())
+    content = content.replace("{comment_gold}", comment_gold.strip())
+    content = content.replace("{comments}", comments.strip())
+    return content
+
+
+def get_work_files(base_name: str) -> list[str]:
+    """
+    Get list of intermediate work files to clean up.
+
+    Args:
+        base_name: Base name (e.g., youtube_VIDEO_ID)
+
+    Returns:
+        List of work file names
+    """
+    return [
+        f"{base_name}_name.txt",
+        f"{base_name}_comments.md",
+        f"{base_name}_comments_cleaned.md",
+        f"{base_name}_comment_gold.md",
+    ]
+
+
+# I/O layer (uses injected dependencies)
+class CommentFinalizer:
+    """Finalize comment analysis using dependency injection for testability."""
+
+    def __init__(self, filesystem: FileSystem, script_dir: Path):
+        """
+        Initialize finalizer with dependencies.
+
+        Args:
+            filesystem: File system interface for I/O
+            script_dir: Directory containing the script and template
+        """
+        self.filesystem = filesystem
+        self.script_dir = script_dir
+
+    def load_template(self) -> str:
+        """
+        Load template file.
+
+        Returns:
+            Template content
+
+        Raises:
+            TemplateNotFoundError: If template file not found
+        """
+        template_file = self.script_dir / "template.md"
+        if not self.filesystem.exists(template_file):
+            raise TemplateNotFoundError(f"Template not found: {template_file}")
+        return self.filesystem.read_text(template_file)
+
+    def read_file_or_empty(self, file_path: Path) -> str:
+        """
+        Read file content or return empty string if file doesn't exist.
+
+        Args:
+            file_path: Path to file
+
+        Returns:
+            File content or empty string
+        """
+        if self.filesystem.exists(file_path):
+            return self.filesystem.read_text(file_path)
+        return ""
+
+    def finalize(
+        self, base_name: str, output_dir: Path, debug: bool = False
+    ) -> Path:
+        """
+        Create final comment analysis file and clean up intermediate files.
+
+        Args:
+            base_name: Base name (e.g., youtube_VIDEO_ID)
+            output_dir: Output directory
+            debug: If True, keep intermediate work files
+
+        Returns:
+            Path to final file
+
+        Raises:
+            TemplateNotFoundError: If template not found
+        """
+        # Load template
+        template = self.load_template()
+
+        # Read component files
+        video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
+        comment_gold = self.read_file_or_empty(output_dir / f"{base_name}_comment_gold.md")
+        comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_cleaned.md")
+
+        # Fill template
+        final_content = fill_template(template, video_name, comment_gold, comments)
+
+        # Generate filename
+        video_id = base_name.replace("youtube_", "")
+        final_filename = generate_final_filename(video_name, video_id)
+
+        # Write final file
+        final_file = output_dir / final_filename
+        self.filesystem.write_text(final_file, final_content)
+
+        print(f"Created final file: {final_filename}")
+
+        # Clean up intermediate work files unless --debug is set
+        if debug:
+            print("Debug mode: keeping intermediate work files")
+        else:
+            work_files = get_work_files(base_name)
+            for work_file in work_files:
+                file_path = output_dir / work_file
+                if self.filesystem.exists(file_path):
+                    self.filesystem.remove(file_path)
+            print("Cleaned up intermediate work files")
+
+        print(f"Final file: {final_filename}")
+        return final_file
+
+
+# Real implementation for production use
+class RealFileSystem:
+    """Real file system implementation."""
+
+    def read_text(self, path: Path) -> str:
+        """Read text from file."""
+        return path.read_text(encoding="utf-8")
+
+    def write_text(self, path: Path, content: str) -> None:
+        """Write text to file."""
+        path.write_text(content, encoding="utf-8")
+
+    def exists(self, path: Path) -> bool:
+        """Check if path exists."""
+        return path.exists()
+
+    def mkdir(self, path: Path, parents: bool = False, exist_ok: bool = False) -> None:
+        """Create directory."""
+        path.mkdir(parents=parents, exist_ok=exist_ok)
+
+    def remove(self, path: Path) -> None:
+        """Remove file."""
+        path.unlink()
+
+
+def parse_args(args: list[str]) -> tuple[str, Path, bool]:
+    """
+    Parse command line arguments.
+
+    Args:
+        args: Command line arguments (excluding script name)
+
+    Returns:
+        Tuple of (base_name, output_dir, debug)
+    """
     debug = False
-    args = []
-    for arg in sys.argv[1:]:
-        if arg == '--debug':
+    filtered_args = []
+    for arg in args:
+        if arg == "--debug":
             debug = True
         else:
-            args.append(arg)
+            filtered_args.append(arg)
 
-    # Parse arguments
-    if len(args) < 1:
-        print("ERROR: No BASE_NAME provided", file=sys.stderr)
+    if len(filtered_args) < 1:
+        raise ValueError("No BASE_NAME provided")
+
+    base_name = filtered_args[0]
+    output_dir = Path(filtered_args[1]) if len(filtered_args) > 1 else Path(".")
+
+    return base_name, output_dir, debug
+
+
+def main() -> None:
+    """Main entry point."""
+    try:
+        base_name, output_dir, debug = parse_args(sys.argv[1:])
+    except ValueError as e:
+        print(f"ERROR: {e}", file=sys.stderr)
         print("Usage: finalize_comments.py <BASE_NAME> <OUTPUT_DIR> [--debug]", file=sys.stderr)
         sys.exit(1)
 
-    base_name = args[0]
-    output_dir = args[1] if len(args) > 1 else "."
-
     # Get script directory for template
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    template_file = os.path.join(script_dir, "template.md")
+    script_dir = Path(__file__).parent.resolve()
 
-    # Validate template exists
-    if not os.path.exists(template_file):
-        print(f"ERROR: {template_file} not found", file=sys.stderr)
+    # Create finalizer with real dependencies
+    finalizer = CommentFinalizer(RealFileSystem(), script_dir)
+
+    try:
+        finalizer.finalize(base_name, output_dir, debug)
+    except Exception as e:
+        print(f"ERROR: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # Read template
-    with open(template_file, 'r', encoding='utf-8') as f:
-        template = f.read()
-
-    # Read component files
-    video_name = read_file_or_empty(os.path.join(output_dir, f"{base_name}_name.txt"))
-    comment_gold = read_file_or_empty(os.path.join(output_dir, f"{base_name}_comment_gold.md"))
-    comments = read_file_or_empty(os.path.join(output_dir, f"{base_name}_comments_cleaned.md"))
-
-    # Replace placeholders
-    final_content = template.replace("{video_name}", video_name.strip())
-    final_content = final_content.replace("{comment_gold}", comment_gold.strip())
-    final_content = final_content.replace("{comments}", comments.strip())
-
-    # Create human-readable filename
-    if video_name.strip():
-        cleaned_title = clean_title_for_filename(video_name.strip())
-        video_id = base_name.replace('youtube_', '')
-        final_filename = f"youtube - {cleaned_title} - comments ({video_id}).md"
-    else:
-        # Fallback to old format if title not found
-        final_filename = f"{base_name}_comment_analysis.md"
-
-    # Write final file
-    final_file = os.path.join(output_dir, final_filename)
-    with open(final_file, 'w', encoding='utf-8') as f:
-        f.write(final_content)
-
-    print(f"Created final file: {final_filename}")
-
-    # Clean up intermediate work files unless --debug is set
-    if debug:
-        print("Debug mode: keeping intermediate work files")
-    else:
-        work_files = [
-            f"{base_name}_name.txt",
-            f"{base_name}_comments.md",
-            f"{base_name}_comments_cleaned.md",
-            f"{base_name}_comment_gold.md"
-        ]
-
-        for work_file in work_files:
-            file_path = os.path.join(output_dir, work_file)
-            if os.path.exists(file_path):
-                os.remove(file_path)
-
-        print("Cleaned up intermediate work files")
-
-    print(f"Final file: {final_filename}")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"ERROR: {str(e)}", file=sys.stderr)
-        sys.exit(1)
+    main()
