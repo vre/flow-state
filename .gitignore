@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+.pytest_cache
+.coverage
 *.py[cod]
 *$py.class
 *.so
@@ -35,3 +37,4 @@ tmp/
 *.webm
 *.m4a
 *.mp3
+

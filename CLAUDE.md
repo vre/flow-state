@@ -48,6 +48,7 @@ We are NOT writing documentation or a book.
 - Script references use relative paths: `./script.sh`
 - Move logic to scripts, not skill file - reduces context
 - Invoke subagents for complex multi-step tasks - further reduces context
+- Do not duplicate anything in SKILL.md that is in the scripts - scripts guide LLM with help text, SKILL.md only shows how to invoke
 
 **Self-documenting scripts:**
 - Include usage headers
@@ -60,6 +61,11 @@ We are NOT writing documentation or a book.
 - For multiple outputs: pass output directory, script decides filenames internally
 - Scripts extract identifiers from inputs when needed (e.g., video ID from URL)
 - Usage validation: check `len(sys.argv)`, print usage, `sys.exit(1)` on wrong count
+
+**Code organization:**
+- Duplication across different skills/plugins is acceptable - each should be self-contained
+- Duplication within a skill is acceptable for <50 lines - prefer self-contained scripts
+- Extract to shared module only when duplication >50 lines within same skill
 
 **Keep in sync:**
 - README.md skill descriptions
