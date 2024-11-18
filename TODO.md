@@ -3,6 +3,9 @@
 ## Cooking
 - [x] Timestamps linking to original video
 - [x] Move the comment analysis to summary section
+- [x] Retitle the comment analysis and add tiny heading summary
+- [x] Add key takeaways from comments
+- [ ] Move the transcription to own file
 
 - [ ] What about really long videos? Should do Multiple parts or what? Longer video, longer summary? Or squeeze based on information content ratio?
 - [ ] Test with different video types - lectures, talks, vlogs, tutorials, reviews
