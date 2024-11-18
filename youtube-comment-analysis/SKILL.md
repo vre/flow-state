@@ -49,50 +49,39 @@ task_tool:
 - subagent_type: "general-purpose"
 - model: "haiku"
 - prompt:
-
-**Standalone mode (no summary):**
 ```
-Read <output_directory>/${BASE_NAME}_comments.md and clean/curate comments. Write to <output_directory>/${BASE_NAME}_comments_cleaned.md. Do not translate.
+Read Summary section from "<output_directory>/youtube - * ({video_id}).md" file to understand main points.
+
+Read <output_directory>/${BASE_NAME}_comments.md to clean/curate comments. 
 
 Tasks:
 - Remove low-value: "+1", "thanks", "great video", spam, duplicates
-- Remove comments that repeat content from other comments
-```
-
-**Sequential mode (with summary from youtube-to-markdown):**
-```
-Read Summary section from <output_directory>/youtube - * ({video_id}).md file to understand main points.
-
-Read <output_directory>/${BASE_NAME}_comments.md and clean/curate comments. Write to <output_directory>/${BASE_NAME}_comments_cleaned.md. Do not translate.
-
-Tasks:
-- Remove low-value: "+1", "thanks", "great video", spam, duplicates
-- Remove comments that are off-topic (use summary to identify)
+- Remove comments that are off-topic (use summary to identify if available)
 - Remove comments that repeat content from the summary or other comments
+
+Write as is to <output_directory>/${BASE_NAME}_comments_cleaned.md. Do not translate.
 ```
 
-## Step 3: Extract Golden Comments
+## Step 3: Extract Insightful Comments
 
 task_tool:
 - subagent_type: "general-purpose"
 - prompt:
-
-**Standalone mode (no summary):**
 ```
-Read <output_directory>/${BASE_NAME}_comments_cleaned.md. Extract and condense the MOST exceptional insights from highly upvoted comments. No fluff, NOT a document. Do not translate. Write to <output_directory>/${BASE_NAME}_comment_gold.md in format:
+Read Summary section from "<output_directory>/youtube - * ({video_id}).md" file if available.
 
-**Golden Comments**:
-- [true insights from comments]
-```
+Read <output_directory>/${BASE_NAME}_comments_cleaned.md. Extract, condense, combine and summarize ruthlessly for the MOST exceptional true insights NOT already covered by the summary. No fluff, NOT a document.
 
-**Sequential mode (with summary from youtube-to-markdown):**
-```
-Read Summary section from <output_directory>/youtube - * ({video_id}).md file.
+Write to <output_directory>/${BASE_NAME}_comment_gold.md in format:
 
-Read <output_directory>/${BASE_NAME}_comments_cleaned.md. Extract, condense, combine and summarize ruthlessly for the MOST exceptional true golden insights NOT already covered by the summary. No fluff, NOT a document. Write to <output_directory>/${BASE_NAME}_comment_gold.md in format:
+## Comment Insights ([Analyze the insights and determine their primary theme/direction in 2-7 words])
 
-**Golden Comments**:
-- [any true insights hiding in the comment garbage, NOT in summary]
+Key Takeaway from Comments: [One paragraph summary - ONLY if it adds value beyond just repeating the bullet points below]
+
+**[title per detected comment insight theme, if any detectable]**:
+- [any true insights hiding in the comments, NOT in summary, **highlight keywords**]
+- [insight 2]
+- [insight N]
 ```
 
 ## Step 4: Finalize

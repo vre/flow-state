@@ -160,12 +160,12 @@ class CommentFinalizer:
         # Find "## Description" and insert before it
         description_marker = "## Description"
         if description_marker in content:
-            golden_section = f"## Golden Comments\n\n{comment_gold.strip()}\n\n"
+            insights_section = f"{comment_gold.strip()}\n\n"
             updated_content = content.replace(
-                description_marker, f"{golden_section}{description_marker}"
+                description_marker, f"{insights_section}{description_marker}"
             )
             self.filesystem.write_text(summary_file, updated_content)
-            print(f"Inserted Golden Comments into summary file: {summary_file.name}")
+            print(f"Inserted Comment Insights into summary file: {summary_file.name}")
 
     def finalize(
         self, base_name: str, output_dir: Path, debug: bool = False

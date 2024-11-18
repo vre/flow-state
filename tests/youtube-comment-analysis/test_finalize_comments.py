@@ -24,14 +24,14 @@ def mock_filesystem() -> "MockFileSystem":
 
 @pytest.fixture
 def template_content() -> str:
-    """Sample template content (without Golden Insights)."""
+    """Sample template content (without Comment Insights)."""
     return "## Curated Comments\n\n{comments}\n"
 
 
 @pytest.fixture
 def template_standalone_content() -> str:
-    """Sample standalone template content (with Golden Insights)."""
-    return "## Golden Insights\n\n{comment_gold}\n\n## Curated Comments\n\n{comments}\n"
+    """Sample standalone template content (LLM generates header)."""
+    return "{comment_gold}\n\n## Curated Comments\n\n{comments}\n"
 
 
 # Mock implementation
@@ -293,7 +293,8 @@ class TestCommentFinalizer:
         # Setup mock files - no summary file exists
         mock_filesystem.files[script_dir / "template_standalone.md"] = template_standalone_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
-        mock_filesystem.files[output_dir / f"{base_name}_comment_gold.md"] = "Golden insight"
+        # LLM-generated content includes the header
+        mock_filesystem.files[output_dir / f"{base_name}_comment_gold.md"] = "## Comment Insights (Theme)\n\nGolden insight"
         mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = "Comment content"
 
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
@@ -304,11 +305,11 @@ class TestCommentFinalizer:
         assert result_file == output_dir / expected_filename
         assert result_file in mock_filesystem.files
 
-        # Check content - should have Golden Insights section
+        # Check content - should have Comment Insights section
         final_content = mock_filesystem.files[result_file]
         assert "Golden insight" in final_content
         assert "Comment content" in final_content
-        assert "## Golden Insights" in final_content
+        assert "## Comment Insights" in final_content
 
         # Check work files cleaned up
         assert output_dir / f"{base_name}_name.txt" not in mock_filesystem.files
@@ -322,7 +323,7 @@ class TestCommentFinalizer:
         assert "Cleaned up intermediate work files" in captured.out
 
     def test_finalize_with_summary_file(self, mock_filesystem, template_content, capsys):
-        """Test finalization when summary file exists - inserts Golden Comments into summary."""
+        """Test finalization when summary file exists - inserts Comment Insights into summary."""
         script_dir = Path("/app")
         output_dir = Path("/tmp/output")
         base_name = "youtube_abc123"
@@ -330,7 +331,8 @@ class TestCommentFinalizer:
         # Setup mock files including summary file
         mock_filesystem.files[script_dir / "template.md"] = template_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
-        mock_filesystem.files[output_dir / f"{base_name}_comment_gold.md"] = "Golden insight"
+        # LLM-generated content includes the header
+        mock_filesystem.files[output_dir / f"{base_name}_comment_gold.md"] = "## Comment Insights (Theme)\n\nGolden insight"
         mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = "Comment content"
 
         # Create summary file
@@ -341,23 +343,23 @@ class TestCommentFinalizer:
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
         result_file = finalizer.finalize(base_name, output_dir, debug=False)
 
-        # Check summary file was updated with Golden Comments
+        # Check summary file was updated with Comment Insights
         updated_summary = mock_filesystem.files[summary_file]
-        assert "## Golden Comments" in updated_summary
+        assert "## Comment Insights" in updated_summary
         assert "Golden insight" in updated_summary
-        # Golden Comments should be before Description
-        golden_pos = updated_summary.index("## Golden Comments")
+        # Comment Insights should be before Description
+        insights_pos = updated_summary.index("## Comment Insights")
         desc_pos = updated_summary.index("## Description")
-        assert golden_pos < desc_pos
+        assert insights_pos < desc_pos
 
-        # Check comment file created without Golden Insights section
+        # Check comment file created without Comment Insights section
         final_content = mock_filesystem.files[result_file]
         assert "Comment content" in final_content
-        assert "## Golden Insights" not in final_content
+        assert "## Comment Insights" not in final_content
 
         # Check console output
         captured = capsys.readouterr()
-        assert "Inserted Golden Comments into summary" in captured.out
+        assert "Inserted Comment Insights into summary" in captured.out
 
     def test_finalize_with_summary_file_no_golden_comments(self, mock_filesystem, template_content, capsys):
         """Test finalization when summary exists but no golden comments - uses template.md."""
@@ -379,20 +381,20 @@ class TestCommentFinalizer:
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
         result_file = finalizer.finalize(base_name, output_dir, debug=False)
 
-        # Summary file should NOT be modified (no golden comments to insert)
+        # Summary file should NOT be modified (no comment insights to insert)
         updated_summary = mock_filesystem.files[summary_file]
-        assert "## Golden Comments" not in updated_summary
+        assert "## Comment Insights" not in updated_summary
         assert updated_summary == summary_content
 
-        # Comment file should use template.md (no Golden Insights section)
+        # Comment file should use template.md (no Comment Insights section)
         final_content = mock_filesystem.files[result_file]
         assert "Comment content" in final_content
-        assert "## Golden Insights" not in final_content
+        assert "## Comment Insights" not in final_content
         assert "## Curated Comments" in final_content
 
         # Check console output - no insertion message
         captured = capsys.readouterr()
-        assert "Inserted Golden Comments into summary" not in captured.out
+        assert "Inserted Comment Insights into summary" not in captured.out
 
     def test_finalize_debug_mode(self, mock_filesystem, template_standalone_content, capsys):
         """Test finalization in debug mode keeps work files."""
@@ -472,27 +474,29 @@ class TestCommentFinalizer:
         assert output_dir / f"{base_name}_name.txt" not in mock_filesystem.files
 
     def test_insert_golden_comments_into_summary(self, mock_filesystem):
-        """Test inserting Golden Comments into existing summary file."""
+        """Test inserting Comment Insights into existing summary file."""
         script_dir = Path("/app")
         summary_file = Path("/tmp/youtube - Test Video (abc123).md")
         summary_content = "## Summary\n\nSummary here\n\n## Description\n\nDescription here"
         mock_filesystem.files[summary_file] = summary_content
 
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
-        finalizer.insert_golden_comments_into_summary(summary_file, "Golden insight content")
+        # LLM-generated content includes the header
+        comment_gold_content = "## Comment Insights (Theme)\n\nGolden insight content"
+        finalizer.insert_golden_comments_into_summary(summary_file, comment_gold_content)
 
-        # Check Golden Comments section was inserted
+        # Check Comment Insights section was inserted
         updated_content = mock_filesystem.files[summary_file]
-        assert "## Golden Comments" in updated_content
+        assert "## Comment Insights" in updated_content
         assert "Golden insight content" in updated_content
 
         # Check it's before Description
-        golden_pos = updated_content.index("## Golden Comments")
+        insights_pos = updated_content.index("## Comment Insights")
         desc_pos = updated_content.index("## Description")
-        assert golden_pos < desc_pos
+        assert insights_pos < desc_pos
 
     def test_insert_golden_comments_no_description_section(self, mock_filesystem):
-        """Test inserting Golden Comments when no Description section exists."""
+        """Test inserting Comment Insights when no Description section exists."""
         script_dir = Path("/app")
         summary_file = Path("/tmp/youtube - Test Video (abc123).md")
         summary_content = "## Summary\n\nSummary here\n\n## Transcription\n\nTranscript"
@@ -506,7 +510,7 @@ class TestCommentFinalizer:
         assert updated_content == summary_content
 
     def test_insert_golden_comments_file_not_exist(self, mock_filesystem, capsys):
-        """Test inserting Golden Comments when summary file doesn't exist."""
+        """Test inserting Comment Insights when summary file doesn't exist."""
         script_dir = Path("/app")
         summary_file = Path("/tmp/nonexistent.md")
 
@@ -516,4 +520,4 @@ class TestCommentFinalizer:
 
         # No output expected
         captured = capsys.readouterr()
-        assert "Inserted Golden Comments" not in captured.out
+        assert "Inserted Comment Insights" not in captured.out
