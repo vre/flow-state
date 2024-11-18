@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from apply_paragraph_breaks import ParagraphBreaker, ParsedLine
+from apply_paragraph_breaks import ParagraphBreaker, ParsedLine, extract_video_id_from_path
 from shared_types import FileOperationError
 
 
@@ -124,3 +124,88 @@ class TestParagraphBreaker:
         # Should have timestamp from first line of paragraph
         assert "[00:00:01.000]" in paragraphs[0]
         assert "[00:00:02.000]" not in paragraphs[0]  # Later timestamps removed
+
+    def test_convert_timestamp_to_link_hms_format(self):
+        """Test converting HH:MM:SS timestamp to YouTube link."""
+        breaker = ParagraphBreaker(video_id="dQw4w9WgXcQ")
+        timestamp = "[00:01:08.400]"
+        result = breaker.convert_timestamp_to_link(timestamp)
+
+        assert result == "[[00:01:08]](https://youtube.com/watch?v=dQw4w9WgXcQ&t=68s)"
+
+    def test_convert_timestamp_to_link_ms_format(self):
+        """Test converting MM:SS timestamp to YouTube link."""
+        breaker = ParagraphBreaker(video_id="dQw4w9WgXcQ")
+        timestamp = "[01:30.500]"
+        result = breaker.convert_timestamp_to_link(timestamp)
+
+        assert result == "[[01:30]](https://youtube.com/watch?v=dQw4w9WgXcQ&t=90s)"
+
+    def test_convert_timestamp_to_link_no_video_id(self):
+        """Test timestamp conversion without video_id returns original."""
+        breaker = ParagraphBreaker(video_id=None)
+        timestamp = "[00:01:08.400]"
+        result = breaker.convert_timestamp_to_link(timestamp)
+
+        assert result == "[00:01:08.400]"
+
+    def test_convert_timestamp_to_link_rounds_down_subseconds(self):
+        """Test that subseconds are rounded down."""
+        breaker = ParagraphBreaker(video_id="test123")
+        timestamp = "[00:01:08.999]"
+        result = breaker.convert_timestamp_to_link(timestamp)
+
+        # Should round down to 68 seconds, not 69
+        assert "t=68s" in result
+        assert "[[00:01:08]]" in result
+
+    def test_apply_breaks_with_video_id_creates_links(self, mock_fs):
+        """Test that applying breaks with video_id creates clickable links."""
+        breaker = ParagraphBreaker(fs=mock_fs, video_id="test_video_id")
+
+        input_content = "[00:00:01.000] First line\n[00:00:02.000] Second line"
+        input_path = Path("/input.md")
+        output_path = Path("/output.md")
+        mock_fs.write_text(input_path, input_content)
+
+        breaker.apply_breaks(input_path, output_path, {2})
+
+        content = mock_fs.read_text(output_path)
+
+        # Should contain markdown link instead of plain timestamp
+        assert "[[00:00:01]](https://youtube.com/watch?v=test_video_id&t=1s)" in content
+        assert "[00:00:01.000]" not in content  # Original timestamp should be replaced
+
+
+class TestExtractVideoIdFromPath:
+    """Tests for extract_video_id_from_path function."""
+
+    def test_extract_video_id_standard_format(self):
+        """Test extracting video ID from standard file path."""
+        path = Path("youtube_dQw4w9WgXcQ_transcript.md")
+        result = extract_video_id_from_path(path)
+        assert result == "dQw4w9WgXcQ"
+
+    def test_extract_video_id_with_hyphens(self):
+        """Test extracting video ID with hyphens."""
+        path = Path("youtube_test-video-123_deduped.md")
+        result = extract_video_id_from_path(path)
+        assert result == "test-video-123"
+
+    def test_extract_video_id_with_underscores(self):
+        """Test extracting video ID with underscores."""
+        path = Path("youtube_test_video_123_output.md")
+        result = extract_video_id_from_path(path)
+        assert result == "test_video_123"
+
+    def test_extract_video_id_no_match(self):
+        """Test returns None when pattern doesn't match."""
+        path = Path("some_other_file.md")
+        result = extract_video_id_from_path(path)
+        assert result is None
+
+    def test_extract_video_id_from_full_path(self):
+        """Test extraction works with full path, not just filename."""
+        path = Path("/some/directory/youtube_abc123_transcript.md")
+        result = extract_video_id_from_path(path)
+        assert result == "abc123"
