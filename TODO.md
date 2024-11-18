@@ -1,8 +1,7 @@
 # TODO
 
 ## Cooking
-
-- [ ] Timestamps linking to original video
+- [x] Timestamps linking to original video
 - [ ] What is comments are in multiple languages? Now hardcoded do not translate.
 
 - [ ] What about really long videos? Should do Multiple parts or what? Longer video, longer summary? Or squeeze based on information content ratio?

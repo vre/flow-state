@@ -6,6 +6,7 @@ BREAKS format: "15,42,78,103" (comma-separated line numbers)
 """
 
 import sys
+import re
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -22,14 +23,16 @@ class ParsedLine:
 class ParagraphBreaker:
     """Applies paragraph breaks to transcript."""
 
-    def __init__(self, fs: FileSystem = RealFileSystem()):
+    def __init__(self, fs: FileSystem = RealFileSystem(), video_id: str | None = None):
         """
         Initialize paragraph breaker with dependencies.
 
         Args:
             fs: File system implementation
+            video_id: YouTube video ID for timestamp links
         """
         self.fs = fs
+        self.video_id = video_id
 
     def parse_break_points(self, break_points_str: str) -> set[int]:
         """
@@ -48,6 +51,38 @@ class ParagraphBreaker:
             return {int(x.strip()) for x in break_points_str.split(',')}
         except ValueError as e:
             raise ValueError(f"Invalid break points format: {e}")
+
+    def convert_timestamp_to_link(self, timestamp: str) -> str:
+        """
+        Convert timestamp to clickable YouTube link.
+
+        Args:
+            timestamp: Timestamp in format "[HH:MM:SS.mmm]" or "[MM:SS.mmm]"
+
+        Returns:
+            Markdown link with timestamp or original timestamp if no video_id
+        """
+        if not self.video_id:
+            return timestamp
+
+        # Extract timestamp components
+        match = re.match(r'\[(\d{2}):(\d{2}):(\d{2})\.\d{3}\]', timestamp)
+        if match:
+            hours, minutes, seconds = map(int, match.groups())
+            total_seconds = hours * 3600 + minutes * 60 + seconds
+            display_time = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+        else:
+            # Try MM:SS format
+            match = re.match(r'\[(\d{2}):(\d{2})\.\d{3}\]', timestamp)
+            if match:
+                minutes, seconds = map(int, match.groups())
+                total_seconds = minutes * 60 + seconds
+                display_time = f"{minutes:02d}:{seconds:02d}"
+            else:
+                return timestamp
+
+        youtube_url = f"https://youtube.com/watch?v={self.video_id}&t={total_seconds}s"
+        return f"[[{display_time}]]({youtube_url})"
 
     def parse_transcript_line(self, line: str) -> ParsedLine:
         """
@@ -112,7 +147,8 @@ class ParagraphBreaker:
                 # Finish current paragraph
                 if current_paragraph and paragraph_start_timestamp:
                     paragraph_text = ' '.join(current_paragraph)
-                    paragraphs.append(f"{paragraph_text} {paragraph_start_timestamp}")
+                    timestamp_link = self.convert_timestamp_to_link(paragraph_start_timestamp)
+                    paragraphs.append(f"{paragraph_text} {timestamp_link}")
                     current_paragraph = []
                     paragraph_start_timestamp = None
 
@@ -128,6 +164,20 @@ class ParagraphBreaker:
         return len(paragraphs)
 
 
+def extract_video_id_from_path(file_path: Path) -> str | None:
+    """
+    Extract video ID from file path with pattern youtube_{VIDEO_ID}_*.
+
+    Args:
+        file_path: Path to file
+
+    Returns:
+        Video ID or None if not found
+    """
+    match = re.match(r'youtube_([a-zA-Z0-9_-]+)_', file_path.name)
+    return match.group(1) if match else None
+
+
 def main() -> None:
     """CLI entry point."""
     if len(sys.argv) != 4:
@@ -138,8 +188,11 @@ def main() -> None:
     output_path = Path(sys.argv[2])
     break_points_str = sys.argv[3]
 
+    # Extract video ID from input file path
+    video_id = extract_video_id_from_path(input_path)
+
     try:
-        breaker = ParagraphBreaker()
+        breaker = ParagraphBreaker(video_id=video_id)
         break_points = breaker.parse_break_points(break_points_str)
         breaker.apply_breaks(input_path, output_path, break_points)
     except Exception as e:
