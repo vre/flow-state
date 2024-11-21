@@ -71,7 +71,7 @@ class TestFinalizer:
         assert result == "youtube - Test Video Title (test123).md"
 
     def test_assemble_final_content(self, mock_fs, sample_template):
-        """Test assembling final content from components."""
+        """Test assembling summary content from components."""
         finalizer = Finalizer(fs=mock_fs)
 
         base_name = "youtube_test123"
@@ -80,16 +80,29 @@ class TestFinalizer:
         # Create component files
         mock_fs.write_text(output_dir / f"{base_name}_metadata.md", "Metadata content")
         mock_fs.write_text(output_dir / f"{base_name}_summary.md", "Summary content")
-        mock_fs.write_text(output_dir / f"{base_name}_description.md", "Description content")
-        mock_fs.write_text(output_dir / f"{base_name}_transcript.md", "Transcript content")
 
         result = finalizer.assemble_final_content(sample_template, base_name, output_dir)
 
         assert "Metadata content" in result
         assert "Summary content" in result
+        assert "{metadata}" not in result  # Placeholders should be replaced
+
+    def test_assemble_transcript_content(self, mock_fs, sample_transcript_template):
+        """Test assembling transcript content from components."""
+        finalizer = Finalizer(fs=mock_fs)
+
+        base_name = "youtube_test123"
+        output_dir = Path("/output")
+
+        # Create component files
+        mock_fs.write_text(output_dir / f"{base_name}_description.md", "Description content")
+        mock_fs.write_text(output_dir / f"{base_name}_transcript.md", "Transcript content")
+
+        result = finalizer.assemble_transcript_content(sample_transcript_template, base_name, output_dir)
+
         assert "Description content" in result
         assert "Transcript content" in result
-        assert "{metadata}" not in result  # Placeholders should be replaced
+        assert "{description}" not in result  # Placeholders should be replaced
 
     def test_assemble_final_content_missing_components(self, mock_fs, sample_template):
         """Test assembling with missing component files."""
@@ -106,7 +119,6 @@ class TestFinalizer:
         assert "Metadata content" in result
         # Missing components should be empty, not error
         assert "## Summary" in result
-        assert "## Description" in result
 
     def test_cleanup_work_files(self, mock_fs):
         """Test cleanup of intermediate work files."""
@@ -146,7 +158,7 @@ class TestFinalizer:
         # Final file should still exist
         assert mock_fs.exists(final_file)
 
-    def test_finalize_complete_flow(self, mock_fs, sample_template):
+    def test_finalize_complete_flow(self, mock_fs, sample_template, sample_transcript_template):
         """Test complete finalization flow."""
         finalizer = Finalizer(fs=mock_fs)
 
@@ -156,6 +168,7 @@ class TestFinalizer:
 
         # Setup files
         mock_fs.write_text(script_dir / "template.md", sample_template)
+        mock_fs.write_text(script_dir / "template_transcript.md", sample_transcript_template)
         mock_fs.write_text(output_dir / f"{base_name}_title.txt", "Test Video")
         mock_fs.write_text(output_dir / f"{base_name}_metadata.md", "Metadata")
         mock_fs.write_text(output_dir / f"{base_name}_summary.md", "Summary")
@@ -168,15 +181,25 @@ class TestFinalizer:
         try:
             finalize_module.__file__ = str(script_dir / "finalize.py")
 
-            result = finalizer.finalize(base_name, output_dir, debug=False)
+            summary_path, transcript_path = finalizer.finalize(base_name, output_dir, debug=False)
 
-            # Check final file was created
-            assert result.name == "youtube - Test Video (test123).md"
-            assert mock_fs.exists(result)
+            # Check both files were created
+            assert summary_path.name == "youtube - Test Video (test123).md"
+            assert transcript_path.name == "youtube - Test Video - transcript (test123).md"
+            assert mock_fs.exists(summary_path)
+            assert mock_fs.exists(transcript_path)
 
-            content = mock_fs.read_text(result)
-            assert "Metadata" in content
-            assert "Summary" in content
+            # Check summary content
+            summary_content = mock_fs.read_text(summary_path)
+            assert "Metadata" in summary_content
+            assert "Summary" in summary_content
+            assert "Description" not in summary_content  # Should not be in summary
+            assert "Transcript" not in summary_content  # Should not be in summary
+
+            # Check transcript content
+            transcript_content = mock_fs.read_text(transcript_path)
+            assert "Description" in transcript_content
+            assert "Transcript" in transcript_content
 
             # Work files should be cleaned up
             assert not mock_fs.exists(output_dir / f"{base_name}_metadata.md")
@@ -184,7 +207,7 @@ class TestFinalizer:
         finally:
             finalize_module.__file__ = original_file
 
-    def test_finalize_debug_mode(self, mock_fs, sample_template):
+    def test_finalize_debug_mode(self, mock_fs, sample_template, sample_transcript_template):
         """Test finalization with debug mode (keeps work files)."""
         finalizer = Finalizer(fs=mock_fs)
 
@@ -194,18 +217,22 @@ class TestFinalizer:
 
         # Setup files
         mock_fs.write_text(script_dir / "template.md", sample_template)
+        mock_fs.write_text(script_dir / "template_transcript.md", sample_transcript_template)
         mock_fs.write_text(output_dir / f"{base_name}_title.txt", "Test Video")
         mock_fs.write_text(output_dir / f"{base_name}_metadata.md", "Metadata")
+        mock_fs.write_text(output_dir / f"{base_name}_description.md", "Description")
+        mock_fs.write_text(output_dir / f"{base_name}_transcript.md", "Transcript")
 
         import finalize as finalize_module
         original_file = finalize_module.__file__
         try:
             finalize_module.__file__ = str(script_dir / "finalize.py")
 
-            result = finalizer.finalize(base_name, output_dir, debug=True)
+            summary_path, transcript_path = finalizer.finalize(base_name, output_dir, debug=True)
 
-            # Final file should be created
-            assert mock_fs.exists(result)
+            # Both final files should be created
+            assert mock_fs.exists(summary_path)
+            assert mock_fs.exists(transcript_path)
 
             # Work files should NOT be cleaned up in debug mode
             assert mock_fs.exists(output_dir / f"{base_name}_metadata.md")

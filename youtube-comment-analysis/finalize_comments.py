@@ -4,7 +4,7 @@ Creates final comment analysis markdown file from template and component files.
 
 Usage: finalize_comments.py <BASE_NAME> <OUTPUT_DIR> [--debug]
 Keeps: {BASE_NAME}_comment_analysis.md
-Removes: _name.txt, _comments.md, _comments_cleaned.md, _comment_gold.md (unless --debug)
+Removes: _name.txt, _comments.md, _comments_cleaned.md, _comment_insights.md (unless --debug)
 """
 
 import re
@@ -57,21 +57,21 @@ def generate_final_filename(video_name: str, video_id: str) -> str:
         return f"youtube_{video_id}_comment_analysis.md"
 
 
-def fill_template(template: str, video_name: str, comment_gold: str, comments: str) -> str:
+def fill_template(template: str, video_name: str, comment_insights: str, comments: str) -> str:
     """
     Fill template with component content.
 
     Args:
         template: Template content with placeholders
         video_name: Video title
-        comment_gold: Golden comments content
+        comment_insights: Comment insights content
         comments: Cleaned comments content
 
     Returns:
         Final content with placeholders replaced
     """
     content = template.replace("{video_name}", video_name.strip())
-    content = content.replace("{comment_gold}", comment_gold.strip())
+    content = content.replace("{comment_insights}", comment_insights.strip())
     content = content.replace("{comments}", comments.strip())
     return content
 
@@ -90,7 +90,7 @@ def get_work_files(base_name: str) -> list[str]:
         f"{base_name}_name.txt",
         f"{base_name}_comments.md",
         f"{base_name}_comments_cleaned.md",
-        f"{base_name}_comment_gold.md",
+        f"{base_name}_comment_insights.md",
     ]
 
 
@@ -142,30 +142,27 @@ class CommentFinalizer:
             return self.filesystem.read_text(file_path)
         return ""
 
-    def insert_golden_comments_into_summary(
-        self, summary_file: Path, comment_gold: str
+    def insert_comment_insights_into_summary(
+        self, summary_file: Path, comment_insights: str
     ) -> None:
         """
-        Insert Golden Comments section into existing summary file before Description.
+        Insert Comment Insights section into existing summary file at end.
 
         Args:
             summary_file: Path to summary file
-            comment_gold: Golden comments content to insert
+            comment_insights: Comment insights content to insert
         """
         if not self.filesystem.exists(summary_file):
             return
 
         content = self.filesystem.read_text(summary_file)
 
-        # Find "## Description" and insert before it
-        description_marker = "## Description"
-        if description_marker in content:
-            insights_section = f"{comment_gold.strip()}\n\n"
-            updated_content = content.replace(
-                description_marker, f"{insights_section}{description_marker}"
-            )
-            self.filesystem.write_text(summary_file, updated_content)
-            print(f"Inserted Comment Insights into summary file: {summary_file.name}")
+        # Insert at end of file (after Summary section)
+        insights_section = f"\n\n{comment_insights.strip()}\n"
+        updated_content = content.rstrip() + insights_section
+
+        self.filesystem.write_text(summary_file, updated_content)
+        print(f"Inserted Comment Insights into summary file: {summary_file.name}")
 
     def finalize(
         self, base_name: str, output_dir: Path, debug: bool = False
@@ -186,7 +183,7 @@ class CommentFinalizer:
         """
         # Read component files
         video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
-        comment_gold = self.read_file_or_empty(output_dir / f"{base_name}_comment_gold.md")
+        comment_insights = self.read_file_or_empty(output_dir / f"{base_name}_comment_insights.md")
         comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_cleaned.md")
 
         # Generate summary filename to check if it exists
@@ -198,17 +195,17 @@ class CommentFinalizer:
         summary_exists = summary_file and self.filesystem.exists(summary_file)
 
         if summary_exists:
-            # Insert Golden Comments into existing summary file (if they exist)
-            if comment_gold:
-                self.insert_golden_comments_into_summary(summary_file, comment_gold)
-            # Use template without Golden Insights section
+            # Insert Comment Insights into existing summary file (if they exist)
+            if comment_insights:
+                self.insert_comment_insights_into_summary(summary_file, comment_insights)
+            # Use template without Comment Insights section
             template = self.load_template(standalone=False)
         else:
-            # Use standalone template with Golden Insights section
+            # Use standalone template with Comment Insights section
             template = self.load_template(standalone=True)
 
         # Fill template
-        final_content = fill_template(template, video_name, comment_gold, comments)
+        final_content = fill_template(template, video_name, comment_insights, comments)
 
         # Generate filename
         final_filename = generate_final_filename(video_name, video_id)

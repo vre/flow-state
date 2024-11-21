@@ -5,11 +5,3 @@
 ## Summary
 
 {summary}
-
-## Description
-
-{description}
-
-## Transcription
-
-{transcription}

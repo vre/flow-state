@@ -72,7 +72,7 @@ Read Summary section from "<output_directory>/youtube - * ({video_id}).md" file 
 
 Read <output_directory>/${BASE_NAME}_comments_cleaned.md. Extract, condense, combine and summarize ruthlessly for the MOST exceptional true insights NOT already covered by the summary. No fluff, NOT a document.
 
-Write to <output_directory>/${BASE_NAME}_comment_gold.md in format:
+Write to <output_directory>/${BASE_NAME}_comment_insights.md in format:
 
 ## Comment Insights ([Analyze the insights and determine their primary theme/direction in 2-7 words])
 

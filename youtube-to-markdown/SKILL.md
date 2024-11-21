@@ -160,7 +160,11 @@ Read <output_directory>/${BASE_NAME}_chapters.json:
 python3 finalize.py "${BASE_NAME}" "<output_directory>"
 ```
 
-Script uses template.md to create final file by merging all component files (metadata, summary, description, transcript) and removes intermediate work files. Final output: `youtube - {title} ({video_id}).md`
+Script uses templates to create two final files: summary file with metadata and summary, and transcript file with description and transcript. Removes intermediate work files.
+
+Outputs:
+- `youtube - {title} ({video_id}).md` - Main summary
+- `youtube - {title} - transcript ({video_id}).md` - Description and transcript
 
 Use `--debug` flag to keep intermediate work files for inspection.
 

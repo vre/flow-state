@@ -1,4 +1,4 @@
-{comment_gold}
+{comment_insights}
 
 ## Curated Comments
 
