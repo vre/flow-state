@@ -152,7 +152,7 @@ def sample_deduped_transcript():
 
 @pytest.fixture
 def sample_template():
-    """Sample markdown template."""
+    """Sample markdown template for summary file."""
     return """# Video Information
 
 {metadata}
@@ -160,8 +160,13 @@ def sample_template():
 ## Summary
 
 {summary}
+"""
 
-## Description
+
+@pytest.fixture
+def sample_transcript_template():
+    """Sample markdown template for transcript file."""
+    return """## Description
 
 {description}
 

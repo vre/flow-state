@@ -24,12 +24,13 @@ class Finalizer:
         """
         self.fs = fs
 
-    def read_template(self, script_dir: Path) -> str:
+    def read_template(self, script_dir: Path, template_name: str = "template.md") -> str:
         """
         Read template file.
 
         Args:
             script_dir: Directory containing this script
+            template_name: Name of template file
 
         Returns:
             Template content
@@ -37,7 +38,7 @@ class Finalizer:
         Raises:
             FileOperationError: If template not found
         """
-        template_file = script_dir / "template.md"
+        template_file = script_dir / template_name
         if not self.fs.exists(template_file):
             raise FileOperationError(f"{template_file} not found")
         return self.fs.read_text(template_file)
@@ -98,16 +99,39 @@ class Finalizer:
         # Read component files
         metadata = self.read_component_or_empty(output_dir / f"{base_name}_metadata.md")
         summary = self.read_component_or_empty(output_dir / f"{base_name}_summary.md")
-        description = self.read_component_or_empty(output_dir / f"{base_name}_description.md")
-        transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript.md")
 
         # Replace placeholders
         final_content = template.replace("{metadata}", metadata.strip())
         final_content = final_content.replace("{summary}", summary.strip())
-        final_content = final_content.replace("{description}", description.strip())
-        final_content = final_content.replace("{transcription}", transcription.strip())
 
         return final_content
+
+    def assemble_transcript_content(
+        self,
+        template: str,
+        base_name: str,
+        output_dir: Path
+    ) -> str:
+        """
+        Assemble transcript content from template and components.
+
+        Args:
+            template: Template content
+            base_name: Base name
+            output_dir: Output directory
+
+        Returns:
+            Assembled transcript content
+        """
+        # Read component files
+        description = self.read_component_or_empty(output_dir / f"{base_name}_description.md")
+        transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript.md")
+
+        # Replace placeholders
+        transcript_content = template.replace("{description}", description.strip())
+        transcript_content = transcript_content.replace("{transcription}", transcription.strip())
+
+        return transcript_content
 
     def cleanup_work_files(self, base_name: str, output_dir: Path) -> None:
         """
@@ -143,9 +167,9 @@ class Finalizer:
         base_name: str,
         output_dir: Path,
         debug: bool = False
-    ) -> Path:
+    ) -> tuple[Path, Path]:
         """
-        Create final markdown file and cleanup.
+        Create final markdown files and cleanup.
 
         Args:
             base_name: Base name (youtube_{VIDEO_ID})
@@ -153,27 +177,44 @@ class Finalizer:
             debug: If True, keep intermediate files
 
         Returns:
-            Path to final file
+            Tuple of (summary_path, transcript_path)
 
         Raises:
             FileOperationError: If finalization fails
         """
-        # Get script directory for template
+        # Get script directory for templates
         script_dir = Path(__file__).parent
 
-        # Read template
-        template = self.read_template(script_dir)
+        # Read templates
+        summary_template = self.read_template(script_dir, "template.md")
+        transcript_template = self.read_template(script_dir, "template_transcript.md")
 
-        # Assemble final content
-        final_content = self.assemble_final_content(template, base_name, output_dir)
+        # Assemble content
+        summary_content = self.assemble_final_content(summary_template, base_name, output_dir)
+        transcript_content = self.assemble_transcript_content(transcript_template, base_name, output_dir)
 
-        # Create final filename
-        final_filename = self.create_final_filename(base_name, output_dir)
-        final_path = output_dir / final_filename
+        # Create filenames
+        title_path = output_dir / f"{base_name}_title.txt"
+        title = self.read_component_or_empty(title_path).strip()
+        video_id = base_name.replace('youtube_', '')
 
-        # Write final file
-        self.fs.write_text(final_path, final_content)
-        print(f"Created final file: {final_filename}")
+        if title:
+            cleaned_title = clean_title_for_filename(title)
+            summary_filename = f"youtube - {cleaned_title} ({video_id}).md"
+            transcript_filename = f"youtube - {cleaned_title} - transcript ({video_id}).md"
+        else:
+            summary_filename = f"{base_name}.md"
+            transcript_filename = f"{base_name}_transcript.md"
+
+        summary_path = output_dir / summary_filename
+        transcript_path = output_dir / transcript_filename
+
+        # Write files
+        self.fs.write_text(summary_path, summary_content)
+        print(f"Created summary file: {summary_filename}")
+
+        self.fs.write_text(transcript_path, transcript_content)
+        print(f"Created transcript file: {transcript_filename}")
 
         # Clean up intermediate work files unless --debug is set
         if debug:
@@ -181,8 +222,7 @@ class Finalizer:
         else:
             self.cleanup_work_files(base_name, output_dir)
 
-        print(f"Final file: {final_filename}")
-        return final_path
+        return summary_path, transcript_path
 
 
 def main() -> None:
