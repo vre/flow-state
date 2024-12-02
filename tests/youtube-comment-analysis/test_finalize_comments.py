@@ -175,7 +175,8 @@ class TestGetWorkFiles:
         assert "youtube_abc123_comments.md" in result
         assert "youtube_abc123_comments_cleaned.md" in result
         assert "youtube_abc123_comment_insights.md" in result
-        assert len(result) == 4
+        assert "youtube_abc123_quick_summary.md" in result
+        assert len(result) == 5
 
 
 # Tests for parse_args

@@ -57,6 +57,22 @@ class Finalizer:
             return self.fs.read_text(path)
         return ""
 
+    def strip_leading_header(self, content: str, header: str) -> str:
+        """
+        Strip leading markdown header if present.
+
+        Args:
+            content: Content that may start with header
+            header: Header text to strip (e.g., "## Quick Summary")
+
+        Returns:
+            Content with leading header removed
+        """
+        stripped = content.strip()
+        if stripped.startswith(header):
+            stripped = stripped[len(header):].lstrip()
+        return stripped
+
     def create_final_filename(self, base_name: str, output_dir: Path) -> str:
         """
         Create human-readable filename from title.
@@ -97,11 +113,17 @@ class Finalizer:
             Final assembled content
         """
         # Read component files
+        quick_summary = self.read_component_or_empty(output_dir / f"{base_name}_quick_summary.md")
         metadata = self.read_component_or_empty(output_dir / f"{base_name}_metadata.md")
         summary = self.read_component_or_empty(output_dir / f"{base_name}_summary.md")
 
+        # Strip duplicate headers from components
+        quick_summary = self.strip_leading_header(quick_summary, "## Quick Summary")
+        summary = self.strip_leading_header(summary, "## Summary")
+
         # Replace placeholders
-        final_content = template.replace("{metadata}", metadata.strip())
+        final_content = template.replace("{quick_summary}", quick_summary.strip())
+        final_content = final_content.replace("{metadata}", metadata.strip())
         final_content = final_content.replace("{summary}", summary.strip())
 
         return final_content

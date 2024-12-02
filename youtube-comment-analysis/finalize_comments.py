@@ -91,6 +91,7 @@ def get_work_files(base_name: str) -> list[str]:
         f"{base_name}_comments.md",
         f"{base_name}_comments_cleaned.md",
         f"{base_name}_comment_insights.md",
+        f"{base_name}_quick_summary.md",
     ]
 
 
@@ -142,6 +143,28 @@ class CommentFinalizer:
             return self.filesystem.read_text(file_path)
         return ""
 
+    def insert_quick_summary_into_summary(
+        self, summary_file: Path, quick_summary: str
+    ) -> None:
+        """
+        Insert Quick Summary section at the top of existing summary file.
+
+        Args:
+            summary_file: Path to summary file
+            quick_summary: Quick summary content to insert
+        """
+        if not self.filesystem.exists(summary_file):
+            return
+
+        content = self.filesystem.read_text(summary_file)
+
+        # Insert at top of file (before everything)
+        quick_summary_section = f"## Quick Summary\n\n{quick_summary.strip()}\n\n"
+        updated_content = quick_summary_section + content
+
+        self.filesystem.write_text(summary_file, updated_content)
+        print(f"Inserted Quick Summary into summary file: {summary_file.name}")
+
     def insert_comment_insights_into_summary(
         self, summary_file: Path, comment_insights: str
     ) -> None:
@@ -184,6 +207,7 @@ class CommentFinalizer:
         # Read component files
         video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
         comment_insights = self.read_file_or_empty(output_dir / f"{base_name}_comment_insights.md")
+        quick_summary = self.read_file_or_empty(output_dir / f"{base_name}_quick_summary.md")
         comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_cleaned.md")
 
         # Generate summary filename to check if it exists
@@ -195,6 +219,9 @@ class CommentFinalizer:
         summary_exists = summary_file and self.filesystem.exists(summary_file)
 
         if summary_exists:
+            # Insert Quick Summary at top of existing summary file (if it exists)
+            if quick_summary:
+                self.insert_quick_summary_into_summary(summary_file, quick_summary)
             # Insert Comment Insights into existing summary file (if they exist)
             if comment_insights:
                 self.insert_comment_insights_into_summary(summary_file, comment_insights)

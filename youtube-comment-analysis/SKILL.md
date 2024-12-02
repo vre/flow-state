@@ -84,6 +84,10 @@ Key Takeaway from Comments: [One paragraph summary - ONLY if it adds value beyon
 - [insight N]
 ```
 
+## Step 3.5: Generate Quick Summary
+
+Write a finalizing short summary to <output_directory>/${BASE_NAME}_quick_summary.md synthesizing video + comment insights.
+
 ## Step 4: Finalize
 
 ```bash
