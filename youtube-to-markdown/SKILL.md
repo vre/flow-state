@@ -12,6 +12,8 @@ allowed-tools:
 
 # YouTube to Markdown
 
+**Multiple videos**: Process one video at a time, sequentially. Do not run parallel extractions.
+
 Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress.
 
 ## Step 0: Ask about comment analysis
@@ -147,7 +149,10 @@ task_tool:
 - subagent_type: "general-purpose"
 - prompt:
 ```
-Read <output_directory>/${BASE_NAME}_transcript_cleaned.md and add markdown headings. Write to <output_directory>/${BASE_NAME}_transcript.md.
+INPUT: <output_directory>/${BASE_NAME}_transcript_cleaned.md
+OUTPUT: <output_directory>/${BASE_NAME}_transcript.md
+
+Read the INPUT file. Add markdown headings. Write result to OUTPUT file.
 
 Read <output_directory>/${BASE_NAME}_chapters.json:
 - If contains chapters: Use chapter names as ### headings at chapter timestamps, add #### headings for subtopics
