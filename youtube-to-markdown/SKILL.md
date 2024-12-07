@@ -112,26 +112,48 @@ task_tool:
 ```
 Read <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt.
 
-Analyze content structure:
-1. Identify meaningful content units (topic shifts, argument structure, narrative breaks)
-  - If video is single continuous topic leave content unit header out
-2. Skip ads, sponsors, self-promotion ("like and subscribe", merch, etc.)
-3. Merge content spanning ad breaks if thematically connected
+1. Classify content type:
+   - TIPS: gear reviews, rankings, "X ways to...", practical advice lists
+   - INTERVIEW: podcasts, conversations, Q&A, multiple perspectives
+   - EDUCATIONAL: concept explanations, analysis, "how X works"
+   - TUTORIAL: step-by-step instructions, coding, recipes
 
-Summarize each content unit proportionally (~100 chars/min of content). No fluff, NOT a document.
+2. Analyze content structure:
+   - Identify meaningful content units (topic shifts, argument structure, narrative breaks)
+   - If single continuous topic, omit content unit headers
+   - Skip ads, sponsors, self-promotion ("like and subscribe", merch, etc.)
+   - Merge content spanning ad breaks if thematically connected
 
-Write to <output_directory>/${BASE_NAME}_summary.md:
+3. Summarize using format for detected type. Target <10% of transcript bytes.
 
+TIPS:
 **TL;DR**: [1 sentence synthesis]
+- **[Category]**: [item], [item], [item]
+- **[Category]**: [item], [item]
 
+INTERVIEW:
+**TL;DR**: [1 sentence synthesis]
 ### [Content Unit Title]
-**What/Why/How/What Then**: [as relevant, skip if non-essential]
+[2-3 sentence narrative. "Quote if impactful."]
 
+EDUCATIONAL:
+**TL;DR**: [1 sentence synthesis]
 ### [Content Unit Title]
-[...]
+**What**: [definition/description]
+**Why**: [reasoning/importance]
+**How**: [mechanism/application]
+**What Then**: [implications if actionable]
 
-## Hidden Gems
-- [cross-cutting insights that emerge from connecting multiple sections]
+TUTORIAL:
+**TL;DR**: [1 sentence synthesis]
+**Prerequisites**: [if any]
+1. [Step with outcome]
+2. [Step with outcome]
+**Result**: [what you end up with]
+
+4. Add ## Hidden Gems for valuable tangents/side narratives that don't fit main structure but deserve preservation.
+
+Write to <output_directory>/${BASE_NAME}_summary.md
 ```
 
 ## Step 6: Clean speech artifacts
