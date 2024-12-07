@@ -31,7 +31,7 @@ AskUserQuestion:
      description: "Extract only video transcript and metadata"
 ```
 
-Note user's choice for Step 9.
+Note user's choice for Step 10.
 
 ## Step 1: Extract data (metadata, description, chapters)
 
@@ -156,7 +156,32 @@ TUTORIAL:
 Write to <output_directory>/${BASE_NAME}_summary.md
 ```
 
-## Step 6: Clean speech artifacts
+## Step 6: Review and tighten summary
+
+task_tool:
+- subagent_type: "general-purpose"
+- prompt:
+```
+You are an adversarial copy editor. Your job is to ruthlessly cut fluff and enforce quality standards.
+
+Read <output_directory>/${BASE_NAME}_summary.md
+
+Enforce these rules:
+
+1. **Byte budget**: Total summary must be <10% of transcript bytes. Measure and trim if over.
+2. **Format compliance**: Verify correct format for detected type (TIPS/INTERVIEW/EDUCATIONAL/TUTORIAL)
+3. **Hidden Gems**: Must be tangential insights NOT covered in main sections. Remove any that duplicate main content.
+4. **Redundancy**: Merge sections with overlapping content
+5. **Tightness**: Cut filler words, compress verbose explanations, prefer lists over prose
+
+If violations found, rewrite to <output_directory>/${BASE_NAME}_summary.md
+
+If compliant, respond "PASSED" and make no changes.
+
+Preserve original language - do not translate.
+```
+
+## Step 7: Clean speech artifacts
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -174,7 +199,7 @@ Tasks:
 - Keep timestamps at end of paragraphs
 ```
 
-## Step 7: Add topic headings
+## Step 8: Add topic headings
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -190,7 +215,7 @@ Read <output_directory>/${BASE_NAME}_chapters.json:
 - If empty: Add ### headings where major topics change
 ```
 
-## Step 8: Finalize and cleanup
+## Step 9: Finalize and cleanup
 
 ```bash
 python3 finalize.py "${BASE_NAME}" "<output_directory>"
@@ -204,6 +229,6 @@ Outputs:
 
 Use `--debug` flag to keep intermediate work files for inspection.
 
-## Step 9: Chain to comment analysis (optional)
+## Step 10: Chain to comment analysis (optional)
 
 If user chose "Yes, analyze comments" in Step 0 run youtube-comment-analysis Skill with the same YouTube URL.
