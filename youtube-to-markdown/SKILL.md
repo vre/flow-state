@@ -110,19 +110,28 @@ task_tool:
 - subagent_type: "general-purpose"
 - prompt:
 ```
-Summarize <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt. No fluff, it is NOT a document. Aim to 10% xor max 1500 letters. Write to <output_directory>/${BASE_NAME}_summary.md:
-**TL;DR**: [1 sentence core insight, do not repeat later]
+Read <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt.
 
-[skip the question if repeating or non essential content]
-**What**:
-**Where**:
-**When**:
-**Why**:
-**How**:
-**What Then**:
+Analyze content structure:
+1. Identify meaningful content units (topic shifts, argument structure, narrative breaks)
+  - If video is single continuous topic leave content unit header out
+2. Skip ads, sponsors, self-promotion ("like and subscribe", merch, etc.)
+3. Merge content spanning ad breaks if thematically connected
 
-**Hidden Gems**:
-- [any insights hiding under the main story]
+Summarize each content unit proportionally (~100 chars/min of content). No fluff, NOT a document.
+
+Write to <output_directory>/${BASE_NAME}_summary.md:
+
+**TL;DR**: [1 sentence synthesis]
+
+### [Content Unit Title]
+**What/Why/How/What Then**: [as relevant, skip if non-essential]
+
+### [Content Unit Title]
+[...]
+
+## Hidden Gems
+- [cross-cutting insights that emerge from connecting multiple sections]
 ```
 
 ## Step 6: Clean speech artifacts
