@@ -258,15 +258,15 @@ class TestFormatCommentMarkdown:
         assert "##### Eve (2 likes)" in result
         assert "Deep reply" in result
 
-    def test_format_depth_3_flattened(self, sample_comments):
-        """Test that depth 3+ is flattened to bullet list."""
+    def test_format_depth_3_uses_h6(self, sample_comments):
+        """Test that depth 3 uses H6 heading (YouTube only uses 2 levels, but future-proofed)."""
         _, replies_by_parent = build_comment_hierarchy(sample_comments)
         comment = sample_comments[5]  # Frank's comment
 
         result = format_comment_markdown(comment, depth=3, replies_by_parent=replies_by_parent)
 
-        assert "- **Frank (1 likes)**: Very deep" in result
-        assert "###" not in result  # No heading for deep nesting
+        assert "###### Frank (1 likes)" in result
+        assert "Very deep" in result
 
 
 # Tests for generate_comments_markdown
@@ -275,7 +275,7 @@ class TestGenerateCommentsMarkdown:
 
     def test_generate_with_comments(self, sample_comments):
         """Test generating markdown with comments."""
-        result = generate_comments_markdown(sample_comments, max_top_level=10)
+        result = generate_comments_markdown(sample_comments)
 
         assert "### 1. Alice (42 likes)" in result
         assert "### 2. David (30 likes)" in result
@@ -287,12 +287,12 @@ class TestGenerateCommentsMarkdown:
 
         assert result == "No comments available\n"
 
-    def test_generate_respects_max_top_level(self, sample_comments):
-        """Test that max_top_level limit is respected."""
-        result = generate_comments_markdown(sample_comments, max_top_level=1)
+    def test_generate_includes_all_top_level(self, sample_comments):
+        """Test that all top-level comments are included (no max limit)."""
+        result = generate_comments_markdown(sample_comments)
 
         assert "### 1. Alice (42 likes)" in result
-        assert "### 2. David" not in result  # Second top-level should be excluded
+        assert "### 2. David (30 likes)" in result  # Both top-level included
 
 
 # Tests for count_comments_and_replies
@@ -352,7 +352,7 @@ class TestCommentExtractor:
         """Test fetching video data successfully."""
         json_output = '{"title": "Test Video", "id": "abc123", "comments": []}'
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "test_url"],
+            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
             0,
             json_output,
             "",
@@ -372,7 +372,7 @@ class TestCommentExtractor:
     def test_fetch_video_data_command_failure(self, mock_runner, mock_filesystem):
         """Test handling yt-dlp command failure."""
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "test_url"],
+            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
             1,
             "",
             "Error: video not found",
@@ -390,7 +390,7 @@ class TestCommentExtractor:
     def test_fetch_video_data_invalid_json(self, mock_runner, mock_filesystem):
         """Test handling invalid JSON from yt-dlp."""
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "test_url"],
+            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
             0,
             "invalid json{",
             "",
@@ -410,7 +410,7 @@ class TestCommentExtractor:
         json_output = '{"title": "Test Video", "id": "abc123", "comments": []}'
         mock_runner.set_return_value(["yt-dlp", "--version"], 0, "2023.01.01", "")
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "https://youtu.be/abc123"],
+            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "https://youtu.be/abc123"],
             0,
             json_output,
             "",

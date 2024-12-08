@@ -16,23 +16,6 @@ allowed-tools:
 
 Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress.
 
-## Step 0: Ask about comment analysis
-
-If not clear from user's request, ask:
-
-```
-AskUserQuestion:
-- question: "Would you like to analyze comments after extracting the video transcript?"
-- header: "Comments"
-- options:
-  1. label: "Yes, analyze comments"
-     description: "After video extraction, run youtube-comment-analysis for cross-analysis with video summary"
-  2. label: "No, video only"
-     description: "Extract only video transcript and metadata"
-```
-
-Note user's choice for Step 10.
-
 ## Step 1: Extract data (metadata, description, chapters)
 
 ```bash
@@ -229,6 +212,6 @@ Outputs:
 
 Use `--debug` flag to keep intermediate work files for inspection.
 
-## Step 10: Chain to comment analysis (optional)
+## Step 10: Comment analysis (optional)
 
-If user chose "Yes, analyze comments" in Step 0 run youtube-comment-analysis Skill with the same YouTube URL.
+If youtube-comment-analysis skill is available, run it with the same YouTube URL.

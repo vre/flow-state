@@ -32,7 +32,9 @@ FAIL:
 
 ## Core Principles
 
-YAGNI + KISS + DRY + Avoid Wordiness
+YAGNI + KISS + DRY + Avoid Wordiness + NO CODE before tests
+
+**Testability:** Pure functions + thin `main()` glue. No DI frameworks. See `prefilter_comments.py`.
 
 We are NOT writing documentation or a book.
 

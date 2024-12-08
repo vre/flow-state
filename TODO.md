@@ -15,15 +15,13 @@
   - Why/what/how/when format does definitely work with list style videos -> 4 types of summaries
 - [x] Fix bloated summaries 
   - AI always need a verification step added adversial editor step
-
-- [ ] What if the video has 1000+ comments - prefiltering via thumbs up/down?
+- [x] What if the video has 1000+ comments - prefiltering via thumbs up/down?
+  - There is actually no sense of not analyzing comments. Only ask how if many comments to analyze.
 
 - [ ] Highlighting notable content to browseability
 - [ ] Keyword/topic list section with links to transcript parts
 - [ ] Analysis linking to transcript/commentary
 - [ ] Keyword/topic list linking to transcript parts
-
-- [ ] Make analysis, summary, highlighting optional - ask the user before running
 
 - [ ] Try modding skill to run on github copilot, openai codex, ...
 - [ ] Check alternative extraction methods via browser, playwright, ... maybe extraction also when user signed in.
@@ -33,6 +31,9 @@
   - Investigated alternatives (bash/python/env vars) but command line spam is worse 
 - [ ] What is comments are in multiple languages? Now hardcoded do not translate.
   - Comments are mostly in the language of the video, that most probably is the language user wants. Claude is not that good translating all the languages, especially towards smaller ones.
+- [ ] Make analysis, summary, highlighting optional - ask the user before running
+  - All extra questions stop the flow.. make a good summary as possible with what you got. There is no additional highlighting defined - LLM does what it does.
+
 
 ## Noted limitations
 - Claude does not want to make chapters for copyrighted content, such as music videos.

@@ -4,7 +4,7 @@ Creates final comment analysis markdown file from template and component files.
 
 Usage: finalize_comments.py <BASE_NAME> <OUTPUT_DIR> [--debug]
 Keeps: {BASE_NAME}_comment_analysis.md
-Removes: _name.txt, _comments.md, _comments_cleaned.md, _comment_insights.md (unless --debug)
+Removes: _name.txt, _comments.md, _comments_prefiltered.md, _comment_insights.md (unless --debug)
 """
 
 import re
@@ -89,7 +89,7 @@ def get_work_files(base_name: str) -> list[str]:
     return [
         f"{base_name}_name.txt",
         f"{base_name}_comments.md",
-        f"{base_name}_comments_cleaned.md",
+        f"{base_name}_comments_prefiltered.md",
         f"{base_name}_comment_insights.md",
         f"{base_name}_quick_summary.md",
     ]
@@ -208,7 +208,7 @@ class CommentFinalizer:
         video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
         comment_insights = self.read_file_or_empty(output_dir / f"{base_name}_comment_insights.md")
         quick_summary = self.read_file_or_empty(output_dir / f"{base_name}_quick_summary.md")
-        comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_cleaned.md")
+        comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_prefiltered.md")
 
         # Generate summary filename to check if it exists
         video_id = base_name.replace("youtube_", "")
