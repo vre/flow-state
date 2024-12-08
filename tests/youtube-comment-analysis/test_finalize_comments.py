@@ -173,7 +173,7 @@ class TestGetWorkFiles:
 
         assert "youtube_abc123_name.txt" in result
         assert "youtube_abc123_comments.md" in result
-        assert "youtube_abc123_comments_cleaned.md" in result
+        assert "youtube_abc123_comments_prefiltered.md" in result
         assert "youtube_abc123_comment_insights.md" in result
         assert "youtube_abc123_quick_summary.md" in result
         assert len(result) == 5
@@ -296,7 +296,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         # LLM-generated content includes the header
         mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
-        mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = "Comment content"
+        mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comment content"
 
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
         result_file = finalizer.finalize(base_name, output_dir, debug=False)
@@ -315,7 +315,7 @@ class TestCommentFinalizer:
         # Check work files cleaned up
         assert output_dir / f"{base_name}_name.txt" not in mock_filesystem.files
         assert output_dir / f"{base_name}_comments.md" not in mock_filesystem.files
-        assert output_dir / f"{base_name}_comments_cleaned.md" not in mock_filesystem.files
+        assert output_dir / f"{base_name}_comments_prefiltered.md" not in mock_filesystem.files
         assert output_dir / f"{base_name}_comment_insights.md" not in mock_filesystem.files
 
         # Check console output
@@ -334,7 +334,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         # LLM-generated content includes the header
         mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
-        mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = "Comment content"
+        mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comment content"
 
         # Create summary file (no Description/Transcription, those are in separate file)
         summary_file = output_dir / "youtube - Test Video (abc123).md"
@@ -372,7 +372,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[script_dir / "template.md"] = template_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = ""  # Empty
-        mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = "Comment content"
+        mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comment content"
 
         # Create summary file
         summary_file = output_dir / "youtube - Test Video (xyz789).md"
@@ -407,7 +407,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[script_dir / "template_standalone.md"] = template_standalone_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = ""
-        mock_filesystem.files[output_dir / f"{base_name}_comments_cleaned.md"] = ""
+        mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = ""
 
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
         finalizer.finalize(base_name, output_dir, debug=True)

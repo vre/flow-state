@@ -116,7 +116,7 @@ def format_comment_markdown(
     """
     Format a single comment and its replies as markdown.
 
-    Uses heading levels 3-5 for depths 0-2, flattens deeper levels to bullet lists.
+    Uses heading levels 3-6 for depths 0-3, flattens deeper levels to bullet lists.
 
     Args:
         comment: Comment to format
@@ -130,36 +130,24 @@ def format_comment_markdown(
     """
     lines: list[str] = []
 
-    if depth == 0:
-        # Top-level: ### (foldable in Obsidian)
-        prefix = f"{number}. " if include_numbering else ""
-        lines.append(f"### {prefix}{comment.author} ({comment.like_count} likes)\n")
-        lines.append(f"{comment.text}\n")
-    elif depth == 1:
-        # First reply level: ####
-        lines.append(f"#### {comment.author} ({comment.like_count} likes)\n")
-        lines.append(f"{comment.text}\n")
-    elif depth == 2:
-        # Second reply level: #####
-        lines.append(f"##### {comment.author} ({comment.like_count} likes)\n")
+    # Map depth to heading level: 0->###, 1->####, 2->#####, 3->######
+    # YouTube currently only uses 2 levels (top + replies), but supports up to H6 for future threading
+    if depth <= 3:
+        heading_level = 3 + depth
+        hashes = "#" * heading_level
+        if depth == 0 and include_numbering:
+            lines.append(f"{hashes} {number}. {comment.author} ({comment.like_count} likes)\n")
+        else:
+            lines.append(f"{hashes} {comment.author} ({comment.like_count} likes)\n")
         lines.append(f"{comment.text}\n")
     else:
         # Deeper levels: flatten as bullet list
+        indent = "  " * (depth - 4)
         lines.append(
-            f"- **{comment.author} ({comment.like_count} likes)**: {comment.text}\n"
+            f"{indent}- **{comment.author} ({comment.like_count} likes)**: {comment.text}\n"
         )
 
-        # Flatten all deeper replies (don't recurse)
-        replies = replies_by_parent.get(comment.id, [])
-        for reply in replies:
-            lines.append(
-                f"  - **{reply.author} ({reply.like_count} likes)**: {reply.text}\n"
-            )
-        if replies:
-            lines.append("\n")
-        return "\n".join(lines)
-
-    # Recursively format replies for depth 0-2
+    # Recursively format replies
     replies = replies_by_parent.get(comment.id, [])
     for reply in replies:
         lines.append(
@@ -169,13 +157,12 @@ def format_comment_markdown(
     return "\n".join(lines)
 
 
-def generate_comments_markdown(comments: list[Comment], max_top_level: int = 50) -> str:
+def generate_comments_markdown(comments: list[Comment]) -> str:
     """
     Generate markdown document with hierarchical comments.
 
     Args:
         comments: List of comments
-        max_top_level: Maximum number of top-level comments to include
 
     Returns:
         Markdown formatted string
@@ -184,7 +171,7 @@ def generate_comments_markdown(comments: list[Comment], max_top_level: int = 50)
         return "No comments available\n"
 
     _, replies_by_parent = build_comment_hierarchy(comments)
-    top_level = replies_by_parent.get("root", [])[:max_top_level]
+    top_level = replies_by_parent.get("root", [])
 
     lines: list[str] = []
     for idx, comment in enumerate(top_level, 1):
@@ -266,12 +253,14 @@ class CommentExtractor:
 
         try:
             # Run yt-dlp and capture output to file
+            # comment_sort=top returns most-liked comments first
             returncode, stdout, stderr = self.runner.run(
                 [
                     "yt-dlp",
                     "--dump-single-json",
                     "--write-comments",
                     "--skip-download",
+                    "--extractor-args", "youtube:comment_sort=top",
                     video_url,
                 ],
                 capture_stdout=True,
