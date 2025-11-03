@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# uv cache
+.uv/
+
+# Chrome profiles and debugging
+chromectl-profile/
+chromectl-test/
+chromectl-test2/
+
+# Screenshots and output
+*.png
+*.log
+console-output.log
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Distribution
+*.zip
+dist/
+build/
