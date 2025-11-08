@@ -1,0 +1,32 @@
+{
+  "name": "flow-state",
+  "owner": {
+    "name": "Ville Reijonen",
+    "email": "marketplace@vre.iki.fi"
+  },
+  "metadata": {
+    "description": "Knowledge work, context management, and productivity tools/skills/etc. for Claude Code",
+    "version": "1.0.0",
+    "pluginRoot": "./"
+  },
+  "plugins": [
+    {
+      "name": "youtube-to-markdown",
+      "source": "./youtube-to-markdown",
+      "description": "Transform YouTube video to storagable knowledge. Get tight summary, cleaned transcript broken into chapters and paragraphs, timestamp links back to original video, and notable content highlighted. Might be that you can skip watching the video entirely.",
+      "version": "1.0.0",
+      "category": "media-extraction",
+      "keywords": ["youtube", "transcript", "captions", "markdown", "summary", "chapters"],
+      "skills": ["./"]
+    },
+    {
+      "name": "youtube-comment-analysis",
+      "source": "./youtube-comment-analysis",
+      "description": "Extract and analyze YouTube comments. Run standalone for comment analysis or sequential with youtube-to-markdown for cross-analysis with video summary. Avoid diving in the cesspool and wasting your time on irrelevant noise.",
+      "version": "1.0.0",
+      "category": "media-extraction",
+      "keywords": ["youtube", "comments", "analysis"],
+      "skills": ["./"]
+    }
+  ]
+}
