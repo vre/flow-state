@@ -2,7 +2,7 @@
 
 ## Cooking
 - [x] Timestamps linking to original video
-- [ ] What is comments are in multiple languages? Now hardcoded do not translate.
+- [x] Move the comment analysis to summary section
 
 - [ ] What about really long videos? Should do Multiple parts or what? Longer video, longer summary? Or squeeze based on information content ratio?
 - [ ] Test with different video types - lectures, talks, vlogs, tutorials, reviews
@@ -22,7 +22,8 @@
 ## Maybe later
 - [ ] Annoying Write tool asks for "Create a File?" and opens editor
   - Investigated alternatives (bash/python/env vars) but command line spam is worse 
+- [ ] What is comments are in multiple languages? Now hardcoded do not translate.
+  - Comments are mostly in the language of the video, that most probably is the language user wants. Claude is not that good translating all the languages, especially towards smaller ones.
 
 ## Noted limitations
-
 - Claude does not want to make chapters for copyrighted content, such as music videos.
