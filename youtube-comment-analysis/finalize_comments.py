@@ -109,9 +109,12 @@ class CommentFinalizer:
         self.filesystem = filesystem
         self.script_dir = script_dir
 
-    def load_template(self) -> str:
+    def load_template(self, standalone: bool = False) -> str:
         """
         Load template file.
+
+        Args:
+            standalone: If True, load standalone template with Golden Insights section
 
         Returns:
             Template content
@@ -119,7 +122,8 @@ class CommentFinalizer:
         Raises:
             TemplateNotFoundError: If template file not found
         """
-        template_file = self.script_dir / "template.md"
+        template_name = "template_standalone.md" if standalone else "template.md"
+        template_file = self.script_dir / template_name
         if not self.filesystem.exists(template_file):
             raise TemplateNotFoundError(f"Template not found: {template_file}")
         return self.filesystem.read_text(template_file)
@@ -138,6 +142,31 @@ class CommentFinalizer:
             return self.filesystem.read_text(file_path)
         return ""
 
+    def insert_golden_comments_into_summary(
+        self, summary_file: Path, comment_gold: str
+    ) -> None:
+        """
+        Insert Golden Comments section into existing summary file before Description.
+
+        Args:
+            summary_file: Path to summary file
+            comment_gold: Golden comments content to insert
+        """
+        if not self.filesystem.exists(summary_file):
+            return
+
+        content = self.filesystem.read_text(summary_file)
+
+        # Find "## Description" and insert before it
+        description_marker = "## Description"
+        if description_marker in content:
+            golden_section = f"## Golden Comments\n\n{comment_gold.strip()}\n\n"
+            updated_content = content.replace(
+                description_marker, f"{golden_section}{description_marker}"
+            )
+            self.filesystem.write_text(summary_file, updated_content)
+            print(f"Inserted Golden Comments into summary file: {summary_file.name}")
+
     def finalize(
         self, base_name: str, output_dir: Path, debug: bool = False
     ) -> Path:
@@ -155,19 +184,33 @@ class CommentFinalizer:
         Raises:
             TemplateNotFoundError: If template not found
         """
-        # Load template
-        template = self.load_template()
-
         # Read component files
         video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
         comment_gold = self.read_file_or_empty(output_dir / f"{base_name}_comment_gold.md")
         comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_cleaned.md")
 
+        # Generate summary filename to check if it exists
+        video_id = base_name.replace("youtube_", "")
+        summary_filename = f"youtube - {clean_title_for_filename(video_name.strip())} ({video_id}).md" if video_name.strip() else None
+        summary_file = output_dir / summary_filename if summary_filename else None
+
+        # Check if summary file exists
+        summary_exists = summary_file and self.filesystem.exists(summary_file)
+
+        if summary_exists:
+            # Insert Golden Comments into existing summary file (if they exist)
+            if comment_gold:
+                self.insert_golden_comments_into_summary(summary_file, comment_gold)
+            # Use template without Golden Insights section
+            template = self.load_template(standalone=False)
+        else:
+            # Use standalone template with Golden Insights section
+            template = self.load_template(standalone=True)
+
         # Fill template
         final_content = fill_template(template, video_name, comment_gold, comments)
 
         # Generate filename
-        video_id = base_name.replace("youtube_", "")
         final_filename = generate_final_filename(video_name, video_id)
 
         # Write final file
