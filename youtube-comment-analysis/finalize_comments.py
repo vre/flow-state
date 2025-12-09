@@ -4,7 +4,8 @@ Creates final comment analysis markdown file from template and component files.
 
 Usage: finalize_comments.py <BASE_NAME> <OUTPUT_DIR> [--debug]
 Keeps: {BASE_NAME}_comment_analysis.md
-Removes: _name.txt, _comments.md, _comments_prefiltered.md, _comment_insights.md (unless --debug)
+Removes: _name.txt, _comments.md, _comments_prefiltered.md, _comment_insights.md, _comment_insights_tight.md (unless --debug)
+Note: Quick Summary removed - TL;DR in summary file is sufficient
 """
 
 import re
@@ -76,6 +77,23 @@ def fill_template(template: str, video_name: str, comment_insights: str, comment
     return content
 
 
+def strip_leading_header(content: str, header: str) -> str:
+    """
+    Strip leading markdown header if present.
+
+    Args:
+        content: Content that may start with header
+        header: Header text to strip (e.g., "## Quick Summary")
+
+    Returns:
+        Content with leading header removed
+    """
+    stripped = content.strip()
+    if stripped.startswith(header):
+        stripped = stripped[len(header) :].lstrip()
+    return stripped
+
+
 def get_work_files(base_name: str) -> list[str]:
     """
     Get list of intermediate work files to clean up.
@@ -91,7 +109,7 @@ def get_work_files(base_name: str) -> list[str]:
         f"{base_name}_comments.md",
         f"{base_name}_comments_prefiltered.md",
         f"{base_name}_comment_insights.md",
-        f"{base_name}_quick_summary.md",
+        f"{base_name}_comment_insights_tight.md",
     ]
 
 
@@ -143,28 +161,6 @@ class CommentFinalizer:
             return self.filesystem.read_text(file_path)
         return ""
 
-    def insert_quick_summary_into_summary(
-        self, summary_file: Path, quick_summary: str
-    ) -> None:
-        """
-        Insert Quick Summary section at the top of existing summary file.
-
-        Args:
-            summary_file: Path to summary file
-            quick_summary: Quick summary content to insert
-        """
-        if not self.filesystem.exists(summary_file):
-            return
-
-        content = self.filesystem.read_text(summary_file)
-
-        # Insert at top of file (before everything)
-        quick_summary_section = f"## Quick Summary\n\n{quick_summary.strip()}\n\n"
-        updated_content = quick_summary_section + content
-
-        self.filesystem.write_text(summary_file, updated_content)
-        print(f"Inserted Quick Summary into summary file: {summary_file.name}")
-
     def insert_comment_insights_into_summary(
         self, summary_file: Path, comment_insights: str
     ) -> None:
@@ -206,8 +202,7 @@ class CommentFinalizer:
         """
         # Read component files
         video_name = self.read_file_or_empty(output_dir / f"{base_name}_name.txt")
-        comment_insights = self.read_file_or_empty(output_dir / f"{base_name}_comment_insights.md")
-        quick_summary = self.read_file_or_empty(output_dir / f"{base_name}_quick_summary.md")
+        comment_insights = self.read_file_or_empty(output_dir / f"{base_name}_comment_insights_tight.md")
         comments = self.read_file_or_empty(output_dir / f"{base_name}_comments_prefiltered.md")
 
         # Generate summary filename to check if it exists
@@ -219,9 +214,6 @@ class CommentFinalizer:
         summary_exists = summary_file and self.filesystem.exists(summary_file)
 
         if summary_exists:
-            # Insert Quick Summary at top of existing summary file (if it exists)
-            if quick_summary:
-                self.insert_quick_summary_into_summary(summary_file, quick_summary)
             # Insert Comment Insights into existing summary file (if they exist)
             if comment_insights:
                 self.insert_comment_insights_into_summary(summary_file, comment_insights)
