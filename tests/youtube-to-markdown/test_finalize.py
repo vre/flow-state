@@ -79,7 +79,7 @@ class TestFinalizer:
 
         # Create component files
         mock_fs.write_text(output_dir / f"{base_name}_metadata.md", "Metadata content")
-        mock_fs.write_text(output_dir / f"{base_name}_summary.md", "Summary content")
+        mock_fs.write_text(output_dir / f"{base_name}_summary_tight.md", "Summary content")
 
         result = finalizer.assemble_final_content(sample_template, base_name, output_dir)
 
