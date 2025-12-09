@@ -175,7 +175,7 @@ class TestGetWorkFiles:
         assert "youtube_abc123_comments.md" in result
         assert "youtube_abc123_comments_prefiltered.md" in result
         assert "youtube_abc123_comment_insights.md" in result
-        assert "youtube_abc123_quick_summary.md" in result
+        assert "youtube_abc123_comment_insights_tight.md" in result
         assert len(result) == 5
 
 
@@ -295,7 +295,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[script_dir / "template_standalone.md"] = template_standalone_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         # LLM-generated content includes the header
-        mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
+        mock_filesystem.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
         mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comment content"
 
         finalizer = CommentFinalizer(mock_filesystem, script_dir)
@@ -316,7 +316,7 @@ class TestCommentFinalizer:
         assert output_dir / f"{base_name}_name.txt" not in mock_filesystem.files
         assert output_dir / f"{base_name}_comments.md" not in mock_filesystem.files
         assert output_dir / f"{base_name}_comments_prefiltered.md" not in mock_filesystem.files
-        assert output_dir / f"{base_name}_comment_insights.md" not in mock_filesystem.files
+        assert output_dir / f"{base_name}_comment_insights_tight.md" not in mock_filesystem.files
 
         # Check console output
         captured = capsys.readouterr()
@@ -333,7 +333,7 @@ class TestCommentFinalizer:
         mock_filesystem.files[script_dir / "template.md"] = template_content
         mock_filesystem.files[output_dir / f"{base_name}_name.txt"] = "Test Video"
         # LLM-generated content includes the header
-        mock_filesystem.files[output_dir / f"{base_name}_comment_insights.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
+        mock_filesystem.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "## Comment Insights (Theme)\n\nInsightful comment"
         mock_filesystem.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comment content"
 
         # Create summary file (no Description/Transcription, those are in separate file)
