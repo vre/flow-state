@@ -4,16 +4,19 @@ For now Youtube extraction.
 
 ## Skills
 
-**Youtube to Markdown** - Transform streaming content into storagable knowledge.
-- ✨ **TL;DR + structured summary**: Core insights, What/Why/How analysis, Hidden Gems
-- 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings
-- 🏷️ **Timestamp links**: Jump back to specific moments in the original video
-- 🎁 **Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
+🎁 **Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
+
+**Youtube to Markdown** - Transform streaming content into storagable knowledge as Markdown.
+- ✨ **TL;DR + structured summary**: Core insights with four content spesific summarization formats
+- 💎 **Hidden Gems**: Collects insights that normal summarization loses
+- 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings into own file
+- 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
+- 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
 
 **Youtube Comment Analysis** - Filter out the content from the cesspool.
-- 🥇 **Golden insights**: Curated exceptional comments
-- ⚔️ **Cross-analysis**: Optional integration with youtube-to-markdown for summary comparison
+- 🥇 **Comment insights**: Curates top voted comments and discussion threads
 - 🗑️ **Spam-free**: Filters low-value comments, duplicates, and off-topic noise
+- ⚔️ **Solo-analysis**: Optional standalone comment analysis without transcript
 
 **Skip the Video - Get the Knowledge.**
 
@@ -54,7 +57,7 @@ See an example output in [docs/Example Output.md](docs/Example%20Output.md)
 
 ### youtube-to-markdown
 
-Transform YouTube videos into storagable knowledge. Get TL;DR summaries, cleaned transcripts with chapters, and timestamp links.
+Transform YouTube videos into storagable knowledge. Get TL;DR, content-specific summary, separate file with cleaned transcript broken into paragraphs with topic headings and timestamp links. Continues analyzing comments to bring the audience view to the content.
 
 - **Category**: Media Extraction
 - **Dependencies**: yt-dlp, Python 3
@@ -66,10 +69,10 @@ Extract and analyze YouTube comments. Supports standalone or sequential workflow
 
 - **Category**: Media Extraction
 - **Dependencies**: yt-dlp, Python 3
-- **Output**: Markdown file with golden insights and curated comments
+- **Output**: Markdown file with comment insights and curated comments
 - **Modes**:
-  - Standalone: Comment analysis
-  - Sequential: Cross-analysis with video summary from youtube-to-markdown
+  - Standalone: Analyzes comments only
+  - Sequential: Adds viewpoints from comments to video summary
 
 ## The Backstory
 
