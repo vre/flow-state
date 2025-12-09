@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 Apply paragraph breaks to deduplicated transcript
-Usage: python3 apply_paragraph_breaks.py <INPUT_MD> <OUTPUT_MD> <BREAKS>
-BREAKS format: "15,42,78,103" (comma-separated line numbers)
+Usage: python3 apply_paragraph_breaks.py <INPUT_MD> <BREAKS_FILE> <OUTPUT_MD>
+BREAKS_FILE: file containing comma-separated line numbers (e.g., "15,42,78,103")
 """
 
 import sys
@@ -181,12 +181,18 @@ def extract_video_id_from_path(file_path: Path) -> str | None:
 def main() -> None:
     """CLI entry point."""
     if len(sys.argv) != 4:
-        print("Usage: python3 apply_paragraph_breaks.py <INPUT_MD> <OUTPUT_MD> <BREAKS>", file=sys.stderr)
+        print("Usage: python3 apply_paragraph_breaks.py <INPUT_MD> <BREAKS_FILE> <OUTPUT_MD>", file=sys.stderr)
         sys.exit(1)
 
     input_path = Path(sys.argv[1])
-    output_path = Path(sys.argv[2])
-    break_points_str = sys.argv[3]
+    breaks_file = Path(sys.argv[2])
+    output_path = Path(sys.argv[3])
+
+    # Read breaks from file
+    if not breaks_file.exists():
+        print(f"ERROR: Breaks file not found: {breaks_file}", file=sys.stderr)
+        sys.exit(1)
+    break_points_str = breaks_file.read_text().strip()
 
     # Extract video ID from input file path
     video_id = extract_video_id_from_path(input_path)
