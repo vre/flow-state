@@ -22,7 +22,7 @@ Execute all steps sequentially without asking for user approval. Use TodoWrite t
 python3 extract_data.py "<YOUTUBE_URL>" "<output_directory>"
 ```
 
-Script extracts video ID from URL and creates: youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
+Creates: youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
 
 **IMPORTANT**: If you ask which language transcript to extract then do not translate that language to english and require that subagent do not translate either. Only if the user requests another language that the original then translate.
 
@@ -36,7 +36,7 @@ If video language is `en`, proceed directly. If non-English, ask user which lang
 python3 extract_transcript.py "<YOUTUBE_URL>" "<output_directory>" "<LANG_CODE>"
 ```
 
-Script creates: youtube_{VIDEO_ID}_transcript.vtt
+Creates: youtube_{VIDEO_ID}_transcript.vtt
 
 **IMPORTANT**: All file output must be in the same language as discovered in Step 2. If language is not English, explicitly instruct all subagents to preserve the original language.
 
@@ -69,20 +69,25 @@ Parallel with Step 5.
 
 task_tool:
 - subagent_type: "general-purpose"
+- model: "sonnet"
 - prompt:
 ```
-Analyze <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt and identify natural paragraph break line numbers.
+INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
+CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
 
-Read <output_directory>/${BASE_NAME}_chapters.json. If it contains chapters, use chapter timestamps as primary break points.
+Analyze INPUT and identify natural paragraph break line numbers.
+
+Read CHAPTERS. If it contains chapters, use chapter timestamps as primary break points.
 
 Target ~500 chars per paragraph. Find natural break points at topic shifts or sentence endings.
 
-Return format:
-BREAKS: 15,42,78,103,...
+Write to OUTPUT in format:
+15,42,78,103,...
 ```
 
 ```bash
-python3 ./apply_paragraph_breaks.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md" "<BREAKS from task_tool>"
+python3 ./apply_paragraph_breaks.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
 ```
 
 ## Step 5: Summarize transcript
@@ -91,9 +96,11 @@ Parallel with Step 4.
 
 task_tool:
 - subagent_type: "general-purpose"
+- model: "sonnet"
 - prompt:
 ```
-Read <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt.
+INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
+OUTPUT: <output_directory>/${BASE_NAME}_summary.md
 
 1. Classify content type:
    - TIPS: gear reviews, rankings, "X ways to...", practical advice lists
@@ -107,7 +114,7 @@ Read <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt.
    - Skip ads, sponsors, self-promotion ("like and subscribe", merch, etc.)
    - Merge content spanning ad breaks if thematically connected
 
-3. Summarize using format for detected type. Target <10% of transcript bytes.
+3. Summarize using format for detected type. Target <10% of transcript bytes. Start headers from ## level (no H1).
 
 TIPS:
 **TL;DR**: [1 sentence synthesis]
@@ -136,32 +143,31 @@ TUTORIAL:
 
 4. Add ## Hidden Gems for valuable tangents/side narratives that don't fit main structure but deserve preservation.
 
-Write to <output_directory>/${BASE_NAME}_summary.md
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
 
 ## Step 6: Review and tighten summary
 
 task_tool:
 - subagent_type: "general-purpose"
+- model: "sonnet"
 - prompt:
 ```
-You are an adversarial copy editor. Your job is to ruthlessly cut fluff and enforce quality standards.
+INPUT: <output_directory>/${BASE_NAME}_summary.md
+OUTPUT: <output_directory>/${BASE_NAME}_summary_tight.md
 
-Read <output_directory>/${BASE_NAME}_summary.md
+You are an adversarial copy editor. Your job is to ruthlessly cut fluff and enforce quality standards.
 
 Enforce these rules:
 
-1. **Byte budget**: Total summary must be <10% of transcript bytes. Measure and trim if over.
-2. **Format compliance**: Verify correct format for detected type (TIPS/INTERVIEW/EDUCATIONAL/TUTORIAL)
-3. **Hidden Gems**: Must be tangential insights NOT covered in main sections. Remove any that duplicate main content.
-4. **Redundancy**: Merge sections with overlapping content
-5. **Tightness**: Cut filler words, compress verbose explanations, prefer lists over prose
-
-If violations found, rewrite to <output_directory>/${BASE_NAME}_summary.md
-
-If compliant, respond "PASSED" and make no changes.
+- Byte budget: Total summary must be <10% of transcript bytes. Measure and trim if over.
+- Hidden Gems: Must be tangential insights NOT covered in main sections. Remove any that duplicate main content.
+- Redundancy: Merge sections with overlapping content
+- Tightness: Cut filler words, compress verbose explanations, prefer lists over prose
 
 Preserve original language - do not translate.
+
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
 
 ## Step 7: Clean speech artifacts
@@ -171,7 +177,7 @@ task_tool:
 - model: "haiku"
 - prompt:
 ```
-Read <output_directory>/${BASE_NAME}_transcript_paragraphs.md and clean speech artifacts. Write to <output_directory>/${BASE_NAME}_transcript_cleaned.md.
+Read <output_directory>/${BASE_NAME}_transcript_paragraphs.md and clean speech artifacts.
 
 Tasks:
 - Remove fillers (um, uh, like, you know)
@@ -180,22 +186,27 @@ Tasks:
 - Reduce or add implicit words to improve flow
 - Preserve natural voice and tone
 - Keep timestamps at end of paragraphs
+
+ACTION REQUIRED: Use the Write tool NOW to save output to <output_directory>/${BASE_NAME}_transcript_cleaned.md. Do not ask for confirmation.
 ```
 
 ## Step 8: Add topic headings
 
 task_tool:
 - subagent_type: "general-purpose"
+- model: "sonnet"
 - prompt:
 ```
 INPUT: <output_directory>/${BASE_NAME}_transcript_cleaned.md
 OUTPUT: <output_directory>/${BASE_NAME}_transcript.md
 
-Read the INPUT file. Add markdown headings. Write result to OUTPUT file.
+Read the INPUT file. Add markdown headings.
 
 Read <output_directory>/${BASE_NAME}_chapters.json:
 - If contains chapters: Use chapter names as ### headings at chapter timestamps, add #### headings for subtopics
 - If empty: Add ### headings where major topics change
+
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
 
 ## Step 9: Finalize and cleanup
@@ -212,6 +223,6 @@ Outputs:
 
 Use `--debug` flag to keep intermediate work files for inspection.
 
-## Step 10: Comment analysis (optional)
+## Step 10: Comment analysis
 
-If youtube-comment-analysis skill is available, run it with the same YouTube URL.
+If youtube-comment-analysis skill is available, run it with the same YouTube URL and output directory.
