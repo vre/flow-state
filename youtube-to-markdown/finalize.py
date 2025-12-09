@@ -3,7 +3,7 @@
 Creates final markdown file from template and component files, cleans up intermediate work files
 Usage: finalize.py [--debug] <BASE_NAME> <OUTPUT_DIR>
 Keeps: {BASE_NAME}.md
-Removes: all intermediate files including _metadata.md, _summary.md, _description.md, _transcript.md (unless --debug)
+Removes: all intermediate files including _metadata.md, _summary.md, _summary_tight.md, _description.md, _transcript.md (unless --debug)
 """
 
 import sys
@@ -115,7 +115,7 @@ class Finalizer:
         # Read component files
         quick_summary = self.read_component_or_empty(output_dir / f"{base_name}_quick_summary.md")
         metadata = self.read_component_or_empty(output_dir / f"{base_name}_metadata.md")
-        summary = self.read_component_or_empty(output_dir / f"{base_name}_summary.md")
+        summary = self.read_component_or_empty(output_dir / f"{base_name}_summary_tight.md")
 
         # Strip duplicate headers from components
         quick_summary = self.strip_leading_header(quick_summary, "## Quick Summary")
@@ -167,11 +167,13 @@ class Finalizer:
             f"{base_name}_title.txt",
             f"{base_name}_metadata.md",
             f"{base_name}_summary.md",
+            f"{base_name}_summary_tight.md",
             f"{base_name}_description.md",
             f"{base_name}_chapters.json",
             f"{base_name}_transcript.vtt",
             f"{base_name}_transcript_dedup.md",
             f"{base_name}_transcript_no_timestamps.txt",
+            f"{base_name}_transcript_paragraphs.txt",
             f"{base_name}_transcript_paragraphs.md",
             f"{base_name}_transcript_cleaned.md",
             f"{base_name}_transcript.md"
