@@ -16,7 +16,7 @@ Execute all steps sequentially without asking for user approval. Use TodoWrite t
 
 ## Step 0: Check for video summary
 
-Extract video ID from URL and check if file matching `<output_directory>/youtube - * ({video_id}).md` exists. If found, use it for context in later steps.
+Extract video ID from URL and check if file matching `<output_directory>/youtube - *  ({video_id}).md` exists. If found, use it for context in later steps.
 
 ## Step 1: Extract comments
 
@@ -32,19 +32,22 @@ Creates: youtube_{VIDEO_ID}_name.txt, youtube_{VIDEO_ID}_comments.md
 python3 ./prefilter_comments.py "<output_directory>/${BASE_NAME}_comments.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md"
 ```
 
-Removes junk (short AND unpopular), keeps top 200 by likes. Comments already sorted by yt-dlp.
+Creates: youtube_{VIDEO_ID}_comments_prefiltered.md
 
 ## Step 3: Extract Insightful Comments
 
 task_tool:
 - subagent_type: "general-purpose"
+- model: "sonnet"
 - prompt:
 ```
-Read Summary section from "<output_directory>/youtube - * ({video_id}).md" file if available.
+SUMMARY: "<output_directory>/youtube - * ({video_id}).md" if exists
+INPUT: <output_directory>/${BASE_NAME}_comments_prefiltered.md
+OUTPUT: <output_directory>/${BASE_NAME}_comment_insights.md
 
-Read <output_directory>/${BASE_NAME}_comments_prefiltered.md. Extract, condense, combine and summarize ruthlessly for the MOST exceptional true insights NOT already covered by the summary. No fluff, NOT a document.
+Extract, condense, combine and summarize ruthlessly for the MOST exceptional true insights NOT already covered by the summary. No fluff, NOT a document.
 
-Write to <output_directory>/${BASE_NAME}_comment_insights.md in format:
+Write to OUTPUT in format:
 
 ## Comment Insights ([Analyze the insights and determine their primary theme/direction in 2-7 words])
 
@@ -52,13 +55,28 @@ Key Takeaway from Comments: [One paragraph summary - ONLY if it adds value beyon
 
 **[title per detected comment insight theme, if any detectable]**:
 - [any true insights hiding in the comments, NOT in summary, **highlight keywords**]
-- [insight 2]
-- [insight N]
 ```
 
-## Step 4: Generate Quick Summary
+## Step 4: Review and tighten comment insights
 
-Write a finalizing short summary to <output_directory>/${BASE_NAME}_quick_summary.md synthesizing video + comment insights.
+task_tool:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt:
+```
+SUMMARY: "<output_directory>/youtube - * ({video_id}).md" if exists
+INPUT: <output_directory>/${BASE_NAME}_comment_insights.md
+OUTPUT: <output_directory>/${BASE_NAME}_comment_insights_tight.md
+
+You are an adversarial copy editor. Your job is to ruthlessly cut fluff and enforce quality standards.
+
+Rules:
+- Remove insights already in summary file
+- Cut filler, prefer lists over prose
+- Keep only exceptional value-add insights
+
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+```
 
 ## Step 5: Finalize
 
