@@ -209,7 +209,7 @@ Read <output_directory>/${BASE_NAME}_chapters.json:
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
 
-## Step 9: Finalize and cleanup
+## Step 9: Create output files
 
 ```bash
 python3 finalize.py "${BASE_NAME}" "<output_directory>"
