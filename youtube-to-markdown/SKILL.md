@@ -12,8 +12,7 @@ allowed-tools:
 
 # YouTube to Markdown
 
-**Multiple videos**: Process one video at a time, sequentially. Do not run parallel extractions.
-
+Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions.
 Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress.
 
 ## Step 1: Extract data (metadata, description, chapters)
@@ -24,7 +23,7 @@ python3 extract_data.py "<YOUTUBE_URL>" "<output_directory>"
 
 Creates: youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
 
-**IMPORTANT**: If you ask which language transcript to extract then do not translate that language to english and require that subagent do not translate either. Only if the user requests another language that the original then translate.
+IMPORTANT: If you ask which language transcript to extract then do not translate that language to english and require that subagent do not translate either. Only if the user requests another language that the original then translate.
 
 ## Step 2: Extract transcript
 
@@ -38,7 +37,7 @@ python3 extract_transcript.py "<YOUTUBE_URL>" "<output_directory>" "<LANG_CODE>"
 
 Creates: youtube_{VIDEO_ID}_transcript.vtt
 
-**IMPORTANT**: All file output must be in the same language as discovered in Step 2. If language is not English, explicitly instruct all subagents to preserve the original language.
+IMPORTANT: All file output must be in the same language as discovered in Step 2. If language is not English, explicitly instruct all subagents to preserve the original language.
 
 The download may fail if a video is private, age-restricted, or geo-blocked.
 

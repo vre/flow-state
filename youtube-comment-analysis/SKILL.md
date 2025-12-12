@@ -12,7 +12,7 @@ allowed-tools:
 
 # YouTube Comment Analysis
 
-Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress.
+Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress, update Todolist.
 
 ## Step 0: Check for video summary
 
@@ -45,16 +45,45 @@ SUMMARY: "<output_directory>/youtube - * ({video_id}).md" if exists
 INPUT: <output_directory>/${BASE_NAME}_comments_prefiltered.md
 OUTPUT: <output_directory>/${BASE_NAME}_comment_insights.md
 
-Extract, condense, combine and summarize ruthlessly for the MOST exceptional true insights NOT already covered by the summary. No fluff, NOT a document.
+Detect video type from SUMMARY:
+- TIPS: gear reviews, rankings, practical advice
+- INTERVIEW: podcasts, conversations, Q&A
+- EDUCATIONAL: concept explanations, analysis
+- TUTORIAL: step-by-step instructions
 
 Write to OUTPUT in format:
 
-## Comment Insights ([Analyze the insights and determine their primary theme/direction in 2-7 words])
+## Comment Insights ([2-7 word theme])
 
-Key Takeaway from Comments: [One paragraph summary - ONLY if it adds value beyond just repeating the bullet points below]
+**Key Takeaway**: [One paragraph - ONLY if adds value beyond bullets]
 
-**[title per detected comment insight theme, if any detectable]**:
-- [any true insights hiding in the comments, NOT in summary, **highlight keywords**]
+[Include type-specific sections if found in comments:]
+
+TUTORIAL:
+- **Common Failures**: [what goes wrong, why, how to fix]
+- **Success Patterns**: [what worked, time investment]
+
+TIPS:
+- **What Worked/Didn't**: [real-world validation]
+- **Alternatives Mentioned**: [products, methods]
+
+INTERVIEW:
+- **Points of Agreement/Debate**: [where commenters align/clash]
+- **Related Stories**: [personal experiences shared]
+
+EDUCATIONAL:
+- **Corrections/Extensions**: [where commenters add/fix content]
+- **Debates**: [alternative viewpoints]
+
+**[Additional themes as needed]**:
+- [insight with **keyword highlights**]
+
+Rules:
+- Extract insights NOT already in summary
+- Prioritize actionable over opinions
+- Include commenter attribution only if expertise matters
+
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
 ```
 
 ## Step 4: Review and tighten comment insights
@@ -74,8 +103,9 @@ Rules:
 - Remove insights already in summary file
 - Cut filler, prefer lists over prose
 - Keep only exceptional value-add insights
+- Preserve type-specific sections (Common Failures, What Worked/Didn't, etc.)
 
-ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
 ```
 
 ## Step 5: Finalize
