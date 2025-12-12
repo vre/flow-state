@@ -20,11 +20,12 @@
   - There is actually no sense of not analyzing comments. Only ask how if many comments to analyze.
 - [x] Study better ways to summarize comments
   - There is variance based on video content, so let the LLM analysse and decide.
-- [x] More metadata - amount of comments, license 
+- [x] More metadata - amount of comments, license.
+- [x] Check if already extracted - maybe then update summary structure if old version or less comments analyzed.
 
 ## Ideas for further improvements
 
-- [ ] Check if already extracted - maybe then update the comment analysis only?
+
 - [ ] Highlighting notable content to browseability
 - [ ] Keyword/topic list section with links to transcript parts
 - [ ] Analysis linking to transcript/commentary

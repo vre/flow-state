@@ -15,6 +15,14 @@ allowed-tools:
 Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions.
 Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress.
 
+## Step 0: Check extracted before
+
+```bash
+python3 ./check_existing.py "<YOUTUBE_URL>" "<output_directory>"
+```
+If returns `exists: true` Read and follow UPDATE_MODE.md for update workflow.
+
+
 ## Step 1: Extract data (metadata, description, chapters)
 
 ```bash
