@@ -20,7 +20,7 @@
   - There is actually no sense of not analyzing comments. Only ask how if many comments to analyze.
 - [x] Study better ways to summarize comments
   - There is variance based on video content, so let the LLM analysse and decide.
-- [ ] More metadata - amount of comments, license 
+- [x] More metadata - amount of comments, license 
 
 ## Ideas for further improvements
 

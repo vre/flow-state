@@ -47,13 +47,18 @@ class VideoMetadata:
     uploader: str
     channel_url: str
     channel_follower_count: Optional[int]
+    channel_is_verified: bool
     upload_date: str
     view_count: int
     like_count: int
+    comment_count: Optional[int]
     duration: int
     description: str
     chapters: list[dict[str, Any]]
     language: str
+    categories: list[str]
+    tags: list[str]
+    license: Optional[str]
 
 
 @dataclass
@@ -258,6 +263,25 @@ def format_duration(duration: int) -> str:
         else:
             return f"{minutes:02d}:{seconds:02d}"
     return "Unknown"
+
+
+def format_count(count: Optional[int]) -> str:
+    """
+    Format large numbers with K/M suffix.
+
+    Args:
+        count: Number to format
+
+    Returns:
+        Formatted string (e.g., "2.2M", "71K", "500")
+    """
+    if count is None:
+        return "N/A"
+    if count >= 1_000_000:
+        return f"{count / 1_000_000:.1f}M".replace(".0M", "M")
+    if count >= 1_000:
+        return f"{count / 1_000:.1f}K".replace(".0K", "K")
+    return str(count)
 
 
 def clean_title_for_filename(title: str, max_length: int = 60) -> str:
