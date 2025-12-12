@@ -14,7 +14,7 @@ from typing import Optional
 from shared_types import (
     FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
     VideoMetadata, extract_video_id, format_upload_date, format_subscribers,
-    format_duration, CommandNotFoundError, FileOperationError
+    format_duration, format_count, CommandNotFoundError, FileOperationError
 )
 
 
@@ -116,13 +116,18 @@ class YouTubeDataExtractor:
             uploader=data.get('uploader', 'Unknown'),
             channel_url=data.get('channel_url', data.get('uploader_url', '')),
             channel_follower_count=data.get('channel_follower_count'),
+            channel_is_verified=data.get('channel_is_verified', False),
             upload_date=data.get('upload_date', 'Unknown'),
             view_count=data.get('view_count', 0),
             like_count=data.get('like_count', 0),
+            comment_count=data.get('comment_count'),
             duration=data.get('duration', 0),
             description=data.get('description', 'No description'),
             chapters=data.get('chapters', []),
-            language=data.get('language', 'unknown')
+            language=data.get('language', 'unknown'),
+            categories=data.get('categories', []),
+            tags=data.get('tags', []),
+            license=data.get('license')
         )
 
     def create_metadata_file(
@@ -153,25 +158,41 @@ class YouTubeDataExtractor:
         extraction_date = datetime.now().strftime('%Y-%m-%d')
         sub_text = format_subscribers(metadata.channel_follower_count)
         duration_text = format_duration(metadata.duration)
-        views_text = f"{metadata.view_count:,}" if metadata.view_count else "0"
-        likes_text = f"{metadata.like_count:,}" if metadata.like_count else "0"
+        views_text = format_count(metadata.view_count)
+        likes_text = format_count(metadata.like_count)
+        comments_text = format_count(metadata.comment_count)
+        verified_text = " ✓" if metadata.channel_is_verified else ""
 
         # Build content
         lines = [
-            f"- **Title:** [{metadata.title}]({metadata.webpage_url})"
+            f"- **Title:** [{metadata.title}]({metadata.webpage_url}) · {duration_text}"
         ]
 
         if metadata.channel_url:
             lines.append(
-                f"- **Channel:** [{metadata.uploader}]({metadata.channel_url}) ({sub_text})"
+                f"- **Channel:** [{metadata.uploader}]({metadata.channel_url}){verified_text} ({sub_text})"
             )
         else:
-            lines.append(f"- **Channel:** {metadata.uploader} ({sub_text})")
+            lines.append(f"- **Channel:** {metadata.uploader}{verified_text} ({sub_text})")
 
         lines.extend([
-            f"- **Views:** {views_text} | Likes: {likes_text} | Duration: {duration_text}",
+            f"- **Engagement:** {views_text} views · {likes_text} likes · {comments_text} comments",
             f"- **Published:** {upload_date} | Extracted: {extraction_date}"
         ])
+
+        # Add category and license if available
+        category_license = []
+        if metadata.categories:
+            category_license.append(f"**Category:** {', '.join(metadata.categories)}")
+        if metadata.license:
+            category_license.append(f"**License:** {metadata.license}")
+        if category_license:
+            lines.append(f"- {' | '.join(category_license)}")
+
+        # Add tags if available (limit to 8)
+        if metadata.tags:
+            tags_display = metadata.tags[:8]
+            lines.append(f"- **Tags:** {', '.join(tags_display)}")
 
         content = '\n'.join(lines)
         self.fs.write_text(filename, content)
