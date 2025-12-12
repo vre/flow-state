@@ -101,6 +101,7 @@ task_tool:
 ```
 INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
 OUTPUT: <output_directory>/${BASE_NAME}_summary.md
+FORMATS: ./summary_formats.md
 
 1. Classify content type:
    - TIPS: gear reviews, rankings, "X ways to...", practical advice lists
@@ -114,34 +115,8 @@ OUTPUT: <output_directory>/${BASE_NAME}_summary.md
    - Skip ads, sponsors, self-promotion ("like and subscribe", merch, etc.)
    - Merge content spanning ad breaks if thematically connected
 
-3. Summarize using format for detected type. Target <10% of transcript bytes. Start headers from ## level (no H1).
+3. Read FORMATS file and use format for detected content type. Target <10% of transcript bytes.
 
-TIPS:
-**TL;DR**: [1 sentence synthesis]
-- **[Category]**: [item], [item], [item]
-- **[Category]**: [item], [item]
-
-INTERVIEW:
-**TL;DR**: [1 sentence synthesis]
-### [Content Unit Title]
-[2-3 sentence narrative. "Quote if impactful."]
-
-EDUCATIONAL:
-**TL;DR**: [1 sentence synthesis]
-### [Content Unit Title]
-**What**: [definition/description]
-**Why**: [reasoning/importance]
-**How**: [mechanism/application]
-**What Then**: [implications if actionable]
-
-TUTORIAL:
-**TL;DR**: [1 sentence synthesis]
-**Prerequisites**: [if any]
-1. [Step with outcome]
-2. [Step with outcome]
-**Result**: [what you end up with]
-
-4. Add ## Hidden Gems for valuable tangents/side narratives that don't fit main structure but deserve preservation.
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
@@ -155,14 +130,14 @@ task_tool:
 ```
 INPUT: <output_directory>/${BASE_NAME}_summary.md
 OUTPUT: <output_directory>/${BASE_NAME}_summary_tight.md
+FORMATS: ./summary_formats.md
 
-You are an adversarial copy editor. Your job is to ruthlessly cut fluff and enforce quality standards.
+You are an adversarial copy editor. Cut fluff, enforce quality.
 
-Enforce these rules:
-
-- Byte budget: Total summary must be <10% of transcript bytes. Measure and trim if over.
-- Hidden Gems: Must be tangential insights NOT covered in main sections. Remove any that duplicate main content.
-- Redundancy: Merge sections with overlapping content
+Rules:
+- Read FORMATS - the format has been selected based on the content type - preserve format and do not count a reason to squeeze more from budget.
+- Byte budget: <10% of transcript bytes
+- Hidden Gems: Remove if duplicates main content
 - Tightness: Cut filler words, compress verbose explanations, prefer lists over prose
 
 Preserve original language - do not translate.
