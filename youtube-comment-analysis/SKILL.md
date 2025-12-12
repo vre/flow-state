@@ -16,7 +16,7 @@ Execute all steps sequentially without asking for user approval. Use TodoWrite t
 
 ## Step 0: Check for video summary
 
-Extract video ID from URL and check if file matching `<output_directory>/youtube - *  ({video_id}).md` exists. If found, use it for context in later steps.
+Check if `<output_directory>/youtube - * ({video_id}).md` exists. If found, use it for context in later steps.
 
 ## Step 1: Extract comments
 
