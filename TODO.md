@@ -1,29 +1,5 @@
 # TODO
 
-## Implemented 2.0
-
-- [x] Timestamps linking to original video
-- [x] Move the comment analysis to summary section
-- [x] Retitle the comment analysis and add tiny heading summary
-- [x] Add key takeaways from comments
-- [x] Move the transcription to own file
-  - It took too much space from summary file, and I think it is better use to separate them
-- [x] What about really long videos? Should do Multiple parts or what? Longer video, longer summary? Or squeeze based on information content ratio? 
-  - Create more summaries based on the sections of content in the video
-- [x] How to handle videos with promotion blocks? 
-  - Skip them during the analysis as part of the section identification
-- [x] Test with different video types - lectures, talks, vlogs, tutorials, reviews
-  - Why/what/how/when format does definitely work with list style videos -> 4 types of summaries
-- [x] Fix bloated summaries 
-  - AI always need a verification step added adversial editor step
-- [x] What if the video has 1000+ comments - prefiltering via thumbs up/down?
-  - There is actually no sense of not analyzing comments. Only ask how if many comments to analyze.
-- [x] Study better ways to summarize comments
-  - There is variance based on video content, so let the LLM analysse and decide.
-- [x] More metadata - amount of comments, license.
-- [x] Check if already extracted - maybe then update summary structure if old version or less comments analyzed.
-- [x] Handle constant annoying permission requests
-
 ## Ideas for further improvements
 
 - [ ] Highlighting notable content to browseability
