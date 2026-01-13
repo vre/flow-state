@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.1] - 2026-01-13
+
+### Bug fixes
+- Detect incomplete extractions (empty summary/transcript sections)
+- check_existing.py returns summary_valid, transcript_valid, comments_valid flags
+- SKILL.md asks user before re-processing broken files
+
 ## [2.1.0] - 2025-01-13
 
 ### Technical
