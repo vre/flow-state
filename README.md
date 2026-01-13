@@ -51,7 +51,19 @@ Or for comments only
 get comments https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
-See an example output in [docs/Example Output.md](docs/Example%20Output.md)
+## Examples
+
+All examples are CC-licensed videos with full summary and comment analysis.
+
+| Type | Summary | Links |
+|------|---------|-------|
+| Tutorial | [Faro Shuffle Tutorial!](examples/youtube%20-%20Faro%20Shuffle%20Tutorial!%20(RXhNA0xLRgY).md) | [transcript](examples/youtube%20-%20Faro%20Shuffle%20Tutorial!%20-%20transcript%20(RXhNA0xLRgY).md) · [video](https://www.youtube.com/watch?v=RXhNA0xLRgY) |
+| Educational | [Brain: Parts & functions](examples/youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20(DtkRGbTp1s8).md) | [transcript](examples/youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20-%20transcript%20(DtkRGbTp1s8).md) · [video](https://www.youtube.com/watch?v=DtkRGbTp1s8) |
+| Educational | [Happiness is all in your mind](examples/youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20(xnLoToJVQH4).md) | [transcript](examples/youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20-%20transcript%20(xnLoToJVQH4).md) · [video](https://www.youtube.com/watch?v=xnLoToJVQH4) |
+| Tips | [How to Become a Great Software Developer](examples/youtube%20-%20How%20to%20Become%20a%20Great%20Software%20Developer%20—%20Best%20Advice%20from%20(suATPK45sjk).md) | [transcript](examples/youtube%20-%20How%20to%20Become%20a%20Great%20Software%20Developer%20—%20Best%20Advice%20from%20-%20transcript%20(suATPK45sjk).md) · [video](https://www.youtube.com/watch?v=suATPK45sjk) |
+| Tips | [Sourdough vs Normal Bread](examples/youtube%20-%20Sourdough%20vs%20Normal%20Bread%20-%20Whats%20the%20Difference%20(NieQHjCHnxg).md) | [transcript](examples/youtube%20-%20Sourdough%20vs%20Normal%20Bread%20-%20Whats%20the%20Difference%20-%20transcript%20(NieQHjCHnxg).md) · [video](https://www.youtube.com/watch?v=NieQHjCHnxg) |
+| Interview | [Chris Rock on starting standup](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20(M6rBiCnntng).md) | [transcript](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20-%20transcript%20(M6rBiCnntng).md) · [video](https://www.youtube.com/watch?v=M6rBiCnntng) |
+| Interview | [Interview with Senior JS Developer](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20(Uo3cL4nrGOk).md) | [transcript](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20transcript%20(Uo3cL4nrGOk).md) · [comments](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20comments%20(Uo3cL4nrGOk).md) · [video](https://www.youtube.com/watch?v=Uo3cL4nrGOk) |
 
 ## Available Skills
 
