@@ -115,3 +115,29 @@ Same text
         content = mock_fs.read_text(output_path)
         assert content.count("Same text") == 1
         assert content.count("Different text") == 1
+
+    def test_deduplicate_vtt_with_no_timestamps_output(self, mock_fs, sample_vtt_content):
+        """Test writing additional file without timestamps."""
+        dedup = VTTDeduplicator(fs=mock_fs)
+
+        input_path = Path("/input.vtt")
+        output_path = Path("/output.md")
+        no_timestamps_path = Path("/output_plain.md")
+        mock_fs.write_text(input_path, sample_vtt_content)
+
+        line_count = dedup.deduplicate_vtt(input_path, output_path, no_timestamps_path)
+
+        assert line_count == 3
+        # Check timestamped output
+        content = mock_fs.read_text(output_path)
+        assert "[00:00:01.000] First line of text" in content
+
+        # Check plain output (no timestamps)
+        plain_content = mock_fs.read_text(no_timestamps_path)
+        lines = plain_content.split('\n')
+        assert len(lines) == 3
+        assert lines[0] == "First line of text"
+        assert lines[1] == "Second line of text"
+        assert lines[2] == "Third line of text"
+        # Verify no timestamps in plain output
+        assert "[00:00:" not in plain_content

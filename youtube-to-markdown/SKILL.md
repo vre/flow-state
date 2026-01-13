@@ -66,8 +66,7 @@ Script auto-detects MLX Whisper on Mac and uses it if available, otherwise uses 
 Set BASE_NAME from Step 1 output (youtube_{VIDEO_ID})
 
 ```bash
-python3 deduplicate_vtt.py "<output_directory>/${BASE_NAME}_transcript.vtt" "<output_directory>/${BASE_NAME}_transcript_dedup.md"
-cut -c 16- <output_directory>/${BASE_NAME}_transcript_dedup.md > <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
+python3 ./deduplicate_vtt.py "<output_directory>/${BASE_NAME}_transcript.vtt" "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_no_timestamps.txt"
 ```
 
 ## Step 4: Add natural paragraph breaks

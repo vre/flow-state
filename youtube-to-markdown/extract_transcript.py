@@ -8,6 +8,7 @@ Output: SUCCESS: youtube_{VIDEO_ID}_transcript.vtt or ERROR: No subtitles availa
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import (
     FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
     extract_video_id, CommandNotFoundError, TranscriptNotAvailableError,

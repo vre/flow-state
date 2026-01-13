@@ -9,6 +9,7 @@ Removes: all intermediate files including _metadata.md, _summary.md, _summary_ti
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import FileSystem, RealFileSystem, clean_title_for_filename, FileOperationError
 
 

@@ -22,9 +22,9 @@
   - There is variance based on video content, so let the LLM analysse and decide.
 - [x] More metadata - amount of comments, license.
 - [x] Check if already extracted - maybe then update summary structure if old version or less comments analyzed.
+- [x] Handle constant annoying permission requests
 
 ## Ideas for further improvements
-
 
 - [ ] Highlighting notable content to browseability
 - [ ] Keyword/topic list section with links to transcript parts

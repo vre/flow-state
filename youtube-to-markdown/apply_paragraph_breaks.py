@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 from dataclasses import dataclass
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import FileSystem, RealFileSystem, FileOperationError
 
 

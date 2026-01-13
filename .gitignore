@@ -22,6 +22,7 @@ uv.lock
 .idea/
 *.swp
 *.swo
+.github
 
 # OS
 .DS_Store
@@ -38,3 +39,6 @@ tmp/
 *.webm
 *.m4a
 *.mp3
+
+# Large model files
+ggml-model-fi-large-v3.bin

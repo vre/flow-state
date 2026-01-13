@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.1.0] - 2025-01-13
+
+### Technical
+- Scripts runnable from any directory (sys.path fix for imports)
+- Replaced shell commands (cut, mv, rm) with Python for Claude Code permission compatibility
+- Added file_ops.py for backup/cleanup operations
+- deduplicate_vtt.py: optional third param for timestamp-stripped output
+
+### Testing
+- 9 new tests for file_ops.py
+
+## [2.0.1] - 2025-01-07
+
+### Improvements
+- More metadata in summary output
+- Old format analysis update script added
+
 ## [2.0] - 2024-12-08
 
 ### New features
