@@ -10,6 +10,7 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import extract_video_id
 
 

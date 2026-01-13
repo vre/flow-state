@@ -4,8 +4,6 @@ For now Youtube extraction.
 
 ## Skills
 
-🎁 **Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
-
 **Youtube to Markdown** - Transform streaming content into storagable knowledge as Markdown.
 - ✨ **TL;DR + structured summary**: Core insights with four content spesific summarization formats
 - 💎 **Hidden Gems**: Collects insights that normal summarization loses
@@ -19,6 +17,8 @@ For now Youtube extraction.
 - ⚔️ **Solo-analysis**: Optional standalone comment analysis without transcript
 
 **Skip the Video - Get the Knowledge.**
+
+**Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
 
 ## Quick Start
 
@@ -34,13 +34,6 @@ Add the marketplace and install skills:
 **Usage:**
 
 ```
-Hello, would you be kind and help me by running the a skill so that I could read the
-transcription of the video and add it to my ever growing Obsidian vault? Oh, and could
-you also dive in the cesspool for meee.. I mean the comments section and get me
-something I can read without burning eyes?
-
-or..
-
 extract https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 ('get', 'fetch', 'transcript', 'subtitles', 'captions', etc. works too)
@@ -48,7 +41,7 @@ extract https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 Or for comments only
 ```
-get comments https://www.youtube.com/watch?v=dQw4w9WgXcQ
+comments https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 ## Examples
@@ -83,8 +76,8 @@ Extract and analyze YouTube comments. Supports standalone or sequential workflow
 - **Dependencies**: yt-dlp, Python 3
 - **Output**: Markdown file with comment insights and curated comments
 - **Modes**:
-  - Standalone: Analyzes comments only
   - Sequential: Adds viewpoints from comments to video summary
+  - Standalone: Analyzes comments only
 
 ## The Backstory
 

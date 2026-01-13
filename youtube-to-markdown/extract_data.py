@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import (
     FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
     VideoMetadata, extract_video_id, format_upload_date, format_subscribers,

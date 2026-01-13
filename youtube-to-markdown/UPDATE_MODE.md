@@ -35,8 +35,8 @@ Options based on what changed:
 
 ## Step U4: Execute selected refreshes
 
-Move aside = `mv {file} {file}_backup_{date}.md` (file replaced)
-Backup = `cp {file} {file}_backup_{date}.md` (file modified in place)
+Move aside = `python3 ./file_ops.py backup {file}` then delete original (file replaced)
+Backup = `python3 ./file_ops.py backup {file}` (file modified in place, keep original)
 
 ### Re-summarize
 1. Move summary aside
@@ -71,7 +71,5 @@ If no comment file:
 
 Remove intermediate files created during update:
 ```bash
-rm youtube_{VIDEO_ID}_metadata.md
-rm youtube_{VIDEO_ID}_description.md
-rm youtube_{VIDEO_ID}_chapters.json
+python3 ./file_ops.py cleanup "<output_directory>" "{VIDEO_ID}"
 ```

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Deduplicate VTT (removes duplicate lines from auto-generated captions)
-Usage: python3 deduplicate_vtt.py <INPUT_VTT> <OUTPUT_MD>
+Usage: python3 deduplicate_vtt.py <INPUT_VTT> <OUTPUT_MD> [NO_TIMESTAMPS_MD]
 Output format: [00:00:01.000] Text here
 """
 
@@ -9,6 +9,7 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import FileSystem, RealFileSystem, FileOperationError
 
 
@@ -53,13 +54,16 @@ class VTTDeduplicator:
 
         return None, ""
 
-    def deduplicate_vtt(self, input_path: Path, output_path: Path) -> int:
+    def deduplicate_vtt(
+        self, input_path: Path, output_path: Path, no_timestamps_path: Path | None = None
+    ) -> int:
         """
         Deduplicate VTT file and save as markdown.
 
         Args:
             input_path: Path to input VTT file
             output_path: Path to output markdown file
+            no_timestamps_path: Optional path to write plain text without timestamps
 
         Returns:
             Number of lines written
@@ -100,22 +104,32 @@ class VTTDeduplicator:
         if not self.fs.exists(output_path):
             raise FileOperationError(f"Failed to create {output_path}")
 
+        # Write plain text without timestamps if requested
+        if no_timestamps_path:
+            # Strip "[HH:MM:SS.mmm] " prefix (15 chars) from each line
+            plain_lines = [line[15:] for line in output_lines]
+            self.fs.write_text(no_timestamps_path, '\n'.join(plain_lines))
+
         print(f"SUCCESS: {output_path} ({len(output_lines)} lines)")
         return len(output_lines)
 
 
 def main() -> None:
     """CLI entry point."""
-    if len(sys.argv) != 3:
-        print("Usage: python3 deduplicate_vtt.py <INPUT_VTT> <OUTPUT_MD>", file=sys.stderr)
+    if len(sys.argv) < 3 or len(sys.argv) > 4:
+        print(
+            "Usage: python3 deduplicate_vtt.py <INPUT_VTT> <OUTPUT_MD> [NO_TIMESTAMPS_MD]",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     input_path = Path(sys.argv[1])
     output_path = Path(sys.argv[2])
+    no_timestamps_path = Path(sys.argv[3]) if len(sys.argv) == 4 else None
 
     try:
         deduplicator = VTTDeduplicator()
-        deduplicator.deduplicate_vtt(input_path, output_path)
+        deduplicator.deduplicate_vtt(input_path, output_path, no_timestamps_path)
     except Exception as e:
         print(f"ERROR: {str(e)}", file=sys.stderr)
         sys.exit(1)
