@@ -32,6 +32,8 @@
   - Previously only did what/why/how/when then structure that is now the EDUCATIONAL
 - Adversarial editor step enforces <10% byte budget and cuts fluff
 - YouTube time-links: paragraph timestamps link back to video position
+- Transcript moved to separate file (summary was getting too long)
+- Promotion blocks skipped during section identification
 
 ### Improvements
 - Comment sort: default (new) → top (by likes)
