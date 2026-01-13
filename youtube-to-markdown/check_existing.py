@@ -82,6 +82,51 @@ def detect_v1_comments(content: str) -> bool:
     return not any(section in content for section in type_sections)
 
 
+def has_section_content(content: str, section: str) -> bool:
+    """Check if section header exists AND has non-empty content after it."""
+    pattern = rf"{re.escape(section)}\s*\n(.*?)(?=\n## |\Z)"
+    match = re.search(pattern, content, re.DOTALL)
+    return match is not None and len(match.group(1).strip()) > 0
+
+
+def validate_summary_integrity(content: str) -> tuple[bool, list[str]]:
+    """
+    Validate that summary file has all required elements with content.
+    Returns (is_valid, list_of_issues).
+    """
+    issues = []
+
+    if not has_section_content(content, "## Video"):
+        issues.append("empty_video_section")
+
+    if not has_section_content(content, "## Summary"):
+        issues.append("empty_summary_section")
+    elif "**TL;DR**" not in content:
+        issues.append("missing_tldr")
+
+    return (len(issues) == 0, issues)
+
+
+def validate_transcript_integrity(content: str) -> tuple[bool, list[str]]:
+    """Validate transcript file has required elements with content."""
+    issues = []
+
+    if not has_section_content(content, "## Transcription"):
+        issues.append("empty_transcription_section")
+
+    return (len(issues) == 0, issues)
+
+
+def validate_comments_integrity(content: str) -> tuple[bool, list[str]]:
+    """Validate comments file has required elements with content."""
+    issues = []
+
+    if not has_section_content(content, "## Comment Insights"):
+        issues.append("empty_insights_section")
+
+    return (len(issues) == 0, issues)
+
+
 def extract_metadata_from_file(content: str) -> dict:
     """
     Extract metadata from existing summary file.
@@ -157,11 +202,24 @@ def check_existing(video_url: str, output_dir: Path) -> dict:
         content = Path(files["summary_file"]).read_text()
         result["summary_v1"] = detect_v1_summary(content)
         result["stored_metadata"] = extract_metadata_from_file(content)
+        valid, issues = validate_summary_integrity(content)
+        result["summary_valid"] = valid
+        result["summary_issues"] = issues
+
+    # Analyze transcript if it exists
+    if files["transcript_file"]:
+        content = Path(files["transcript_file"]).read_text()
+        valid, issues = validate_transcript_integrity(content)
+        result["transcript_valid"] = valid
+        result["transcript_issues"] = issues
 
     # Analyze comments if they exist
     if files["comment_file"]:
         content = Path(files["comment_file"]).read_text()
         result["comments_v1"] = detect_v1_comments(content)
+        valid, issues = validate_comments_integrity(content)
+        result["comments_valid"] = valid
+        result["comments_issues"] = issues
 
     return result
 

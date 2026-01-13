@@ -20,7 +20,13 @@ Execute all steps sequentially without asking for user approval. Use TodoWrite t
 ```bash
 python3 ./check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 ```
-If returns `exists: true` Read and follow UPDATE_MODE.md for update workflow.
+
+**Integrity check:**
+- If `summary_valid: false`: Show issues to user, ask "Tiedosto epätäydellinen: [issues]. Prosessoidaanko uudelleen?" If yes, continue to Step 1.
+- If `transcript_valid: false`: Ask user, if yes re-run Steps 2-3, 7-9.
+- If `comments_valid: false`: Ask user, if yes re-run comment analysis.
+
+If returns `exists: true` AND all valid fields are true: Read and follow UPDATE_MODE.md for update workflow.
 
 
 ## Step 1: Extract data (metadata, description, chapters)

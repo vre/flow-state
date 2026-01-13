@@ -14,6 +14,7 @@ tests/
     ├── test_deduplicate_vtt.py (9 tests)
     ├── test_extract_data.py (7 tests)
     ├── test_extract_transcript.py (10 tests)
+    ├── test_file_ops.py (9 tests)
     ├── test_finalize.py (12 tests)
     └── test_shared_types.py (17 tests)
 ```
