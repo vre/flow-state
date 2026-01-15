@@ -1,0 +1,5 @@
+- **Title:** [The Assassin's Teapot Is Weird](https://www.youtube.com/watch?v=jJL0XoNBaac) · 09:11
+- **Channel:** [Steve Mould](https://www.youtube.com/channel/UCEIwxahdLz7bap-VDs9h35A) ✓ (3,510,000 subscribers)
+- **Engagement:** 50M views · 824.3K likes · 15K comments
+- **Published:** 2021-12-10 | Extracted: 2026-01-17
+- **Category:** Science & Technology

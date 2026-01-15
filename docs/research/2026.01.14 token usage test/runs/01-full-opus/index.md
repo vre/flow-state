@@ -1,4 +1,4 @@
-# Sequential Opus Test Run
+# Test Run: 01-full-sequential-opus (Baseline)
 
 **Date:** 2025-01-14
 **Video:** The Assassin's Teapot Is Weird (jJL0XoNBaac)

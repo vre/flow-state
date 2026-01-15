@@ -6,9 +6,10 @@ Usage: python3 analyze_steps.py [trace_log] [otel_log]
 import sys
 import re
 
-# Step definitions for youtube-to-markdown skill
+# Step definitions for youtube-to-markdown skill variants
 # Format: (step_name, model, parallel_with_next)
-STEP_DEFINITIONS = [
+
+STEP_DEFINITIONS_FULL = [
     ("Step 4: Paragraph breaks", "sonnet", True),   # parallel with Step 5
     ("Step 5: Summarize transcript", "sonnet", False),
     ("Step 6: Review/tighten summary", "sonnet", False),
@@ -17,6 +18,38 @@ STEP_DEFINITIONS = [
     ("Step 10a: Extract comments", "sonnet", False),
     ("Step 10b: Analyze comments", "sonnet", False),
 ]
+
+STEP_DEFINITIONS_NO_POLISH = [
+    ("Step 5: Summarize transcript", "sonnet", False),
+    ("Step 6: Review/tighten summary", "sonnet", False),
+    ("Step 10b: Analyze comments", "sonnet", False),  # 10a is bash only
+]
+
+STEP_DEFINITIONS_COMBINED = [
+    ("Step 4: Paragraph breaks", "sonnet", False),
+    ("Step 5: Summarize (combined)", "sonnet", False),
+    ("Step 7: Clean speech", "haiku", False),
+    ("Step 8: Add headings", "sonnet", False),
+    ("Step 10: Comments (combined)", "sonnet", False),
+]
+
+STEP_DEFINITIONS_LITE = [
+    ("Step 5: Summarize (combined)", "sonnet", False),
+    ("Step 10: Comments (combined)", "sonnet", False),
+]
+
+def get_step_definitions(subagent_count: int) -> list:
+    """Auto-detect skill variant by subagent count."""
+    if subagent_count == 7:
+        return STEP_DEFINITIONS_FULL
+    elif subagent_count == 5:
+        return STEP_DEFINITIONS_COMBINED
+    elif subagent_count == 3:
+        return STEP_DEFINITIONS_NO_POLISH
+    elif subagent_count == 2:
+        return STEP_DEFINITIONS_LITE
+    else:
+        return STEP_DEFINITIONS_FULL  # fallback
 
 def parse_trace(path: str) -> list[dict]:
     """Parse trace into events with timestamps."""
@@ -223,6 +256,9 @@ def analyze_steps(trace_path: str, otel_path: str):
     # Sort by start time
     subagents.sort(key=lambda x: x["start"])
 
+    # Auto-detect skill variant by subagent count
+    step_defs = get_step_definitions(len(subagents))
+
     # Identify parallel groups and assign IDs
     for i, sa in enumerate(subagents):
         sa["id"] = i + 1
@@ -236,15 +272,15 @@ def analyze_steps(trace_path: str, otel_path: str):
         sonnet_out = delta.get("sonnet_output", 0)
 
         # Get step name
-        if i < len(STEP_DEFINITIONS):
-            step_name, expected_model, _ = STEP_DEFINITIONS[i]
+        if i < len(step_defs):
+            step_name, expected_model, _ = step_defs[i]
         else:
             step_name = f"Subagent #{i + 1}"
 
         # Check if parallel with previous
         parallel = ""
         if i > 0 and sa["start"] < subagents[i-1]["end"]:
-            prev_name = STEP_DEFINITIONS[i-1][0] if i-1 < len(STEP_DEFINITIONS) else f"#{i}"
+            prev_name = step_defs[i-1][0] if i-1 < len(step_defs) else f"#{i}"
             parallel = f" [parallel with {prev_name}]"
 
         print(f"{step_name}{parallel}:")
@@ -282,8 +318,8 @@ def analyze_steps(trace_path: str, otel_path: str):
         total_cost += cost
 
         # Get step name from definitions, with parallel indicator
-        if i < len(STEP_DEFINITIONS):
-            step_name, expected_model, is_parallel = STEP_DEFINITIONS[i]
+        if i < len(step_defs):
+            step_name, expected_model, is_parallel = step_defs[i]
             if is_parallel and i + 1 < len(subagents):
                 # Check if next subagent starts at same time (parallel)
                 next_start = subagents[i + 1]["start"] - session_start

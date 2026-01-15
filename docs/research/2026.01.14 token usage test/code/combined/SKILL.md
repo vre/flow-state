@@ -9,10 +9,9 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# YouTube to Markdown (Lite Variant)
+# YouTube to Markdown (Combined Variant)
 
-Optimized variant: No polish steps (4, 7, 8) + combined workflows (5+6, 10a+10b).
-Result: 2 subagents for minimum cost.
+Test variant: Keeps all polish steps (4, 7, 8). Combines summary (5+6) and comments (10a+10b) into single subagents.
 
 Execute all steps sequentially without asking for user approval.
 
@@ -50,9 +49,26 @@ python3 extract_transcript_whisper.py "<YOUTUBE_URL>" "<output_directory>"
 python3 ./deduplicate_vtt.py "<output_directory>/${BASE_NAME}_transcript.vtt" "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_no_timestamps.txt"
 ```
 
-Copy dedup as final transcript (no polish steps):
+## Step 4: Add natural paragraph breaks
+
+task_tool:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt:
+```
+INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
+CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
+
+Analyze INPUT and identify natural paragraph break line numbers.
+Read CHAPTERS. If contains chapters, use as primary break points.
+Target ~500 chars per paragraph.
+
+Write to OUTPUT: 15,42,78,103,...
+```
+
 ```bash
-cp "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript.md"
+python3 ./apply_paragraph_breaks.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
 ```
 
 ## Step 5: Summarize transcript (combined summarize + tighten)
@@ -85,6 +101,51 @@ Rules:
 ACTION REQUIRED: Use Write tool NOW to save to OUTPUT file.
 ```
 
+## Step 7: Clean speech artifacts
+
+task_tool:
+- subagent_type: "general-purpose"
+- model: "haiku"
+- prompt:
+```
+Read <output_directory>/${BASE_NAME}_transcript_paragraphs.md and clean speech artifacts.
+
+Tasks:
+- Remove fillers (um, uh, like, you know)
+- Fix transcription errors
+- Add proper punctuation
+- Keep timestamps at end of paragraphs
+
+ACTION REQUIRED: Write to <output_directory>/${BASE_NAME}_transcript_cleaned.md
+```
+
+## Step 8: Add topic headings
+
+task_tool:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt:
+```
+INPUT: <output_directory>/${BASE_NAME}_transcript_cleaned.md
+OUTPUT: <output_directory>/${BASE_NAME}_transcript.md
+CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+
+Read INPUT. Add markdown headings.
+
+If CHAPTERS has content: Use chapter names as ### headings
+If empty: Add ### headings where major topics change
+
+ACTION REQUIRED: Write to OUTPUT file.
+```
+
+## Step 9: Create output files
+
+```bash
+python3 finalize.py "${BASE_NAME}" "<output_directory>"
+```
+
+Use `--debug` flag to keep intermediate work files.
+
 ## Step 10: Extract and analyze comments (combined)
 
 ```bash
@@ -97,10 +158,10 @@ task_tool:
 - model: "sonnet"
 - prompt:
 ```
-SUMMARY: <output_directory>/${BASE_NAME}_summary_tight.md
+SUMMARY_FILE: Find the main summary file "youtube - * (${VIDEO_ID}).md" in <output_directory>
 COMMENTS: <output_directory>/${BASE_NAME}_comments_prefiltered.md
 
-Read SUMMARY to understand video content and type.
+Read SUMMARY_FILE to understand video content and type.
 
 Extract insights from COMMENTS that ADD VALUE beyond summary:
 - Corrections/Extensions
@@ -118,15 +179,5 @@ Rules:
 - Only insights NOT already in summary
 - Be ruthlessly concise
 
-ACTION REQUIRED: Read SUMMARY, append Comment Insights section, and write back using Write tool.
+ACTION REQUIRED: Read the summary file, append Comment Insights section, and write back using Write tool.
 ```
-
-## Step 9: Create output files
-
-```bash
-python3 finalize.py "${BASE_NAME}" "<output_directory>"
-```
-
-Outputs:
-- `youtube - {title} ({video_id}).md` - Main summary with comment insights
-- `youtube - {title} - transcript ({video_id}).md` - Description and transcript

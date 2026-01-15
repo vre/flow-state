@@ -1,0 +1,53 @@
+================================================================================
+STEP-BY-STEP EXECUTION TIMELINE
+================================================================================
+
+Phase 1: Init
+  Time: +0s, duration 3.5s
+  Subagents completed: 0
+  Tools: Skill:1
+
+Phase 2: Skill: youtube-to-markdown
+  Time: +4s, duration 225.3s
+  Subagents completed: 3
+  Tools: Bash:9, Read:7, Task:3, TodoWrite:11, Write:3
+
+================================================================================
+SUBAGENT EXECUTION DETAILS
+================================================================================
+
+Step 5: Summarize transcript:
+  Time: +66s → +95s (29.4s)
+  Tokens out: opus=0, haiku=0, sonnet=1313
+
+Step 6: Review/tighten summary:
+  Time: +111s → +126s (15.7s)
+  Tokens out: opus=0, haiku=0, sonnet=999
+
+Step 10b: Analyze comments:
+  Time: +170s → +211s (40.2s)
+  Tokens out: opus=0, haiku=0, sonnet=1800
+
+================================================================================
+SUMMARY TABLE (output tokens + cost)
+================================================================================
+
+Step                                Dur    Opus   Haiku  Sonnet     Cost
+---------------------------------------------------------------------------
+Step 5: Summarize transcript      29.4s       0       0    1313 $ 0.117
+Step 6: Review/tighten summary    15.7s       0       0     999 $ 0.052
+Step 10b: Analyze comments        40.2s       0       0    1800 $ 0.122
+---------------------------------------------------------------------------
+Subagents total*                              0       0    4112 $  0.29
+  * Parallel steps share token deltas (may double-count)
+Orchestration (opus)                          0                 $  0.31
+---------------------------------------------------------------------------
+SESSION TOTAL (accurate)                      0     739    9396 $  0.60
+
+================================================================================
+CACHING SUMMARY
+================================================================================
+
+Model       CacheRead  CacheCreate        Saved
+--------------------------------------------------
+sonnet        885,413       50,497 $     2.391
