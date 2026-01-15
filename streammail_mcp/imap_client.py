@@ -200,7 +200,7 @@ def list_messages(folder: str, limit: int = 20) -> list[dict]:
                 "from": from_addr,
                 "date": date_str,
                 "size": data.get(b'RFC822.SIZE', 0),
-                "flags": [str(f) for f in data.get(b'FLAGS', [])]
+                "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
             })
 
         return results
@@ -284,7 +284,7 @@ def read_message(folder: str, message_id: int) -> dict:
             "in_reply_to": to_str(envelope.in_reply_to) if envelope.in_reply_to else "",
             "body_text": body_text,
             "body_html": body_html,
-            "flags": [str(f) for f in data.get(b'FLAGS', [])]
+            "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
         }
 
 
