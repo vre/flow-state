@@ -33,6 +33,7 @@ from imap_client import (
     list_messages,
     read_message,
     download_attachment,
+    cleanup_attachments,
     search_messages,
     create_draft,
     parse_folder_path,
@@ -69,7 +70,7 @@ class MailAction(BaseModel):
     @field_validator('action')
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment'}
+        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup'}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -205,6 +206,18 @@ File path, content type, size. Use Read tool for images, pdf/docx skills for doc
 
 ## Example
 {action: "attachment", folder: "Drafts", payload: "1253:0"}
+""",
+
+    "cleanup": """
+# cleanup - Remove Downloaded Attachments
+
+Deletes all downloaded attachments from temp directory.
+
+## Parameters
+None required.
+
+## Example
+{action: "cleanup"}
 """
 }
 
@@ -403,6 +416,12 @@ Open Thunderbird → Drafts to review and send."""
 **Saved to:** {result['saved_to']}
 
 Use Read tool for images, pdf/docx skills for documents."""
+
+        # Cleanup
+        if action == "cleanup":
+            result = cleanup_attachments()
+            freed_kb = result['freed_bytes'] / 1024
+            return f"Cleaned up {result['deleted']} file(s), freed {freed_kb:.1f} KB"
 
         return f"Unknown action '{action}'. Use 'help' for available actions."
 
