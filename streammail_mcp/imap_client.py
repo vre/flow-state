@@ -11,10 +11,13 @@ import email.header
 import email.utils
 import json
 import keyring
+import os
 import re
 import sys
+import tempfile
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from imapclient import IMAPClient
@@ -299,6 +302,68 @@ def read_message(folder: str, message_id: int) -> dict:
             "body_html": body_html,
             "attachments": attachments,
             "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
+        }
+
+
+def download_attachment(folder: str, message_id: int, attachment_index: int) -> dict:
+    """Download an attachment from a message.
+
+    Args:
+        folder: Folder path
+        message_id: Message ID (UID)
+        attachment_index: Zero-based index of the attachment
+
+    Returns:
+        Dict with saved_to path, content_type, size, filename
+    """
+    with imap_connection() as client:
+        try:
+            client.select_folder(folder, readonly=True)
+        except Exception as e:
+            raise IMAPError(f"Cannot open folder '{folder}': {e}")
+
+        messages = client.fetch([message_id], ['RFC822'])
+
+        if message_id not in messages:
+            raise IMAPError(f"Message {message_id} not found in '{folder}'")
+
+        raw_email = messages[message_id][b'RFC822']
+        msg = email.message_from_bytes(raw_email)
+
+        # Find attachments
+        attachments = []
+        for part in msg.walk():
+            disposition = part.get_content_disposition()
+            if disposition == 'attachment' or (disposition == 'inline' and part.get_filename()):
+                attachments.append(part)
+
+        if not attachments:
+            raise IMAPError(f"Message {message_id} has no attachments")
+
+        if attachment_index < 0 or attachment_index >= len(attachments):
+            raise IMAPError(f"Attachment index {attachment_index} out of range (0-{len(attachments)-1})")
+
+        part = attachments[attachment_index]
+        filename = part.get_filename() or f"attachment_{attachment_index}"
+        content_type = part.get_content_type()
+        payload = part.get_payload(decode=True)
+
+        # Save to temp directory
+        temp_dir = Path(tempfile.gettempdir()) / "streammail"
+        temp_dir.mkdir(exist_ok=True)
+
+        # Sanitize filename
+        safe_filename = re.sub(r'[^\w\-_\.]', '_', filename)
+        file_path = temp_dir / safe_filename
+
+        with open(file_path, 'wb') as f:
+            f.write(payload)
+
+        return {
+            "saved_to": str(file_path),
+            "filename": filename,
+            "content_type": content_type,
+            "size": len(payload)
         }
 
 

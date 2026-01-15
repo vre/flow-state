@@ -32,6 +32,7 @@ from imap_client import (
     list_folders,
     list_messages,
     read_message,
+    download_attachment,
     search_messages,
     create_draft,
     parse_folder_path,
@@ -68,7 +69,7 @@ class MailAction(BaseModel):
     @field_validator('action')
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {'list', 'read', 'search', 'draft', 'folders', 'help'}
+        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment'}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -188,6 +189,22 @@ None required.
 
 ## Returns
 List of folders with their names and IMAP flags.
+""",
+
+    "attachment": """
+# attachment - Download Attachment
+
+Downloads an attachment from a message to a temp file.
+
+## Parameters
+- folder: Folder containing message
+- payload: "msg_id:index" (e.g., "1253:0" for first attachment)
+
+## Returns
+File path, content type, size. Use Read tool for images, pdf/docx skills for documents.
+
+## Example
+{action: "attachment", folder: "Drafts", payload: "1253:0"}
 """
 }
 
@@ -359,6 +376,33 @@ async def use_mail(params: MailAction) -> str:
 **Saved to:** {result['folder']}
 
 Open Thunderbird → Drafts to review and send."""
+
+        # Attachment
+        if action == "attachment":
+            if not folder:
+                return "Error: folder required."
+            if not params.payload:
+                return "Error: payload required. Format: 'msg_id:index' (e.g., '1253:0')"
+
+            try:
+                parts = params.payload.split(':')
+                if len(parts) != 2:
+                    raise ValueError("Expected format 'msg_id:index'")
+                msg_id = int(parts[0])
+                att_index = int(parts[1])
+            except ValueError as e:
+                return f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')"
+
+            result = download_attachment(folder, msg_id, att_index)
+
+            return f"""# Attachment Downloaded
+
+**File:** {result['filename']}
+**Type:** {result['content_type']}
+**Size:** {result['size'] / 1024:.1f} KB
+**Saved to:** {result['saved_to']}
+
+Use Read tool for images, pdf/docx skills for documents."""
 
         return f"Unknown action '{action}'. Use 'help' for available actions."
 
