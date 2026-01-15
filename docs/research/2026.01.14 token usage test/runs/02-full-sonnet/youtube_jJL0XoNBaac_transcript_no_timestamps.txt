@@ -1,0 +1,253 @@
+[Music]
+this is an assassin's teapot it can be
+used to pour yourself a drink and to
+pour a drink for your enemy
+you can then
+down your drink
+to prove that the drink isn't poisoned
+there's no poison in there don't worry
+about the poison there is no poison but
+then when your enemy takes a drink they
+find out that it is poisoned and by the
+way this doesn't require you to spend
+the last few years building up an
+immunity to iocan powder it works
+straight off the bat no preparation
+required that's because the assassin's
+teapot can be used to pour three
+different drinks which i've shown here
+using three different colored liquids
+and by the way if you plan to poison
+your enemy i recommend using liquids of
+the same color do i need to tell the
+viewers that they shouldn't be trying to
+poison people like legally just that it
+would break the flow of the video film
+myself having a fake phone call with a
+lawyer in which i explain the problem
+and so long as i say out loud don't try
+to poison people then that should have
+me covered
+okay
+click the way you choose the drink is by
+sneakily covering up one of these holes
+if you cover this hole you get a blue
+drink if you cover this hole you get a
+yellow drink if you cover no holes you
+get a green drink so three drinks in
+total though actually no four drinks
+if you cover both holes you get the null
+drink but how does it work
+well you know me if i want to describe
+how a hydrodynamic mechanism works i
+like to make a transparent 2d version of
+it i'll put a playlist of those videos
+in the card in the description first i
+needed to figure out what was going on
+inside the teapot and a bit like with
+the gloggle jug the only really sensible
+way to do that was to hit it with a
+hammer so you can see there are two
+chambers here side by side and they both
+lead up to the spout additionally one
+chamber leads up to this hole the other
+chamber leads to this hole
+for the 2d version i don't want to put
+them side by side because then it
+wouldn't be 2d but i feel like i can put
+them top to bottom and it should still
+work and here it is so if i want a blue
+drink i cover this hole
+if i want a yellow drink i cover this
+hole
+and if i want a green drink i cover
+neither of the holes
+and for completeness here's the null
+drink
+similarly i could have a black coffee or
+i could have milk or i could have a
+milky coffee so that's how it works but
+why does it work why is it that putting
+your finger over different holes causes
+different liquids to flow out well it
+comes down to surface tension it's
+similar to this demonstration you might
+have seen before look i can pull water
+from this bottle but if i turn the
+bottle upside down no water pours out
+the trick is that there's a gauze
+covering the opening of the bottle so
+when i pour it like this water can flow
+out and air can flow in but when i turn
+the bottle upside down for water to flow
+out air would need to flow in and for
+air to flow in surface tension would
+need to be broken here's another example
+where instead of a gauze there's a small
+hole the hole is actually big enough to
+push a straw up into and it floats to
+the top of the bottle it's a really cool
+trick you know strictly speaking
+ultimately it's not surface tension
+that's keeping the liquid in place it's
+air pressure like the assassin's teapot
+and these bottle tricks wouldn't work in
+a vacuum so the reason the liquid
+doesn't fall out of the assassin's
+teapot when you have your thumb over the
+hole is because the atmosphere is
+pushing on it atmospheric pressure is
+holding the liquid in place and that's
+counter-intuitive like you think well
+the real explanation is that
+you know well if the liquid did fall out
+a little bit it would create a vacuum
+and the vacuum would pull the liquid
+back in but there is no pulling force
+there's only pushing force from the
+atmosphere it's like when you suck on a
+straw
+it's not the suction that's pulling the
+liquid up the straw it's the atmosphere
+pushing the liquid up the straw and
+that's really counter-intuitive because
+you feel like well look that's me doing
+the work i'm i'm sucking on the straw
+i'm pulling the liquid up with my lungs
+at this point i want to go off on a bit
+of a tangent and talk about a type of
+pedantry that i think
+isn't always helpful like imagine you
+say i'm sucking liquid up a straw now i
+mean it's a weird thing to say out loud
+but hypothetically and then an annoying
+physicist comes along and says well
+technically you're not sucking water up
+a straw it's the atmosphere pushing it
+up the straw and then in the next breath
+that physicist might go on to talk about
+the flow of positively charged holes in
+a semiconductor well
+holes don't flow and a hole can't have a
+charge so why is it okay to talk about
+the flow of positively charged holes
+well the reason it's okay is because
+it's useful
+but i would also argue that it's useful
+to talk about a suction force so long as
+you keep the underlying physics in mind
+you should be okay like for example you
+can't just increase a suction force
+indefinitely eventually when you get to
+about 100 kilopascals it stops working
+because you've run out of atmospheric
+pressure the thing that's really doing
+the work underneath similarly i think it
+should be all right to talk about the
+flow of cold like if i put an ice cube
+in my drink the cold flows from the ice
+cube into the drink of course that's not
+really what's happening the warmth from
+the drink is flowing into the ice cube
+and so it gets colder
+but it's useful to talk about the flow
+of cold again so long as you understand
+the underlying physics like you can't
+just keep pumping cold into something
+because eventually you reach absolute
+zero by the way these animations are
+from a video i made about how all leds
+are secretly solar panels and all solar
+panels are secretly leds the link's in
+the card and in the description okay
+tangent over the point is we all know
+that for the water to get out air needs
+to be able to get in and with your
+finger off the hole well i can get in at
+the top but if you cover over the hole
+the only way for the air to get in is
+through the spout and that's where
+surface tension comes in surface tension
+acts to minimize surface area
+you might think well one way for the
+water to get out is if the air can
+sneak past it on the way but what would
+that look like well it might look a bit
+like this you've got a drip of water
+starting on one side and on the other
+side you've got a bubble of air forming
+but see how that increases the surface
+area of the water and because surface
+tension acts to decrease the surface
+area that's not energetically favorable
+and so you don't get this bubbling
+effect and instead the liquid is trapped
+inside the chamber this is also the
+principle behind a magic trick by the
+way sometimes called inexhaustible
+bottle or thinker drink it's usually a
+bit more elaborate it'll have more
+chambers and different options for
+drinks but anyway you can read all about
+it in my kids book sciences magic
+available for more good bookstores so
+these are magnets yeah
+and then these metal sticks magnets and
+then when they drive around
+they also go around with it
+and that makes it spin yeah and some of
+them go
+like this that was my daughter
+spontaneously explaining the mechanics
+of the thing that she just built the
+thing she just built was from a kiwiko
+project the sponsor of this video
+actually my kids have had a kiwiko
+subscription since way before they
+approached me for sponsorship so i can
+tell you a bit about them it's a
+subscription service where a box comes
+in the post every month and everything
+you need for the projects is in the box
+you never need to run off to the shops
+or anything like that and the projects
+are stem projects there's eight
+different subscription lines for every
+possible age group you know something
+that i haven't talked about before that
+i really appreciate about kiwi co is the
+spontaneous stem discussions that arise
+from it you know i'm the sort of person
+who like a fact will pop into my mind
+and i'll say hey kids did you know this
+thing about the moon you know whatever
+and you know it's completely out of
+context and the kids are sort of like
+well okay fine you know so these days
+i'm on the lookout for you know stem
+discussions that are within the context
+of what we're doing and kiwico is great
+for that because the kids are so
+invested in the projects already like
+they're building these things they're
+excited about them and then as you saw
+with the explanation these stem
+discussions arise spontaneously and it's
+really amazing to see we've got a promo
+for the holiday season perhaps you know
+someone who would appreciate a kiwiko
+subscription in which case you can get
+the first month absolutely free using my
+special url if you go to kiwico dot com
+forward slash steve mold the link is
+also in the description so check out
+kiwi code today i hope you enjoyed this
+video if you did don't forget to hit
+subscribe and the algorithm thinks
+you'll enjoy this video next
+so do you think the air is doing the
+same thing yeah you're saying that the
+air from the candle the candle is making
+the air push up
+on those red things
+now i see

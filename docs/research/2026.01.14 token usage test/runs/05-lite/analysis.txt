@@ -1,0 +1,48 @@
+================================================================================
+STEP-BY-STEP EXECUTION TIMELINE
+================================================================================
+
+Phase 1: Init
+  Time: +48s, duration 4.2s
+  Subagents completed: 0
+  Tools: Bash:1, Skill:1
+
+Phase 2: Skill: youtube-to-markdown
+  Time: +52s, duration 236.8s
+  Subagents completed: 2
+  Tools: Bash:9, Edit:1, Read:6, Task:2, TodoWrite:8, Write:2
+
+================================================================================
+SUBAGENT EXECUTION DETAILS
+================================================================================
+
+Step 5: Summarize (combined):
+  Time: +127s → +155s (27.9s)
+  Tokens out: opus=0, haiku=0, sonnet=1288
+
+Step 10: Comments (combined):
+  Time: +206s → +267s (60.6s)
+  Tokens out: opus=0, haiku=0, sonnet=2882
+
+================================================================================
+SUMMARY TABLE (output tokens + cost)
+================================================================================
+
+Step                                Dur    Opus   Haiku  Sonnet     Cost
+---------------------------------------------------------------------------
+Step 5: Summarize (combined)      27.9s       0       0    1288 $ 0.114
+Step 10: Comments (combined)      60.6s       0       0    2882 $ 0.165
+---------------------------------------------------------------------------
+Subagents total*                              0       0    4170 $  0.28
+  * Parallel steps share token deltas (may double-count)
+Orchestration (opus)                          0                 $  0.24
+---------------------------------------------------------------------------
+SESSION TOTAL (accurate)                      0     759    8072 $  0.52
+
+================================================================================
+CACHING SUMMARY
+================================================================================
+
+Model       CacheRead  CacheCreate        Saved
+--------------------------------------------------
+sonnet        723,909       47,005 $     1.955

@@ -1,0 +1,74 @@
+================================================================================
+STEP-BY-STEP EXECUTION TIMELINE
+================================================================================
+
+Phase 1: Init
+  Time: +0s, duration 4.4s
+  Subagents completed: 2
+  Tools: Skill:1
+
+Phase 2: Skill: youtube-to-markdown
+  Time: +4s, duration 473.2s
+  Subagents completed: 7
+  Tools: Bash:12, Glob:2, Read:14, Skill:1, Task:7, TodoWrite:18, Write:7
+
+================================================================================
+SUBAGENT EXECUTION DETAILS
+================================================================================
+
+Step 4: Paragraph breaks:
+  Time: +73s → +97s (24.4s)
+  Tokens out: opus=0, haiku=0, sonnet=1342
+
+Step 5: Summarize transcript:
+  Time: +119s → +145s (26.4s)
+  Tokens out: opus=0, haiku=0, sonnet=1401
+
+Step 6: Review/tighten summary:
+  Time: +159s → +184s (24.6s)
+  Tokens out: opus=0, haiku=64, sonnet=1155
+
+Step 7: Clean speech artifacts:
+  Time: +196s → +228s (32.1s)
+  Tokens out: opus=0, haiku=2934, sonnet=266
+
+Step 8: Add topic headings:
+  Time: +239s → +272s (32.8s)
+  Tokens out: opus=0, haiku=0, sonnet=3252
+
+Step 10a: Extract comments:
+  Time: +363s → +416s (53.1s)
+  Tokens out: opus=0, haiku=0, sonnet=2191
+
+Step 10b: Analyze comments:
+  Time: +430s → +452s (21.5s)
+  Tokens out: opus=0, haiku=0, sonnet=1285
+
+================================================================================
+SUMMARY TABLE (output tokens + cost)
+================================================================================
+
+Step                                Dur    Opus   Haiku  Sonnet     Cost
+---------------------------------------------------------------------------
+Step 4: Paragraph breaks          24.4s       0       0    1342 $ 0.117
+Step 5: Summarize transcript      26.4s       0       0    1401 $ 0.071
+Step 6: Review/tighten summary    24.6s       0      64    1155 $ 0.067
+Step 7: Clean speech artifacts    32.1s       0    2934     266 $ 0.027
+Step 8: Add topic headings        32.8s       0       0    3252 $ 0.102
+Step 10a: Extract comments        53.1s       0       0    2191 $ 0.131
+Step 10b: Analyze comments        21.5s       0       0    1285 $ 0.065
+---------------------------------------------------------------------------
+Subagents total*                              0    2998   10892 $  0.58
+  * Parallel steps share token deltas (may double-count)
+Orchestration (opus)                          0                 $  0.53
+---------------------------------------------------------------------------
+SESSION TOTAL (accurate)                      0    3882   20874 $  1.11
+
+================================================================================
+CACHING SUMMARY
+================================================================================
+
+Model       CacheRead  CacheCreate        Saved
+--------------------------------------------------
+sonnet      1,634,484       77,463 $     4.413
+haiku          35,211       21,539 $     0.008

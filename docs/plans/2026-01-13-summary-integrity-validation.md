@@ -1,52 +1,52 @@
 # Summary Integrity Validation
 
-## Ongelma
+## Problem
 
-`check_existing.py` tunnistaa vain v1 vs v2 formaatin (`detect_v1_summary`), mutta EI havaitse:
-1. Tyhjää summaryä (vain `## Summary` otsikko ilman sisältöä)
-2. Puuttuvia pakollisia elementtejä (TL;DR, metadata-kentät)
-3. Epäonnistunutta prosessointia (keskeytetty, crashannut)
+`check_existing.py` only identifies v1 vs v2 format (`detect_v1_summary`), but does NOT detect:
+1. Empty summary (only `## Summary` heading without content)
+2. Missing required elements (TL;DR, metadata fields)
+3. Failed processing (interrupted, crashed)
 
-Seuraus: Käyttäjälle näytetään "v2.0 - Ajan tasalla" vaikka tiedosto on rikki.
+Consequence: User sees "v2.0 - Up to date" even though the file is broken.
 
-## Ratkaisu
+## Solution
 
-Lisätään `validate_summary_integrity()` -funktio joka tarkistaa onko tiedosto onnistuneesti käsitelty.
+Add `validate_summary_integrity()` function that checks if file was successfully processed.
 
-### Validoitavat elementit
+### Elements to Validate
 
-**Summary-tiedosto** (`youtube - {title} ({VIDEO_ID}).md`):
+**Summary file** (`youtube - {title} ({VIDEO_ID}).md`):
 ```
-PAKOLLINEN:
-- ## Video -osio
-  - **Title:** (ei tyhjä)
+REQUIRED:
+- ## Video section
+  - **Title:** (not empty)
   - **Engagement:** (views, likes, comments)
-  - **Published:** ja Extracted:
-- ## Summary -osio
-  - **TL;DR**: (vähintään 20 merkkiä)
-  - Sisältöä otsikon jälkeen (vähintään 100 merkkiä)
+  - **Published:** and Extracted:
+- ## Summary section
+  - **TL;DR**: (at least 20 characters)
+  - Content after heading (at least 100 characters)
 
-VALINNAINEN:
+OPTIONAL:
 - **Tags:**
 - ## Hidden Gems
 ```
 
-**Transcript-tiedosto** (`youtube - {title} - transcript ({VIDEO_ID}).md`):
+**Transcript file** (`youtube - {title} - transcript ({VIDEO_ID}).md`):
 ```
-PAKOLLINEN:
-- ## Description -osio (voi olla tyhjä)
-- ## Transcription -osio (vähintään 500 merkkiä)
-```
-
-**Comments-tiedosto** (`youtube - {title} - comments ({VIDEO_ID}).md`):
-```
-PAKOLLINEN:
-- ## Comment Insights -osio (vähintään 100 merkkiä)
+REQUIRED:
+- ## Description section (can be empty)
+- ## Transcription section (at least 500 characters)
 ```
 
-### Paluuarvo
+**Comments file** (`youtube - {title} - comments ({VIDEO_ID}).md`):
+```
+REQUIRED:
+- ## Comment Insights section (at least 100 characters)
+```
 
-`check_existing()` palauttaa laajennettuna:
+### Return Value
+
+`check_existing()` returns expanded:
 ```python
 {
     "video_id": "xxx",
@@ -55,24 +55,24 @@ PAKOLLINEN:
     "comment_file": null,
     "transcript_file": "/path/to/transcript.md",
 
-    # Nykyiset
+    # Existing
     "summary_v1": false,
     "comments_v1": null,
     "stored_metadata": {...},
 
-    # UUDET
-    "summary_valid": true,      # Kaikki pakolliset elementit OK
-    "summary_issues": [],       # Lista puuttuvista/rikkinäisistä
+    # NEW
+    "summary_valid": true,      # All required elements OK
+    "summary_issues": [],       # List of missing/broken items
     "transcript_valid": true,
     "transcript_issues": [],
-    "comments_valid": null,     # null jos tiedostoa ei ole
+    "comments_valid": null,     # null if file doesn't exist
     "comments_issues": null
 }
 ```
 
-## Toteutus
+## Implementation
 
-### Vaihe 1: Lisää validointifunktiot `check_existing.py`:iin
+### Phase 1: Add validation functions to `check_existing.py`
 
 ```python
 def validate_summary_integrity(content: str) -> tuple[bool, list[str]]:
@@ -135,9 +135,9 @@ def validate_comments_integrity(content: str) -> tuple[bool, list[str]]:
     return (len(issues) == 0, issues)
 ```
 
-### Vaihe 2: Laajenna `check_existing()` -funktiota
+### Phase 2: Extend `check_existing()` function
 
-Lisää validointikutsut rivien 155-165 jälkeen:
+Add validation calls after lines 155-165:
 
 ```python
 # Validate summary integrity
@@ -167,29 +167,29 @@ if files["comment_file"]:
     result["comments_issues"] = issues
 ```
 
-### Vaihe 3: Päivitä SKILL.md käyttämään uusia kenttiä
+### Phase 3: Update SKILL.md to use new fields
 
-Lisää Step 0 jälkeiseen logiikkaan:
+Add logic after Step 0:
 ```markdown
-Jos `summary_valid: false`:
-- Näytä issues-lista käyttäjälle
-- Ehdota: "Tiedosto on epätäydellinen. Haluatko prosessoida uudelleen?"
+If `summary_valid: false`:
+- Show issues list to user
+- Suggest: "File is incomplete. Do you want to reprocess?"
 ```
 
-## Tiedostot
+## Files
 
-| Tiedosto | Muutos |
-|----------|--------|
-| `check_existing.py` | +3 validointifunktiota, laajennettu check_existing() |
-| `SKILL.md` | Päivitetty logiikka käsittelemään summary_valid/issues |
+| File | Change |
+|------|--------|
+| `check_existing.py` | +3 validation functions, extended check_existing() |
+| `SKILL.md` | Updated logic to handle summary_valid/issues |
 
-## Testaus
+## Testing
 
 ```bash
-# Testataan tyhjällä summarylla
+# Test with empty summary
 python3 check_existing.py "https://www.youtube.com/watch?v=Udc19q1o6Mg" "/Users/vre/Sync/Obsidian/Joplinpoplin"
 
-# Odotettu tulos:
+# Expected result:
 {
   "video_id": "Udc19q1o6Mg",
   "exists": true,
