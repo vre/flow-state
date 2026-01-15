@@ -9,6 +9,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "imapclient>=3.0.0",
     "keyring>=25.0.0",
+    "html2text>=2025.4.15",
 ]
 
 [project.scripts]

@@ -20,8 +20,9 @@ Usage with Claude Desktop/Code:
 """
 
 import json
-import re
 from typing import Optional
+
+import html2text
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -288,18 +289,14 @@ async def use_mail(params: MailAction) -> str:
 
             lines.extend(["", "---", ""])
 
-            # Prefer plain text, fall back to HTML
+            # Prefer plain text, fall back to HTML converted to text
             if msg['body_text']:
                 lines.append(msg['body_text'])
             elif msg['body_html']:
-                lines.append("(HTML content)")
-                # Simple HTML stripping for readability
-                html = msg['body_html']
-                html = re.sub(r'<style[^>]*>.*?</style>', '', html, flags=re.DOTALL)
-                html = re.sub(r'<script[^>]*>.*?</script>', '', html, flags=re.DOTALL)
-                html = re.sub(r'<[^>]+>', ' ', html)
-                html = re.sub(r'\s+', ' ', html).strip()
-                lines.append(html[:2000])  # Truncate very long HTML
+                h = html2text.HTML2Text()
+                h.ignore_links = False
+                h.body_width = 0  # No wrapping
+                lines.append(h.handle(msg['body_html']))
 
             return "\n".join(lines)
 
