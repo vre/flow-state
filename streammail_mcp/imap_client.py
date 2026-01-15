@@ -367,6 +367,25 @@ def download_attachment(folder: str, message_id: int, attachment_index: int) -> 
         }
 
 
+def cleanup_attachments() -> dict:
+    """Remove all downloaded attachments from temp directory."""
+    temp_dir = Path(tempfile.gettempdir()) / "streammail"
+
+    if not temp_dir.exists():
+        return {"deleted": 0, "freed_bytes": 0}
+
+    deleted = 0
+    freed_bytes = 0
+
+    for file_path in temp_dir.iterdir():
+        if file_path.is_file():
+            freed_bytes += file_path.stat().st_size
+            file_path.unlink()
+            deleted += 1
+
+    return {"deleted": deleted, "freed_bytes": freed_bytes}
+
+
 def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
     """Search messages in a folder.
 
