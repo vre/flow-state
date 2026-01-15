@@ -30,12 +30,14 @@ streammail_mcp/
 use_mail(action, folder?, payload?, limit?)
 
 Actions:
-- list     - Listaa viestit kansiosta
-- read     - Lue yksittäinen viesti (payload=msg_id)
-- search   - Etsi viestejä (payload=query)
-- draft    - Luo draft-vastaus (payload=JSON{to,subject,body,in_reply_to?})
-- folders  - Listaa kansiot
-- help     - Ohje (payload=topic)
+- list       - Listaa viestit kansiosta
+- read       - Lue viesti (payload=msg_id), näyttää liitteet
+- search     - Etsi viestejä (payload=query)
+- draft      - Luo draft-vastaus (payload=JSON{to,subject,body,in_reply_to?})
+- folders    - Listaa kansiot
+- attachment - Lataa liite tiedostoon (payload="msg_id:index")
+- cleanup    - Poista ladatut liitteet temp-hakemistosta
+- help       - Ohje (payload=topic)
 ```
 
 ## Turvallisuus
@@ -56,6 +58,30 @@ uv run python imap_client.py    # Testaa yhteys
 claude mcp add streammail -- uv --directory /Users/vre/work/streammail_mcp run streammail
 ```
 
+## Viimeisimmät muutokset (2026-01)
+
+- **Flags-korjaus** - Flagit näkyvät nyt oikein (`\Draft` vs `b'\\Draft'`)
+- **HTML→teksti** - `html2text`-kirjasto muuntaa HTML-viestit luettavaksi tekstiksi
+- **Liitteiden listaus** - `read`-action näyttää liitteet (nimi, tyyppi, koko)
+- **Liitteiden lataus** - `attachment`-action tallentaa liitteen temp-tiedostoon
+- **Cleanup** - `cleanup`-action poistaa ladatut liitteet
+
+### Liitteiden käsittely
+
+```
+# Lataa liite
+{action: "attachment", folder: "Drafts", payload: "1253:0"}
+→ Tallentaa: /var/folders/.../streammail/logo.png
+
+# Claude voi lukea:
+# - Kuvat: Read-työkalu (multimodal)
+# - PDF: pdf-skill
+# - Word: docx-skill
+
+# Siivoa temp-tiedostot
+{action: "cleanup"}
+```
+
 ## Korjatut bugit
 
 ### TypeError: string pattern on bytes-like object
@@ -70,11 +96,10 @@ claude mcp add streammail -- uv --directory /Users/vre/work/streammail_mcp run s
 
 ## Seuraavat kehitysideat
 
-1. **Attachment-tuki** - Liitteiden listaus ja lataus
-2. **Useampi tili** - Tuki monelle IMAP-tilille
-3. **Välimuisti** - Kansiolistaus/viestien cachetus
-4. **Hakuoperaattorit** - Monimutkaisemmat hakukriteerit (AND/OR)
-5. **Flag-hallinta** - Viestien merkitseminen luetuksi/tärkeäksi
+1. **Useampi tili** - Tuki monelle IMAP-tilille
+2. **Välimuisti** - Kansiolistaus/viestien cachetus
+3. **Hakuoperaattorit** - Monimutkaisemmat hakukriteerit (AND/OR)
+4. **Flag-hallinta** - Viestien merkitseminen luetuksi/tärkeäksi
 
 ## Hyödyllisiä komentoja
 
