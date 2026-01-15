@@ -73,10 +73,23 @@ def imap_connection():
             pass
 
 
-def decode_header_value(value: str) -> str:
+def to_str(value) -> str:
+    """Convert bytes or str to str."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode('utf-8', errors='replace')
+    return str(value)
+
+
+def decode_header_value(value) -> str:
     """Decode MIME-encoded header value."""
     if not value:
         return ""
+
+    # Convert bytes to str first
+    if isinstance(value, bytes):
+        value = value.decode('utf-8', errors='replace')
 
     decoded_parts = []
     for part, charset in email.header.decode_header(value):
@@ -120,8 +133,8 @@ def list_folders() -> list[dict]:
         folders = client.list_folders()
         return [
             {
-                "name": folder_name,
-                "flags": [str(f) for f in flags]
+                "name": to_str(folder_name),
+                "flags": [to_str(f) for f in flags]
             }
             for flags, delimiter, folder_name in folders
         ]
@@ -165,9 +178,13 @@ def list_messages(folder: str, limit: int = 20) -> list[dict]:
             from_addr = ""
             if envelope.from_:
                 f = envelope.from_[0]
-                from_addr = f"{decode_header_value(f.name or '')} <{f.mailbox}@{f.host}>".strip()
-                if from_addr.startswith(" <"):
-                    from_addr = from_addr[2:-1]
+                name = decode_header_value(f.name) if f.name else ""
+                mailbox = to_str(f.mailbox)
+                host = to_str(f.host)
+                if name:
+                    from_addr = f"{name} <{mailbox}@{host}>"
+                else:
+                    from_addr = f"{mailbox}@{host}"
 
             # Parse date
             date_str = ""
@@ -179,7 +196,7 @@ def list_messages(folder: str, limit: int = 20) -> list[dict]:
 
             results.append({
                 "id": msg_id,
-                "subject": decode_header_value(envelope.subject.decode() if envelope.subject else "(no subject)"),
+                "subject": decode_header_value(envelope.subject) if envelope.subject else "(no subject)",
                 "from": from_addr,
                 "date": date_str,
                 "size": data.get(b'RFC822.SIZE', 0),
@@ -245,20 +262,26 @@ def read_message(folder: str, message_id: int) -> dict:
         def format_addrs(addr_list):
             if not addr_list:
                 return []
-            return [
-                f"{decode_header_value(a.name or '')} <{a.mailbox}@{a.host}>".strip()
-                for a in addr_list
-            ]
+            result = []
+            for a in addr_list:
+                name = decode_header_value(a.name) if a.name else ""
+                mailbox = to_str(a.mailbox)
+                host = to_str(a.host)
+                if name:
+                    result.append(f"{name} <{mailbox}@{host}>")
+                else:
+                    result.append(f"{mailbox}@{host}")
+            return result
 
         return {
             "id": message_id,
-            "subject": decode_header_value(envelope.subject.decode() if envelope.subject else ""),
+            "subject": decode_header_value(envelope.subject) if envelope.subject else "",
             "from": format_addrs(envelope.from_),
             "to": format_addrs(envelope.to),
             "cc": format_addrs(envelope.cc),
             "date": str(envelope.date) if envelope.date else "",
-            "message_id": envelope.message_id.decode() if envelope.message_id else "",
-            "in_reply_to": envelope.in_reply_to.decode() if envelope.in_reply_to else "",
+            "message_id": to_str(envelope.message_id) if envelope.message_id else "",
+            "in_reply_to": to_str(envelope.in_reply_to) if envelope.in_reply_to else "",
             "body_text": body_text,
             "body_html": body_html,
             "flags": [str(f) for f in data.get(b'FLAGS', [])]
@@ -327,11 +350,17 @@ def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
             from_addr = ""
             if envelope.from_:
                 f = envelope.from_[0]
-                from_addr = f"{decode_header_value(f.name or '')} <{f.mailbox}@{f.host}>".strip()
+                name = decode_header_value(f.name) if f.name else ""
+                mailbox = to_str(f.mailbox)
+                host = to_str(f.host)
+                if name:
+                    from_addr = f"{name} <{mailbox}@{host}>"
+                else:
+                    from_addr = f"{mailbox}@{host}"
 
             results.append({
                 "id": msg_id,
-                "subject": decode_header_value(envelope.subject.decode() if envelope.subject else ""),
+                "subject": decode_header_value(envelope.subject) if envelope.subject else "",
                 "from": from_addr,
                 "date": str(envelope.date) if envelope.date else ""
             })
