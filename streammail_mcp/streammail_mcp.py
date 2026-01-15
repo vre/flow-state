@@ -287,6 +287,14 @@ async def use_mail(params: MailAction) -> str:
             if msg['in_reply_to']:
                 lines.append(f"**In-Reply-To:** {msg['in_reply_to']}")
 
+            # Attachments
+            if msg.get('attachments'):
+                lines.append("")
+                lines.append(f"**Attachments:** ({len(msg['attachments'])})")
+                for att in msg['attachments']:
+                    size_kb = att['size'] / 1024
+                    lines.append(f"  - {att['filename']} ({att['content_type']}, {size_kb:.1f} KB)")
+
             lines.extend(["", "---", ""])
 
             # Prefer plain text, fall back to HTML converted to text

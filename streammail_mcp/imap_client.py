@@ -235,17 +235,30 @@ def read_message(folder: str, message_id: int) -> dict:
         # Parse email
         msg = email.message_from_bytes(raw_email)
 
-        # Extract body
+        # Extract body and attachments
         body_text = ""
         body_html = ""
+        attachments = []
 
         if msg.is_multipart():
             for part in msg.walk():
                 content_type = part.get_content_type()
-                if content_type == "text/plain" and not body_text:
+                disposition = part.get_content_disposition()
+
+                # Attachments
+                if disposition == 'attachment' or (disposition == 'inline' and part.get_filename()):
+                    payload = part.get_payload(decode=True)
+                    attachments.append({
+                        'filename': part.get_filename() or 'unnamed',
+                        'content_type': content_type,
+                        'size': len(payload) if payload else 0
+                    })
+                # Body text
+                elif content_type == "text/plain" and not body_text:
                     payload = part.get_payload(decode=True)
                     charset = part.get_content_charset() or 'utf-8'
                     body_text = payload.decode(charset, errors='replace')
+                # Body HTML
                 elif content_type == "text/html" and not body_html:
                     payload = part.get_payload(decode=True)
                     charset = part.get_content_charset() or 'utf-8'
@@ -284,6 +297,7 @@ def read_message(folder: str, message_id: int) -> dict:
             "in_reply_to": to_str(envelope.in_reply_to) if envelope.in_reply_to else "",
             "body_text": body_text,
             "body_html": body_html,
+            "attachments": attachments,
             "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
         }
 
