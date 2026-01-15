@@ -1,0 +1,19 @@
+[project]
+name = "streammail-mcp"
+version = "0.1.0"
+description = "Lightweight IMAP MCP server for Claude"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp>=1.0.0",
+    "pydantic>=2.0.0",
+    "imapclient>=3.0.0",
+    "keyring>=25.0.0",
+]
+
+[project.scripts]
+streammail = "streammail_mcp:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
