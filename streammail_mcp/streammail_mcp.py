@@ -277,9 +277,26 @@ async def use_mail(params: MailAction) -> str:
 
             lines = [f"# Messages in {folder}", f"Showing {len(messages)} messages", ""]
             for msg in messages:
-                flags = " ".join(msg["flags"])
+                # Separate standard flags from custom tags
+                std_flags = []
+                tags = []
+                for f in msg["flags"]:
+                    if f.startswith('\\'):
+                        # Standard flag: \Seen -> seen
+                        std_flags.append(f[1:].lower())
+                    else:
+                        tags.append(f)
+
+                # Format: [flags] #tags
+                flag_str = ""
+                if std_flags:
+                    flag_str = f"[{','.join(std_flags)}]"
+                if tags:
+                    flag_str += " " + " ".join(f"#{t}" for t in tags)
+                flag_str = flag_str.strip()
+
                 lines.append(f"**[{msg['id']}]** {msg['subject']}")
-                lines.append(f"  From: {msg['from']} | {msg['date']} {flags}")
+                lines.append(f"  From: {msg['from']} | {msg['date']} {flag_str}")
                 lines.append("")
 
             return "\n".join(lines)
