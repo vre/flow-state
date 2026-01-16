@@ -543,6 +543,122 @@ def create_draft(folder: str, to: str, subject: str, body: str,
         }
 
 
+def modify_draft(folder: str, message_id: int, body: str,
+                 subject: Optional[str] = None,
+                 to: Optional[str] = None,
+                 cc: Optional[str] = None) -> dict:
+    """Modify an existing draft message.
+
+    Reads the original draft, preserves threading info (In-Reply-To, References),
+    deletes the old draft, and creates a new one with updated content.
+
+    Args:
+        folder: Folder containing the draft (usually Drafts)
+        message_id: Message ID of the draft to modify
+        body: New message body (required)
+        subject: New subject (optional, keeps original if not provided)
+        to: New recipient (optional, keeps original if not provided)
+        cc: New CC (optional, keeps original if not provided)
+
+    Returns:
+        Info about the modified draft
+    """
+    with imap_connection() as client:
+        # Select folder
+        try:
+            client.select_folder(folder, readonly=False)
+        except Exception as e:
+            raise IMAPError(f"Cannot open folder '{folder}': {e}")
+
+        # Fetch original draft
+        messages = client.fetch([message_id], ['RFC822', 'ENVELOPE'])
+
+        if message_id not in messages:
+            raise IMAPError(f"Message {message_id} not found in '{folder}'")
+
+        data = messages[message_id]
+        envelope = data[b'ENVELOPE']
+        raw_email = data[b'RFC822']
+        original_msg = email.message_from_bytes(raw_email)
+
+        # Extract original values
+        original_subject = decode_header_value(envelope.subject) if envelope.subject else ""
+        original_to = []
+        if envelope.to:
+            for a in envelope.to:
+                mailbox = to_str(a.mailbox)
+                host = to_str(a.host)
+                original_to.append(f"{mailbox}@{host}")
+        original_cc = []
+        if envelope.cc:
+            for a in envelope.cc:
+                mailbox = to_str(a.mailbox)
+                host = to_str(a.host)
+                original_cc.append(f"{mailbox}@{host}")
+
+        # Preserve threading fields (decode and clean up)
+        in_reply_to = original_msg.get('In-Reply-To', '')
+        if in_reply_to:
+            in_reply_to = decode_header_value(in_reply_to).replace('\n', '').replace('\r', '').strip()
+        references = original_msg.get('References', '')
+        if references:
+            references = decode_header_value(references).replace('\n', '').replace('\r', '').strip()
+
+        # Build new message
+        new_msg = email.message.EmailMessage()
+
+        _, _, username, _ = get_credentials()
+        new_msg['From'] = username
+        new_msg['To'] = to if to else ', '.join(original_to)
+        new_msg['Subject'] = subject if subject else original_subject
+        new_msg['Date'] = email.utils.formatdate(localtime=True)
+        new_msg['Message-ID'] = email.utils.make_msgid()
+
+        if cc:
+            new_msg['Cc'] = cc
+        elif original_cc:
+            new_msg['Cc'] = ', '.join(original_cc)
+
+        # Preserve threading
+        if in_reply_to:
+            new_msg['In-Reply-To'] = in_reply_to
+        if references:
+            new_msg['References'] = references
+
+        new_msg.set_content(body)
+
+        # Delete old draft
+        client.delete_messages([message_id])
+        client.expunge()
+
+        # Find Drafts folder for appending
+        folders = client.list_folders()
+        drafts_folder = None
+        for flags, delimiter, folder_name in folders:
+            if b'\\Drafts' in flags or folder_name.lower() in ['drafts', 'draft', 'luonnokset']:
+                drafts_folder = folder_name
+                break
+
+        if not drafts_folder:
+            drafts_folder = folder  # Use current folder as fallback
+
+        # Append new draft
+        client.append(
+            drafts_folder,
+            new_msg.as_bytes(),
+            flags=[b'\\Draft', b'\\Seen']
+        )
+
+        return {
+            "status": "modified",
+            "folder": drafts_folder,
+            "to": new_msg['To'],
+            "subject": new_msg['Subject'],
+            "message_id": new_msg['Message-ID'],
+            "preserved_reply_to": bool(in_reply_to)
+        }
+
+
 def test_connection():
     """Test IMAP connection with stored credentials."""
     try:
