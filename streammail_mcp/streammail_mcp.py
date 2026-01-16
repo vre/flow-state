@@ -172,8 +172,8 @@ Creates a new draft or modifies an existing one.
 
 ## Workflow
 1. Use 'read' to get message (note message_id for replies)
-2. Use 'draft' to create/modify
-3. Open Thunderbird → Drafts → review and send
+2. Use 'draft' with in_reply_to - quote relevant parts with >
+3. Open email client → Drafts → review and send
 """,
 
     "folders": """
