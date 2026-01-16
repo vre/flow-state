@@ -1,0 +1,97 @@
+MIME-Version: 1.0
+Date: Fri, 16 Jan 2026 17:20:26 +0200
+Message-ID: <CAOdp6xFBDbYcDhiWotTR5Y4i15iDTSh4gUuxPzcfT=EGiER66Q@mail.gmail.com>
+Subject: Formatting test Gmail
+From: Ville Reijonen <xxx@gmail.com>
+To: xxx@xxx
+Content-Type: multipart/alternative; boundary="0000000000007fdaed064882e11e"
+
+--0000000000007fdaed064882e11e
+Content-Type: text/plain; charset="UTF-8"
+
+Normal (Sans Serif - Default)
+Normal (Serif)
+Normal (Fixed Width)
+Normal (Wide)
+Normal (Narrow)
+Normal (Comic Sans)
+Normal (Garamond)
+Normal (Georgia)
+Normal (Tahoma)
+Normal (Trebuchet MS)
+Normal (Verdana)
+Huge font
+Large font
+Normal font
+Small font
+*Bold*
+*Italic*
+*Bold and Italic*
+*Underlined*
+*Bold, Italic and Underlined*
+Background green
+Text green
+
+Align left
+Align center
+Align right
+
+   1. Numbered list (Ordered list)
+
+
+   - Bulleted list (Unordered list)
+
+Indent more once
+
+Indent more twice
+
+Indent more twice
+
+
+
+Quote
+
+Strikethrough
+Link <http://link>
+
+--0000000000007fdaed064882e11e
+Content-Type: text/html; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
+
+<div dir=3D"ltr"><div><div><font face=3D"arial, sans-serif">Normal (Sans Se=
+rif - Default)</font></div><div><font face=3D"times new roman, serif">Norma=
+l (Serif)</font></div><div><font face=3D"monospace">Normal (Fixed Width)</f=
+ont></div><div><font face=3D"arial black, sans-serif">Normal (Wide)</font><=
+/div><div>Normal (Narrow)</div><div><font face=3D"comic sans ms, sans-serif=
+">Normal (Comic Sans)</font></div><div><font face=3D"garamond, times new ro=
+man, serif">Normal (Garamond)</font></div><div><font face=3D"georgia, serif=
+">Normal (Georgia)</font></div><div><font face=3D"tahoma, sans-serif">Norma=
+l (Tahoma)</font></div><div><font face=3D"trebuchet ms, sans-serif">Normal =
+(Trebuchet MS)</font></div><div><font face=3D"trebuchet ms, sans-serif">Nor=
+mal (Verdana)</font></div></div><font size=3D"6">Huge font</font><div><font=
+ size=3D"4">Large font</font></div><div>Normal font</div><div><font size=3D=
+"1">Small font</font></div><div><b>Bold</b></div><div><i>Italic</i></div><d=
+iv><i><b>Bold and Italic</b></i></div><div><u>Underlined</u></div><div><u><=
+b><i>Bold, Italic and Underlined</i></b></u></div><div><span style=3D"backg=
+round-color:rgb(0,255,0)">Background green</span></div><div><font color=3D"=
+#00ff00">Text green</font></div><div><br></div><div>Align left</div><div st=
+yle=3D"text-align:center">Align center</div><div style=3D"text-align:right"=
+>Align right</div><div style=3D"text-align:left"><ol><li>Numbered list (Ord=
+ered list)</li></ol><div><ul><li>Bulleted list (Unordered list)</li></ul></=
+div></div><blockquote style=3D"margin:0 0 0 40px;border:none;padding:0px"><=
+div style=3D"text-align:left"><div><div>Indent more once</div></div></div><=
+/blockquote><blockquote style=3D"margin:0 0 0 40px;border:none;padding:0px"=
+><blockquote style=3D"margin:0 0 0 40px;border:none;padding:0px"><div style=
+=3D"text-align:left"><div>Indent more twice</div></div></blockquote></block=
+quote><blockquote style=3D"margin:0 0 0 40px;border:none;padding:0px"><bloc=
+kquote style=3D"margin:0 0 0 40px;border:none;padding:0px"><blockquote styl=
+e=3D"margin:0 0 0 40px;border:none;padding:0px"><div style=3D"text-align:le=
+ft"><div>Indent more twice</div></div></blockquote></blockquote></blockquot=
+e><div><br></div><div><font face=3D"trebuchet ms, sans-serif"><br></font></=
+div><blockquote class=3D"gmail_quote" style=3D"margin:0px 0px 0px 0.8ex;bor=
+der-left:1px solid rgb(204,204,204);padding-left:1ex"><font face=3D"trebuch=
+et ms, sans-serif">Quote</font></blockquote><div><strike>Strikethrough=C2=
+=A0</strike></div><div><a href=3D"http://link" style=3D"">Link</a><br></div=
+><div><br></div></div>
+
+--0000000000007fdaed064882e11e--

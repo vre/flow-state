@@ -20,9 +20,12 @@ Usage with Claude Desktop/Code:
 """
 
 import json
+import re
 from typing import Optional
 
 import html2text
+import markdown
+from pymdownx import emoji
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -39,6 +42,60 @@ from imap_client import (
     modify_draft,
     parse_folder_path,
 )
+
+def preprocess_markdown(text: str) -> str:
+    """Fix common markdown issues before conversion.
+
+    Ensures blank lines before block elements (lists, code blocks, blockquotes, headings).
+    """
+    lines = text.split('\n')
+    result = []
+    prev_was_blank = True  # Start as if there was a blank line
+
+    for line in lines:
+        stripped = line.strip()
+        is_blank = stripped == ''
+
+        # Check if line starts a block element
+        is_block_start = (
+            stripped.startswith('- ') or
+            stripped.startswith('* ') or
+            stripped.startswith('+ ') or
+            re.match(r'^\d+\. ', stripped) or  # ordered list
+            stripped.startswith('> ') or  # blockquote
+            stripped.startswith('```') or  # code block
+            stripped.startswith('#')  # heading
+        )
+
+        # Add blank line before block element if previous line wasn't blank
+        if is_block_start and not prev_was_blank:
+            result.append('')
+
+        result.append(line)
+        prev_was_blank = is_blank
+
+    return '\n'.join(result)
+
+
+def markdown_to_plain(text: str) -> str:
+    """Convert markdown to pre-markdown plain text (Gmail style).
+
+    - **bold** -> *bold*
+    - [text](url) -> text <url>
+    - ~~strike~~ -> text (markers removed)
+    - ==highlight== -> text (markers removed)
+    """
+    # **bold** or __bold__ -> *bold*
+    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
+    text = re.sub(r'__(.+?)__', r'*\1*', text)
+    # [text](url) -> text <url>
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 <\2>', text)
+    # ~~strike~~ -> plain
+    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    # ==highlight== -> plain
+    text = re.sub(r'==(.+?)==', r'\1', text)
+    return text
+
 
 # Initialize MCP server - token-efficient naming
 mcp = FastMCP("streammail_mcp")
@@ -160,12 +217,16 @@ Search messages in a folder.
 Creates a new draft or modifies an existing one.
 
 ## Create New Draft
-- payload: JSON with to, subject, body (required), in_reply_to, cc (optional)
+- payload: JSON with to, subject, body (required), in_reply_to, cc, format (optional)
 
-{action: "draft", payload: '{"to":"x@y.com","subject":"Hi","body":"..."}'}
+{action: "draft", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
+
+## Format
+- "markdown" (default): HTML + plain text. Supports: **bold**, *italic*, ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes
+- "plain": plain text only
 
 ## Modify Existing Draft
-- payload: JSON with id (required), body (required), subject/to/cc (optional)
+- payload: JSON with id (required), body (required), subject/to/cc/format (optional)
 - Preserves In-Reply-To and References for reply threading
 
 {action: "draft", folder: "Drafts", payload: '{"id":1253,"body":"Updated..."}'}
@@ -391,13 +452,37 @@ async def use_mail(params: MailAction) -> str:
                 if 'body' not in draft_data:
                     return "Error: 'body' required for modify"
 
+                body = draft_data['body']
+                format_type = draft_data.get('format', 'markdown')
+
+                if format_type == 'markdown':
+                    preprocessed = preprocess_markdown(body)
+                    html_body = markdown.markdown(
+                        preprocessed,
+                        extensions=[
+                            'pymdownx.tilde',
+                            'pymdownx.tasklist',
+                            'pymdownx.mark',
+                            'pymdownx.betterem',
+                                                        'pymdownx.emoji',
+                        ],
+                        extension_configs={
+                            'pymdownx.emoji': {'emoji_generator': emoji.to_alt}
+                        }
+                    )
+                    plain_body = markdown_to_plain(body)
+                else:
+                    html_body = None
+                    plain_body = body
+
                 result = modify_draft(
                     folder=folder,
                     message_id=int(draft_data['id']),
-                    body=draft_data['body'],
+                    body=plain_body,
                     subject=draft_data.get('subject'),
                     to=draft_data.get('to'),
-                    cc=draft_data.get('cc')
+                    cc=draft_data.get('cc'),
+                    html=html_body
                 )
 
                 reply_info = " (reply threading preserved)" if result['preserved_reply_to'] else ""
@@ -415,13 +500,37 @@ Open Thunderbird → Drafts to review and send."""
             if missing:
                 return f"Error: Missing required fields: {', '.join(missing)}"
 
+            body = draft_data['body']
+            format_type = draft_data.get('format', 'markdown')
+
+            if format_type == 'markdown':
+                preprocessed = preprocess_markdown(body)
+                html_body = markdown.markdown(
+                    preprocessed,
+                    extensions=[
+                        'pymdownx.tilde',
+                        'pymdownx.tasklist',
+                        'pymdownx.mark',
+                        'pymdownx.betterem',
+                                                'pymdownx.emoji',
+                    ],
+                    extension_configs={
+                        'pymdownx.emoji': {'emoji_generator': emoji.to_alt}
+                    }
+                )
+                plain_body = markdown_to_plain(body)
+            else:
+                html_body = None
+                plain_body = body
+
             result = create_draft(
                 folder=folder or "INBOX",
                 to=draft_data['to'],
                 subject=draft_data['subject'],
-                body=draft_data['body'],
+                body=plain_body,
                 in_reply_to=draft_data.get('in_reply_to'),
-                cc=draft_data.get('cc')
+                cc=draft_data.get('cc'),
+                html=html_body
             )
 
             return f"""# Draft Created

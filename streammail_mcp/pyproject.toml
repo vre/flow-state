@@ -10,6 +10,8 @@ dependencies = [
     "imapclient>=3.0.0",
     "keyring>=25.0.0",
     "html2text>=2025.4.15",
+    "markdown>=3.10",
+    "pymdown-extensions>=10.20",
 ]
 
 [project.scripts]

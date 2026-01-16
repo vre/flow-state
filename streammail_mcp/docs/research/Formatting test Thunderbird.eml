@@ -1,0 +1,187 @@
+Content-Type: multipart/alternative;
+ boundary="------------AzYDr023HWkP0Z0zWpLVrAqt"
+Message-ID: <55c9602c-84a2-4e03-8c8f-8c80b990a7de@vre.iki.fi>
+Date: Fri, 16 Jan 2026 17:55:25 +0200
+MIME-Version: 1.0
+User-Agent: Mozilla Thunderbird
+From: Ville Reijonen <xxx@xxx>
+Subject: Formatting test Thunderbird
+To: Ville Reijonen <xxx@gmail.com>
+Content-Language: en-US
+
+This is a multi-part message in MIME format.
+--------------AzYDr023HWkP0Z0zWpLVrAqt
+Content-Type: text/plain; charset=UTF-8; format=flowed
+Content-Transfer-Encoding: 7bit
+
+Variable Width (default)
+
+Fixed Width
+
+Helvetica, Arial
+
+Times
+
+Courier
+
+
+Body Text
+
+Paragraph (default)
+
+
+  Heading 1
+
+
+    Heading 2
+
+
+      Heading 3
+
+
+        Heading 4
+
+
+          Heading 5
+
+
+            Heading 6
+
+Address
+
+Preformat
+
+Font size Tiny
+
+Font size Small
+
+Font size Medium (default)
+
+Font size Large
+
+Font size Extra Large
+
+Font size Huge
+
+
+*Bold*
+
+/Italic/
+
+/*Bold and Italic*/
+
+_Underlined_
+
+_*/Bold, Italic and Underlined/*_
+
+Background green (not possible, whole email is then green)
+
+Text green
+
+Align left
+
+Align center
+
+Align right
+
+Justify
+
+
+ 1. Numbered list
+
+  * Bulleted list (Ordered list)
+
+Link
+
+------------------------------------------------------------------------
+
+(Horizontal Line)
+
+(Anchor)
+
+Table 2x2 100% width 	right top
+left bottom 	right bottom
+
+
+
+--------------AzYDr023HWkP0Z0zWpLVrAqt
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: 7bit
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  </head>
+  <body text="#000000" bgcolor="transparent" link="#0B6CDA"
+    alink="#EE0000" vlink="#551A8B">
+    <p>Variable Width (default)</p>
+    <p><font face="monospace">Fixed Width</font></p>
+    <p><font face="Helvetica, Arial, sans-serif">Helvetica, Arial</font></p>
+    <p><font face="Times New Roman, Times, serif">Times</font></p>
+    <p><font face="Courier New, Courier, monospace">Courier</font></p>
+    <p><font face="Courier New, Courier, monospace"><br>
+      </font></p>
+    <p>Body Text</p>
+    <p>Paragraph (default)</p>
+    <h1>Heading 1</h1>
+    <h2>Heading 2</h2>
+    <h3>Heading 3</h3>
+    <h4>Heading 4</h4>
+    <h5>Heading 5</h5>
+    <h6>Heading 6</h6>
+    <address>Address<br>
+    </address>
+    <pre>Preformat
+
+</pre>
+    <p><font size="1">Font size Tiny</font></p>
+    <p><font size="2">Font size Small</font></p>
+    <p>Font size Medium (default)</p>
+    <p><font size="4">Font size Large</font></p>
+    <p><font size="5">Font size Extra Large</font></p>
+    <p><font size="6">Font size Huge</font></p>
+    <p><br>
+    </p>
+    <p><b>Bold</b></p>
+    <p><i>Italic</i></p>
+    <p><i><b>Bold and Italic</b></i></p>
+    <p><u>Underlined</u></p>
+    <p><u><b><i>Bold, Italic and Underlined</i></b></u></p>
+    <p>Background green (not possible, whole email is then green)</p>
+    <p><font color="#008000">Text green</font></p>
+    <p align="left">Align left</p>
+    <p align="center">Align center</p>
+    <p align="right">Align right</p>
+    <p align="justify">Justify</p>
+    <br>
+    <ol>
+      <li>Numbered list</li>
+    </ol>
+    <ul>
+      <li>Bulleted list (Ordered list)</li>
+    </ul>
+    <p><a href="Link" moz-do-not-send="true"
+        class="moz-txt-link-freetext">Link</a></p>
+    <hr width="100%" size="2">
+    <p>(Horizontal Line)</p>
+    <p><a name="Anchor"></a>(Anchor)</p>
+    <table cellpadding="2" cellspacing="2" border="1" width="100%">
+      <tbody>
+        <tr>
+          <td valign="top">Table 2x2 100% width</td>
+          <td valign="top">right top</td>
+        </tr>
+        <tr>
+          <td valign="top">left bottom</td>
+          <td valign="top">right bottom</td>
+        </tr>
+      </tbody>
+    </table>
+    <p><br>
+    </p>
+    <br>
+  </body>
+</html>
+
+--------------AzYDr023HWkP0Z0zWpLVrAqt--
