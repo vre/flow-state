@@ -468,7 +468,8 @@ def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
 
 def create_draft(folder: str, to: str, subject: str, body: str,
                  in_reply_to: Optional[str] = None,
-                 cc: Optional[str] = None) -> dict:
+                 cc: Optional[str] = None,
+                 html: Optional[str] = None) -> dict:
     """Create a draft message in IMAP Drafts folder.
 
     Args:
@@ -478,6 +479,7 @@ def create_draft(folder: str, to: str, subject: str, body: str,
         body: Message body (plain text)
         in_reply_to: Message-ID to reply to
         cc: CC addresses (comma-separated)
+        html: HTML body (if provided, creates multipart/alternative)
 
     Returns:
         Info about created draft
@@ -501,7 +503,10 @@ def create_draft(folder: str, to: str, subject: str, body: str,
             msg['In-Reply-To'] = in_reply_to
             msg['References'] = in_reply_to
 
+        # Set body - plain text, optionally with HTML alternative
         msg.set_content(body)
+        if html:
+            msg.add_alternative(html, subtype='html')
 
         # Find Drafts folder
         folders = client.list_folders()
@@ -546,7 +551,8 @@ def create_draft(folder: str, to: str, subject: str, body: str,
 def modify_draft(folder: str, message_id: int, body: str,
                  subject: Optional[str] = None,
                  to: Optional[str] = None,
-                 cc: Optional[str] = None) -> dict:
+                 cc: Optional[str] = None,
+                 html: Optional[str] = None) -> dict:
     """Modify an existing draft message.
 
     Reads the original draft, preserves threading info (In-Reply-To, References),
@@ -559,6 +565,7 @@ def modify_draft(folder: str, message_id: int, body: str,
         subject: New subject (optional, keeps original if not provided)
         to: New recipient (optional, keeps original if not provided)
         cc: New CC (optional, keeps original if not provided)
+        html: HTML body (if provided, creates multipart/alternative)
 
     Returns:
         Info about the modified draft
@@ -625,7 +632,10 @@ def modify_draft(folder: str, message_id: int, body: str,
         if references:
             new_msg['References'] = references
 
+        # Set body - plain text, optionally with HTML alternative
         new_msg.set_content(body)
+        if html:
+            new_msg.add_alternative(html, subtype='html')
 
         # Delete old draft
         client.delete_messages([message_id])
