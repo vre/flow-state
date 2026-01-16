@@ -33,7 +33,7 @@ Actions:
 - list       - Listaa viestit kansiosta
 - read       - Lue viesti (payload=msg_id), näyttää liitteet
 - search     - Etsi viestejä (payload=query)
-- draft      - Luo draft-vastaus (payload=JSON{to,subject,body,in_reply_to?})
+- draft      - Luo/muokkaa draft (payload=JSON, id-kenttä → muokkaa)
 - folders    - Listaa kansiot
 - attachment - Lataa liite tiedostoon (payload="msg_id:index")
 - cleanup    - Poista ladatut liitteet temp-hakemistosta
@@ -65,6 +65,7 @@ claude mcp add streammail -- uv --directory /Users/vre/work/streammail_mcp run s
 - **Liitteiden listaus** - `read`-action näyttää liitteet (nimi, tyyppi, koko)
 - **Liitteiden lataus** - `attachment`-action tallentaa liitteen temp-tiedostoon
 - **Cleanup** - `cleanup`-action poistaa ladatut liitteet
+- **Draft modify** - `draft`-action tukee olemassaolevan draftin muokkausta (id-parametri), säilyttää reply threading
 
 ### Liitteiden käsittely
 
