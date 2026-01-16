@@ -1,0 +1,6 @@
+{
+  "name": "streammail",
+  "version": "0.1.0",
+  "description": "Lightweight IMAP email MCP server. Read, search, and draft emails with a single tool.",
+  "mcpServers": "../.mcp.json"
+}
