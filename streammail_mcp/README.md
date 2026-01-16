@@ -6,7 +6,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **~500 tokens** vs typical 15,000+ token MCP servers
 - Single `use_mail` tool with action dispatcher
 - Self-documenting via `help` action
-- Credentials stored securely in OS keychain
+- Credentials stored securely in OS keychain (cross-platform)
 
 ## Features
 
@@ -25,30 +25,53 @@ cd streammail
 # Install dependencies with uv
 uv sync
 
-# Configure IMAP credentials (stored in macOS Keychain)
+# Configure IMAP credentials (stored in system keychain)
 uv run python setup.py
 
 # Test connection
 uv run python imap_client.py
 ```
 
-## Setup
+## Credentials Setup
 
-The setup script asks for:
-- IMAP server (e.g., `mail.example.com`)
-- Port (default: `993` for SSL)
-- Username (your email address)
-- Password (stored securely in keychain)
+### Primary: System Keychain (Recommended)
+
+The setup script stores credentials in your system's secure credential store:
+
+| Platform | Backend |
+|----------|---------|
+| macOS | Keychain |
+| Windows | Credential Manager |
+| Linux | GNOME Keyring / KWallet / Secret Service |
 
 ```bash
 uv run python setup.py
 ```
+
+The script asks for:
+- IMAP server (e.g., `mail.example.com`)
+- Port (default: `993` for SSL)
+- Username (your email address)
+- Password (stored securely in keychain)
 
 Manage credentials:
 ```bash
 uv run python setup.py --show   # Show config (no password)
 uv run python setup.py --clear  # Remove credentials
 ```
+
+### Fallback: Environment Variables (Automation/Docker)
+
+For CI/CD, Docker, or automation, set environment variables instead:
+
+```bash
+export STREAMMAIL_IMAP_SERVER="mail.example.com"
+export STREAMMAIL_IMAP_PORT="993"
+export STREAMMAIL_IMAP_USERNAME="user@example.com"
+export STREAMMAIL_IMAP_PASSWORD="app-password"
+```
+
+Environment variables are used only when keychain credentials are not configured.
 
 ## Claude Configuration
 
@@ -135,7 +158,7 @@ imap://user@server/INBOX/Projects/PLoP
 
 ## Security
 
-- Credentials stored in macOS Keychain (never in files)
+- Credentials stored in system keychain (never in files)
 - Password fetched only when IMAP connection opens
 - Password never appears in logs or tool output
 - IMAP connection uses SSL/TLS

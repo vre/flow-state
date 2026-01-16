@@ -31,7 +31,10 @@ class IMAPError(Exception):
 
 
 def get_credentials() -> tuple[str, str, str, str]:
-    """Fetch IMAP credentials from keychain.
+    """Fetch IMAP credentials from keychain or environment.
+
+    Primary: System keychain (cross-platform via keyring)
+    Fallback: Environment variables (for automation/Docker/CI)
 
     Returns:
         Tuple of (server, port, username, password)
@@ -39,14 +42,23 @@ def get_credentials() -> tuple[str, str, str, str]:
     Raises:
         IMAPError: If credentials not configured
     """
+    # PRIMARY: System keychain (cross-platform)
     server = keyring.get_password(SERVICE_NAME, "imap_server")
-    port = keyring.get_password(SERVICE_NAME, "imap_port")
-    username = keyring.get_password(SERVICE_NAME, "imap_username")
-    password = keyring.get_password(SERVICE_NAME, "imap_password")
+    if server:
+        port = keyring.get_password(SERVICE_NAME, "imap_port")
+        username = keyring.get_password(SERVICE_NAME, "imap_username")
+        password = keyring.get_password(SERVICE_NAME, "imap_password")
+    else:
+        # FALLBACK: Environment variables (automation/Docker)
+        server = os.environ.get("STREAMMAIL_IMAP_SERVER")
+        port = os.environ.get("STREAMMAIL_IMAP_PORT")
+        username = os.environ.get("STREAMMAIL_IMAP_USERNAME")
+        password = os.environ.get("STREAMMAIL_IMAP_PASSWORD")
 
     if not all([server, username, password]):
         raise IMAPError(
-            "IMAP not configured. Run 'python setup.py' first."
+            "IMAP not configured. Run 'uv run python setup.py' to configure, "
+            "or set STREAMMAIL_IMAP_* environment variables."
         )
 
     return server, port or "993", username, password
@@ -102,6 +114,38 @@ def decode_header_value(value) -> str:
             decoded_parts.append(part)
 
     return ''.join(decoded_parts)
+
+
+def format_address(addr) -> str:
+    """Format a single email address for display.
+
+    Args:
+        addr: Address object with name, mailbox, host attributes
+
+    Returns:
+        Formatted string like "Name <email@domain>" or "email@domain"
+    """
+    name = decode_header_value(addr.name) if addr.name else ""
+    mailbox = to_str(addr.mailbox)
+    host = to_str(addr.host)
+
+    if name:
+        return f"{name} <{mailbox}@{host}>"
+    return f"{mailbox}@{host}"
+
+
+def format_address_list(addr_list) -> list[str]:
+    """Format a list of email addresses for display.
+
+    Args:
+        addr_list: List of address objects, or None
+
+    Returns:
+        List of formatted address strings
+    """
+    if not addr_list:
+        return []
+    return [format_address(addr) for addr in addr_list]
 
 
 def parse_folder_path(imap_url: str) -> str:
@@ -178,16 +222,7 @@ def list_messages(folder: str, limit: int = 20) -> list[dict]:
             envelope = data[b'ENVELOPE']
 
             # Parse sender
-            from_addr = ""
-            if envelope.from_:
-                f = envelope.from_[0]
-                name = decode_header_value(f.name) if f.name else ""
-                mailbox = to_str(f.mailbox)
-                host = to_str(f.host)
-                if name:
-                    from_addr = f"{name} <{mailbox}@{host}>"
-                else:
-                    from_addr = f"{mailbox}@{host}"
+            from_addr = format_address(envelope.from_[0]) if envelope.from_ else ""
 
             # Parse date
             date_str = ""
@@ -274,27 +309,12 @@ def read_message(folder: str, message_id: int) -> dict:
             else:
                 body_text = payload.decode(charset, errors='replace')
 
-        # Parse addresses
-        def format_addrs(addr_list):
-            if not addr_list:
-                return []
-            result = []
-            for a in addr_list:
-                name = decode_header_value(a.name) if a.name else ""
-                mailbox = to_str(a.mailbox)
-                host = to_str(a.host)
-                if name:
-                    result.append(f"{name} <{mailbox}@{host}>")
-                else:
-                    result.append(f"{mailbox}@{host}")
-            return result
-
         return {
             "id": message_id,
             "subject": decode_header_value(envelope.subject) if envelope.subject else "",
-            "from": format_addrs(envelope.from_),
-            "to": format_addrs(envelope.to),
-            "cc": format_addrs(envelope.cc),
+            "from": format_address_list(envelope.from_),
+            "to": format_address_list(envelope.to),
+            "cc": format_address_list(envelope.cc),
             "date": str(envelope.date) if envelope.date else "",
             "message_id": to_str(envelope.message_id) if envelope.message_id else "",
             "in_reply_to": to_str(envelope.in_reply_to) if envelope.in_reply_to else "",
@@ -444,17 +464,7 @@ def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
         results = []
         for msg_id, data in messages.items():
             envelope = data[b'ENVELOPE']
-
-            from_addr = ""
-            if envelope.from_:
-                f = envelope.from_[0]
-                name = decode_header_value(f.name) if f.name else ""
-                mailbox = to_str(f.mailbox)
-                host = to_str(f.host)
-                if name:
-                    from_addr = f"{name} <{mailbox}@{host}>"
-                else:
-                    from_addr = f"{mailbox}@{host}"
+            from_addr = format_address(envelope.from_[0]) if envelope.from_ else ""
 
             results.append({
                 "id": msg_id,
