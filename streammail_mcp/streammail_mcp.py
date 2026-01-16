@@ -20,12 +20,9 @@ Usage with Claude Desktop/Code:
 """
 
 import json
-import re
 from typing import Optional
 
 import html2text
-import markdown
-from pymdownx import emoji
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -42,59 +39,7 @@ from imap_client import (
     modify_draft,
     parse_folder_path,
 )
-
-def preprocess_markdown(text: str) -> str:
-    """Fix common markdown issues before conversion.
-
-    Ensures blank lines before block elements (lists, code blocks, blockquotes, headings).
-    """
-    lines = text.split('\n')
-    result = []
-    prev_was_blank = True  # Start as if there was a blank line
-
-    for line in lines:
-        stripped = line.strip()
-        is_blank = stripped == ''
-
-        # Check if line starts a block element
-        is_block_start = (
-            stripped.startswith('- ') or
-            stripped.startswith('* ') or
-            stripped.startswith('+ ') or
-            re.match(r'^\d+\. ', stripped) or  # ordered list
-            stripped.startswith('> ') or  # blockquote
-            stripped.startswith('```') or  # code block
-            stripped.startswith('#')  # heading
-        )
-
-        # Add blank line before block element if previous line wasn't blank
-        if is_block_start and not prev_was_blank:
-            result.append('')
-
-        result.append(line)
-        prev_was_blank = is_blank
-
-    return '\n'.join(result)
-
-
-def markdown_to_plain(text: str) -> str:
-    """Convert markdown to pre-markdown plain text (Gmail style).
-
-    - **bold** -> *bold*
-    - [text](url) -> text <url>
-    - ~~strike~~ -> text (markers removed)
-    - ==highlight== -> text (markers removed)
-    """
-    # **bold** or __bold__ -> *bold*
-    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
-    text = re.sub(r'__(.+?)__', r'*\1*', text)
-    # [text](url) -> text <url>
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 <\2>', text)
-    # ~~strike~~ -> plain
-    text = re.sub(r'~~(.+?)~~', r'\1', text)
-    # ==highlight== -> plain
-    text = re.sub(r'==(.+?)==', r'\1', text)
-    return text
+from markdown_utils import convert_body
 
 
 # Initialize MCP server - token-efficient naming
@@ -454,26 +399,7 @@ async def use_mail(params: MailAction) -> str:
 
                 body = draft_data['body']
                 format_type = draft_data.get('format', 'markdown')
-
-                if format_type == 'markdown':
-                    preprocessed = preprocess_markdown(body)
-                    html_body = markdown.markdown(
-                        preprocessed,
-                        extensions=[
-                            'pymdownx.tilde',
-                            'pymdownx.tasklist',
-                            'pymdownx.mark',
-                            'pymdownx.betterem',
-                                                        'pymdownx.emoji',
-                        ],
-                        extension_configs={
-                            'pymdownx.emoji': {'emoji_generator': emoji.to_alt}
-                        }
-                    )
-                    plain_body = markdown_to_plain(body)
-                else:
-                    html_body = None
-                    plain_body = body
+                html_body, plain_body = convert_body(body, format_type)
 
                 result = modify_draft(
                     folder=folder,
@@ -502,26 +428,7 @@ Open Thunderbird → Drafts to review and send."""
 
             body = draft_data['body']
             format_type = draft_data.get('format', 'markdown')
-
-            if format_type == 'markdown':
-                preprocessed = preprocess_markdown(body)
-                html_body = markdown.markdown(
-                    preprocessed,
-                    extensions=[
-                        'pymdownx.tilde',
-                        'pymdownx.tasklist',
-                        'pymdownx.mark',
-                        'pymdownx.betterem',
-                                                'pymdownx.emoji',
-                    ],
-                    extension_configs={
-                        'pymdownx.emoji': {'emoji_generator': emoji.to_alt}
-                    }
-                )
-                plain_body = markdown_to_plain(body)
-            else:
-                html_body = None
-                plain_body = body
+            html_body, plain_body = convert_body(body, format_type)
 
             result = create_draft(
                 folder=folder or "INBOX",
