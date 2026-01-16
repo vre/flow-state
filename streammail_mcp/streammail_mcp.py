@@ -36,6 +36,7 @@ from imap_client import (
     cleanup_attachments,
     search_messages,
     create_draft,
+    modify_draft,
     parse_folder_path,
 )
 
@@ -154,26 +155,24 @@ Search messages in a folder.
 """,
 
     "draft": """
-# draft - Create Draft Reply
+# draft - Create or Modify Draft
 
-Creates a draft message in the IMAP Drafts folder.
-You can then review/edit/send it in Thunderbird.
+Creates a new draft or modifies an existing one.
 
-## Parameters
-- folder: Current folder (for context)
-- payload: JSON object with:
-  - to (required): Recipient email
-  - subject (required): Message subject
-  - body (required): Plain text body
-  - in_reply_to (optional): Message-ID being replied to
-  - cc (optional): CC addresses, comma-separated
+## Create New Draft
+- payload: JSON with to, subject, body (required), in_reply_to, cc (optional)
 
-## Example
-{action: "draft", folder: "INBOX", payload: '{"to":"boss@example.com","subject":"Re: Q4 Report","body":"Thanks for the update...","in_reply_to":"<abc123@mail.example.com>"}'}
+{action: "draft", payload: '{"to":"x@y.com","subject":"Hi","body":"..."}'}
+
+## Modify Existing Draft
+- payload: JSON with id (required), body (required), subject/to/cc (optional)
+- Preserves In-Reply-To and References for reply threading
+
+{action: "draft", folder: "Drafts", payload: '{"id":1253,"body":"Updated..."}'}
 
 ## Workflow
-1. Use 'read' to get the original message (note the message_id)
-2. Use 'draft' with in_reply_to set to that message_id
+1. Use 'read' to get message (note message_id for replies)
+2. Use 'draft' to create/modify
 3. Open Thunderbird → Drafts → review and send
 """,
 
@@ -358,16 +357,42 @@ async def use_mail(params: MailAction) -> str:
 
             return "\n".join(lines)
 
-        # Draft
+        # Draft (create or modify)
         if action == "draft":
             if not params.payload:
-                return "Error: payload required. JSON with to, subject, body. Use 'help draft' for details."
+                return "Error: payload required. Use 'help draft' for details."
 
             try:
                 draft_data = json.loads(params.payload)
             except json.JSONDecodeError as e:
                 return f"Error: Invalid JSON in payload: {e}"
 
+            # Modify existing draft if 'id' provided
+            if 'id' in draft_data:
+                if not folder:
+                    return "Error: folder required for modify (e.g., 'Drafts')"
+                if 'body' not in draft_data:
+                    return "Error: 'body' required for modify"
+
+                result = modify_draft(
+                    folder=folder,
+                    message_id=int(draft_data['id']),
+                    body=draft_data['body'],
+                    subject=draft_data.get('subject'),
+                    to=draft_data.get('to'),
+                    cc=draft_data.get('cc')
+                )
+
+                reply_info = " (reply threading preserved)" if result['preserved_reply_to'] else ""
+                return f"""# Draft Modified{reply_info}
+
+**To:** {result['to']}
+**Subject:** {result['subject']}
+**Saved to:** {result['folder']}
+
+Open Thunderbird → Drafts to review and send."""
+
+            # Create new draft
             required = ['to', 'subject', 'body']
             missing = [f for f in required if f not in draft_data]
             if missing:
