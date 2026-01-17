@@ -1,5 +1,5 @@
 [project]
-name = "streammail-mcp"
+name = "imap-stream-mcp"
 version = "0.1.0"
 description = "Lightweight IMAP MCP server for Claude"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-streammail = "streammail_mcp:main"
+imap-stream = "imap_stream_mcp:main"
 
 [build-system]
 requires = ["hatchling"]

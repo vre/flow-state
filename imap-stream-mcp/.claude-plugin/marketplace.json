@@ -1,20 +1,20 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "streammail",
+  "name": "imap-stream",
   "version": "0.1.0",
   "description": "Lightweight IMAP email MCP server for Claude Code. Read, search, and draft emails with ~500 tokens.",
   "owner": {
     "name": "Ville Reijonen",
-    "email": "streammail@vre.iki.fi"
+    "email": "imap-stream@vre.iki.fi"
   },
   "plugins": [
     {
-      "name": "streammail",
+      "name": "imap-stream",
       "description": "IMAP email client - list, read, search, draft emails. Single tool design (~500 tokens vs 15,000+). Markdown support for HTML emails.",
       "version": "0.1.0",
       "author": {
         "name": "Ville Reijonen",
-        "email": "streammail@vre.iki.fi"
+        "email": "imap-stream@vre.iki.fi"
       },
       "source": "./",
       "category": "productivity"

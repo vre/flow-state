@@ -62,10 +62,10 @@ class TestGetCredentials:
     def test_keychain_takes_priority(self, mock_keyring, monkeypatch):
         """Keychain credentials should be used when available."""
         # Set env vars (should be ignored when keychain has credentials)
-        monkeypatch.setenv("STREAMMAIL_IMAP_SERVER", "env.server.com")
-        monkeypatch.setenv("STREAMMAIL_IMAP_PORT", "143")
-        monkeypatch.setenv("STREAMMAIL_IMAP_USERNAME", "envuser")
-        monkeypatch.setenv("STREAMMAIL_IMAP_PASSWORD", "envpass")
+        monkeypatch.setenv("IMAP_STREAM_SERVER", "env.server.com")
+        monkeypatch.setenv("IMAP_STREAM_PORT", "143")
+        monkeypatch.setenv("IMAP_STREAM_USERNAME", "envuser")
+        monkeypatch.setenv("IMAP_STREAM_PASSWORD", "envpass")
 
         # Mock keyring to return credentials
         mock_keyring.side_effect = lambda service, key: {
@@ -87,10 +87,10 @@ class TestGetCredentials:
     def test_default_port_when_not_set(self, mock_keyring, monkeypatch):
         """Default port should be 993 when not specified."""
         # Clear env vars
-        monkeypatch.delenv("STREAMMAIL_IMAP_SERVER", raising=False)
-        monkeypatch.delenv("STREAMMAIL_IMAP_PORT", raising=False)
-        monkeypatch.delenv("STREAMMAIL_IMAP_USERNAME", raising=False)
-        monkeypatch.delenv("STREAMMAIL_IMAP_PASSWORD", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_PORT", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_USERNAME", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_PASSWORD", raising=False)
 
         # Mock keyring - no port set
         mock_keyring.side_effect = lambda service, key: {
@@ -107,10 +107,10 @@ class TestGetCredentials:
     def test_falls_back_to_env_vars(self, mock_keyring, monkeypatch):
         """Should fall back to env vars when keychain not configured."""
         # Set env vars
-        monkeypatch.setenv("STREAMMAIL_IMAP_SERVER", "env.server.com")
-        monkeypatch.setenv("STREAMMAIL_IMAP_PORT", "143")
-        monkeypatch.setenv("STREAMMAIL_IMAP_USERNAME", "envuser")
-        monkeypatch.setenv("STREAMMAIL_IMAP_PASSWORD", "envpass")
+        monkeypatch.setenv("IMAP_STREAM_SERVER", "env.server.com")
+        monkeypatch.setenv("IMAP_STREAM_PORT", "143")
+        monkeypatch.setenv("IMAP_STREAM_USERNAME", "envuser")
+        monkeypatch.setenv("IMAP_STREAM_PASSWORD", "envpass")
 
         # Mock keyring to return None (not configured)
         mock_keyring.return_value = None
@@ -126,9 +126,9 @@ class TestGetCredentials:
     def test_raises_when_not_configured(self, mock_keyring, monkeypatch):
         """Should raise IMAPError when no credentials available."""
         # Clear env vars
-        monkeypatch.delenv("STREAMMAIL_IMAP_SERVER", raising=False)
-        monkeypatch.delenv("STREAMMAIL_IMAP_USERNAME", raising=False)
-        monkeypatch.delenv("STREAMMAIL_IMAP_PASSWORD", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_USERNAME", raising=False)
+        monkeypatch.delenv("IMAP_STREAM_PASSWORD", raising=False)
 
         # Mock keyring returning None
         mock_keyring.return_value = None

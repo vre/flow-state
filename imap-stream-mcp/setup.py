@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Streammail Setup - Configure IMAP credentials in macOS Keychain.
+IMAP Stream Setup - Configure IMAP credentials in system keychain.
 
 This script interactively collects IMAP server settings and stores
 them securely in the system keychain. The password is never logged
@@ -14,17 +14,17 @@ import getpass
 import keyring
 import sys
 
-SERVICE_NAME = "streammail"
+SERVICE_NAME = "imap-stream"
 
 
 def setup():
-    """Interactive setup for streammail IMAP configuration."""
+    """Interactive setup for IMAP Stream configuration."""
     print("=" * 50)
-    print("  Streammail Setup")
+    print("  IMAP Stream Setup")
     print("=" * 50)
     print()
     print("This will configure your IMAP connection.")
-    print("Credentials are stored securely in macOS Keychain.")
+    print("Credentials are stored securely in system keychain.")
     print()
 
     # Check for existing config
@@ -79,7 +79,7 @@ def setup():
         print(f"  Username: {username}")
         print(f"  Password: (stored in keychain)")
         print()
-        print("You can now use streammail_mcp with Claude.")
+        print("You can now use imap-stream-mcp with Claude.")
         print()
         print("To test the connection:")
         print("  python -c \"from imap_client import test_connection; test_connection()\"")
@@ -101,7 +101,7 @@ def show_config():
         print("No configuration found. Run 'python setup.py' to configure.")
         return
 
-    print("Current streammail configuration:")
+    print("Current imap-stream configuration:")
     print(f"  Server:   {server}:{port}")
     print(f"  Username: {username}")
     print(f"  Password: {'(set)' if has_password else '(not set)'}")
