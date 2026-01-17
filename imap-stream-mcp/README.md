@@ -1,4 +1,4 @@
-# Streammail MCP
+# IMAP Stream MCP
 
 Lightweight IMAP email client for Claude Desktop/Code/Cowork.
 
@@ -20,7 +20,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 ## Installation
 
 ```bash
-cd streammail
+cd imap-stream-mcp
 
 # Install dependencies with uv
 uv sync
@@ -65,10 +65,10 @@ uv run python setup.py --clear  # Remove credentials
 For CI/CD, Docker, or automation, set environment variables instead:
 
 ```bash
-export STREAMMAIL_IMAP_SERVER="mail.example.com"
-export STREAMMAIL_IMAP_PORT="993"
-export STREAMMAIL_IMAP_USERNAME="user@example.com"
-export STREAMMAIL_IMAP_PASSWORD="app-password"
+export IMAP_STREAM_SERVER="mail.example.com"
+export IMAP_STREAM_PORT="993"
+export IMAP_STREAM_USERNAME="user@example.com"
+export IMAP_STREAM_PASSWORD="app-password"
 ```
 
 Environment variables are used only when keychain credentials are not configured.
@@ -82,9 +82,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```json
 {
   "mcpServers": {
-    "streammail": {
+    "imap-stream": {
       "command": "uv",
-      "args": ["--directory", "/path/to/streammail", "run", "streammail"]
+      "args": ["--directory", "/path/to/imap-stream-mcp", "run", "imap-stream"]
     }
   }
 }
@@ -93,7 +93,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ### Claude Code
 
 ```bash
-claude mcp add streammail -- uv --directory /path/to/streammail run streammail
+claude mcp add imap-stream -- uv --directory /path/to/imap-stream-mcp run imap-stream
 ```
 
 ### Cowork

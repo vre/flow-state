@@ -22,7 +22,7 @@ from typing import Optional
 
 from imapclient import IMAPClient
 
-SERVICE_NAME = "streammail"
+SERVICE_NAME = "imap-stream"
 
 
 class IMAPError(Exception):
@@ -50,15 +50,15 @@ def get_credentials() -> tuple[str, str, str, str]:
         password = keyring.get_password(SERVICE_NAME, "imap_password")
     else:
         # FALLBACK: Environment variables (automation/Docker)
-        server = os.environ.get("STREAMMAIL_IMAP_SERVER")
-        port = os.environ.get("STREAMMAIL_IMAP_PORT")
-        username = os.environ.get("STREAMMAIL_IMAP_USERNAME")
-        password = os.environ.get("STREAMMAIL_IMAP_PASSWORD")
+        server = os.environ.get("IMAP_STREAM_SERVER")
+        port = os.environ.get("IMAP_STREAM_PORT")
+        username = os.environ.get("IMAP_STREAM_USERNAME")
+        password = os.environ.get("IMAP_STREAM_PASSWORD")
 
     if not all([server, username, password]):
         raise IMAPError(
             "IMAP not configured. Run 'uv run python setup.py' to configure, "
-            "or set STREAMMAIL_IMAP_* environment variables."
+            "or set IMAP_STREAM_* environment variables."
         )
 
     return server, port or "993", username, password
