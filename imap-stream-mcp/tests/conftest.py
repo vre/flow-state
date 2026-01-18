@@ -142,10 +142,12 @@ def mock_credentials(monkeypatch):
     """Mock keyring credentials."""
     def mock_get_password(service, key):
         creds = {
-            "imap_server": "mail.example.com",
-            "imap_port": "993",
-            "imap_username": "testuser",
-            "imap_password": "testpass",
+            "accounts": '["default"]',
+            "default_account": "default",
+            "default:imap_server": "mail.example.com",
+            "default:imap_port": "993",
+            "default:imap_username": "testuser",
+            "default:imap_password": "testpass",
         }
         return creds.get(key)
 

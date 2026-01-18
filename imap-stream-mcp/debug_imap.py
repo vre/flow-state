@@ -1,11 +1,29 @@
 #!/usr/bin/env python3
 """Debug IMAP connection issues."""
 
+import json
 import ssl
 import socket
 import keyring
 
-SERVICE_NAME = "streammail"
+SERVICE_NAME = "imap-stream"
+
+
+def get_credentials():
+    """Get credentials from keychain."""
+    accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
+    if not accounts_json:
+        return None, None, None, None
+
+    accounts = json.loads(accounts_json)
+    default = keyring.get_password(SERVICE_NAME, "default_account") or accounts[0]
+
+    server = keyring.get_password(SERVICE_NAME, f"{default}:imap_server")
+    port = keyring.get_password(SERVICE_NAME, f"{default}:imap_port") or "993"
+    username = keyring.get_password(SERVICE_NAME, f"{default}:imap_username")
+    password = keyring.get_password(SERVICE_NAME, f"{default}:imap_password")
+
+    return server, port, username, password
 
 
 def debug_connection():
@@ -16,10 +34,7 @@ def debug_connection():
     print("1. Checking stored credentials...")
     print("=" * 50)
 
-    server = keyring.get_password(SERVICE_NAME, "imap_server")
-    port = keyring.get_password(SERVICE_NAME, "imap_port") or "993"
-    username = keyring.get_password(SERVICE_NAME, "imap_username")
-    password = keyring.get_password(SERVICE_NAME, "imap_password")
+    server, port, username, password = get_credentials()
 
     print(f"   Server:   {server}")
     print(f"   Port:     {port}")
@@ -135,10 +150,7 @@ def test_with_imaplib_debug():
     """Test with full IMAP debug output."""
     import imaplib
 
-    server = keyring.get_password(SERVICE_NAME, "imap_server")
-    port = keyring.get_password(SERVICE_NAME, "imap_port") or "993"
-    username = keyring.get_password(SERVICE_NAME, "imap_username")
-    password = keyring.get_password(SERVICE_NAME, "imap_password")
+    server, port, username, password = get_credentials()
 
     print("=" * 50)
     print("IMAP DEBUG MODE (full protocol trace)")
