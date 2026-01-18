@@ -6,63 +6,48 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **~500 tokens** vs typical 15,000+ token MCP servers
 - Single `use_mail` tool with action dispatcher
 - Self-documenting via `help` action
-- Credentials stored securely in OS keychain (cross-platform)
+- Credentials stored securely in OS keychain
 
 ## Features
 
-- **list** - List messages in any IMAP folder
-- **read** - Read message content
+- **list** - List messages in any folder
+- **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text
-- **draft** - Create draft replies (saved to IMAP Drafts folder)
+- **draft** - Create/modify draft replies
 - **folders** - List available folders
+- **accounts** - List configured email accounts
+- **attachment** - Download attachments
 - **help** - Built-in documentation
 
 ## Installation
 
 ```bash
 cd imap-stream-mcp
-
-# Install dependencies with uv
 uv sync
-
-# Configure IMAP credentials (stored in system keychain)
-uv run python setup.py
-
-# Test connection
-uv run python imap_client.py
+uv run python setup.py      # Configure IMAP account
+uv run python imap_client.py # Test connection
 ```
 
-## Credentials Setup
+## Account Setup
 
-### Primary: System Keychain (Recommended)
-
-The setup script stores credentials in your system's secure credential store:
-
-| Platform | Backend |
-|----------|---------|
-| macOS | Keychain |
-| Windows | Credential Manager |
-| Linux | GNOME Keyring / KWallet / Secret Service |
+### Add Account
 
 ```bash
-uv run python setup.py
+uv run python setup.py                 # Interactive setup
+uv run python setup.py --add work      # Add named account
+uv run python setup.py --add personal  # Add another account
 ```
 
-The script asks for:
-- IMAP server (e.g., `mail.example.com`)
-- Port (default: `993` for SSL)
-- Username (your email address)
-- Password (stored securely in keychain)
+### Manage Accounts
 
-Manage credentials:
 ```bash
-uv run python setup.py --show   # Show config (no password)
-uv run python setup.py --clear  # Remove credentials
+uv run python setup.py --list            # Show accounts
+uv run python setup.py --default work    # Set default
+uv run python setup.py --remove personal # Remove account
+uv run python setup.py --clear           # Remove all
 ```
 
-### Fallback: Environment Variables (Automation/Docker)
-
-For CI/CD, Docker, or automation, set environment variables instead:
+### Environment Variables (Automation/Docker)
 
 ```bash
 export IMAP_STREAM_SERVER="mail.example.com"
@@ -71,9 +56,13 @@ export IMAP_STREAM_USERNAME="user@example.com"
 export IMAP_STREAM_PASSWORD="app-password"
 ```
 
-Environment variables are used only when keychain credentials are not configured.
-
 ## Claude Configuration
+
+### Claude Code
+
+```bash
+claude mcp add imap-stream -- uv --directory /path/to/imap-stream-mcp run imap-stream
+```
 
 ### Claude Desktop
 
@@ -90,78 +79,64 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-### Claude Code
-
-```bash
-claude mcp add imap-stream -- uv --directory /path/to/imap-stream-mcp run imap-stream
-```
-
-### Cowork
-
-Same as Claude Desktop - add to MCP configuration.
-
 ## Usage
 
-Once configured, Claude can use the `use_mail` tool:
-
 ```
-List messages:
+# List messages
 {action: "list", folder: "INBOX"}
-{action: "list", folder: "INBOX/Projects", limit: 50}
+{action: "list", folder: "INBOX", limit: 50}
 
-Read a message:
+# Read message
 {action: "read", folder: "INBOX", payload: "12345"}
 
-Search:
+# Search
 {action: "search", folder: "INBOX", payload: "from:boss@company.com"}
 {action: "search", folder: "INBOX", payload: "subject:urgent"}
 {action: "search", folder: "INBOX", payload: "since:2024-01-01"}
 
-Create draft reply:
-{action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Meeting","body":"Thanks...","in_reply_to":"<msgid>"}'}
+# Create draft
+{action: "draft", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"Thanks!","in_reply_to":"<msgid>"}'}
 
-List folders:
+# List folders
 {action: "folders"}
 
-Get help:
+# List accounts
+{action: "accounts"}
+
+# Download attachment (first attachment from message 1253)
+{action: "attachment", folder: "INBOX", payload: "1253:0"}
+
+# Clean up downloaded attachments
+{action: "cleanup"}
+
+# Help
 {action: "help"}
-{action: "help", payload: "search"}
+{action: "help", payload: "draft"}
+```
+
+## Multi-Account Usage
+
+```
+# Use default account
+{action: "list", folder: "INBOX"}
+
+# Use specific account
+{action: "list", folder: "INBOX", account: "work"}
 ```
 
 ## Workflow: Reply to Email
 
-1. **List messages** to find the one you want:
-   ```
-   {action: "list", folder: "INBOX"}
-   ```
-
-2. **Read the message** to see content and get Message-ID:
-   ```
-   {action: "read", folder: "INBOX", payload: "12345"}
-   ```
-
-3. **Create a draft reply** with Claude's help:
-   ```
-   {action: "draft", payload: '{"to":"sender@example.com","subject":"Re: Subject","body":"Your reply...","in_reply_to":"<original-message-id>"}'}
-   ```
-
-4. **Open Thunderbird** → Drafts → Review and send
-
-## Folder URL Format
-
-You can pass IMAP URLs - the folder path is extracted automatically:
-
-```
-imap://user@server/INBOX/Projects/PLoP
-→ folder: "INBOX/Projects/PLoP"
-```
+1. **List messages** to find the one you want
+2. **Read the message** to see content and Message-ID
+3. **Create draft** with Claude's help
+4. **Open email client** → Drafts → Review and send
 
 ## Security
 
-- Credentials stored in system keychain (never in files)
+- Credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 - Password fetched only when IMAP connection opens
-- Password never appears in logs or tool output
-- IMAP connection uses SSL/TLS
+- Password never in logs or output
+- SSL/TLS connection
 
 ## License
 
