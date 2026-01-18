@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Streammail MCP Server - Lightweight IMAP client for Claude.
+IMAP Stream MCP Server - Lightweight IMAP client for Claude.
 
 Inspired by Jesse Vincent's MCP design philosophy:
-- Single tool with action dispatcher (~900 tokens vs typical 15,000+)
+- Single tool with action dispatcher (~500 tokens vs typical 15,000+)
 - Self-documenting via 'help' action
 - Credentials from OS keychain (never exposed)
 
@@ -11,15 +11,16 @@ Usage with Claude Desktop/Code:
     Add to your MCP config:
     {
         "mcpServers": {
-            "streammail": {
-                "command": "python",
-                "args": ["/path/to/streammail_mcp.py"]
+            "imap-stream": {
+                "command": "uv",
+                "args": ["--directory", "/path/to/imap-stream-mcp", "run", "imap-stream"]
             }
         }
     }
 """
 
 import json
+from pathlib import Path
 from typing import Optional
 
 import html2text
@@ -43,7 +44,7 @@ from markdown_utils import convert_body
 
 
 # Initialize MCP server - token-efficient naming
-mcp = FastMCP("streammail_mcp")
+mcp = FastMCP("imap_stream_mcp")
 
 
 class MailAction(BaseModel):
@@ -83,7 +84,7 @@ class MailAction(BaseModel):
 # Help documentation - loaded only when needed
 HELP_TOPICS = {
     "overview": """
-# Streammail - IMAP Email Tool
+# IMAP Stream - Email Tool
 
 ## Actions
 
@@ -484,13 +485,43 @@ Use Read tool for images, pdf/docx skills for documents."""
         return f"Unknown action '{action}'. Use 'help' for available actions."
 
     except IMAPError as e:
+        error_msg = str(e)
+        # Provide friendly setup guide for unconfigured credentials
+        if "not configured" in error_msg.lower():
+            plugin_dir = Path(__file__).parent.resolve()
+            return f"""# IMAP Stream - Setup Required
+
+Your IMAP credentials are not configured yet.
+
+## Quick Setup
+
+```bash
+uv run --directory {plugin_dir} python setup.py
+```
+
+This stores your IMAP credentials securely in your system keychain.
+
+## What You'll Need
+- IMAP server address (e.g., `imap.gmail.com`, `mail.example.com`)
+- Your email address
+- App-specific password (recommended for Gmail/iCloud)
+
+## Alternative: Environment Variables
+```bash
+export IMAP_STREAM_SERVER="imap.example.com"
+export IMAP_STREAM_USERNAME="you@example.com"
+export IMAP_STREAM_PASSWORD="app-password"
+```
+
+After setup, try: `{{action: "folders"}}` to verify connection.
+"""
         return f"Error: {e}"
     except Exception as e:
         return f"Error: {type(e).__name__}: {e}"
 
 
 def main():
-    """Entry point for streammail MCP server."""
+    """Entry point for IMAP Stream MCP server."""
     mcp.run()
 
 
