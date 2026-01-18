@@ -30,6 +30,8 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 from imap_client import (
     IMAPError,
+    list_accounts,
+    get_default_account,
     list_folders,
     list_messages,
     read_message,
@@ -54,7 +56,7 @@ class MailAction(BaseModel):
 
     action: str = Field(
         ...,
-        description="Action: list|read|search|draft|folders|help"
+        description="Action: list|read|search|draft|folders|accounts|help"
     )
     folder: Optional[str] = Field(
         default=None,
@@ -74,7 +76,7 @@ class MailAction(BaseModel):
     @field_validator('action')
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup'}
+        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup', 'accounts'}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -93,6 +95,7 @@ HELP_TOPICS = {
 - **search** - Search messages
 - **draft** - Create draft reply (saved to Drafts folder)
 - **folders** - List available folders
+- **accounts** - List configured email accounts
 - **help** - Show this help (help topic=<topic> for details)
 
 ## Quick Examples
@@ -224,6 +227,24 @@ None required.
 
 ## Example
 {action: "cleanup"}
+""",
+
+    "accounts": """
+# accounts - List Configured Accounts
+
+Shows all configured email accounts and which is the default.
+
+## Parameters
+None required.
+
+## Example
+{action: "accounts"}
+
+## Multi-Account Usage
+When multiple accounts are configured, specify which account to use:
+{action: "list", folder: "INBOX", account: "work"}
+
+If no account is specified, the default account is used.
 """
 }
 
@@ -239,11 +260,12 @@ None required.
     }
 )
 async def use_mail(params: MailAction) -> str:
-    """IMAP email operations. Actions: list|read|search|draft|folders|help.
+    """IMAP email operations. Actions: list|read|search|draft|folders|accounts|help.
 
     Examples:
       {action:"list", folder:"INBOX"} - list messages
       {action:"read", folder:"INBOX", payload:"123"} - read message
+      {action:"accounts"} - list configured accounts
       {action:"search", folder:"INBOX", payload:"from:x@y.com"}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
       {action:"help", payload:"search"} - help on topic
@@ -265,6 +287,28 @@ async def use_mail(params: MailAction) -> str:
             for f in folders:
                 flags = " ".join(f["flags"]) if f["flags"] else ""
                 lines.append(f"- **{f['name']}** {flags}")
+            return "\n".join(lines)
+
+        # Accounts
+        if action == "accounts":
+            accounts = list_accounts()
+            default = get_default_account()
+
+            if not accounts:
+                plugin_dir = Path(__file__).parent.resolve()
+                return f"""# No Accounts Configured
+
+Run setup to add an account:
+
+```bash
+uv run --directory {plugin_dir} python setup.py
+```"""
+
+            lines = ["# Configured Accounts", ""]
+            for acc in accounts:
+                marker = " (default)" if acc == default else ""
+                lines.append(f"- **{acc}**{marker}")
+
             return "\n".join(lines)
 
         # Parse folder from URL if needed

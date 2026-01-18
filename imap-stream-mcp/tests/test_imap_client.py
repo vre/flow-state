@@ -16,6 +16,8 @@ from imap_client import (
     format_address,
     format_address_list,
     get_credentials,
+    list_accounts,
+    get_default_account,
     list_folders,
     list_messages,
     read_message,
@@ -67,12 +69,14 @@ class TestGetCredentials:
         monkeypatch.setenv("IMAP_STREAM_USERNAME", "envuser")
         monkeypatch.setenv("IMAP_STREAM_PASSWORD", "envpass")
 
-        # Mock keyring to return credentials
+        # Mock keyring to return credentials with prefixed keys
         mock_keyring.side_effect = lambda service, key: {
-            "imap_server": "keychain.server.com",
-            "imap_port": "993",
-            "imap_username": "keychainuser",
-            "imap_password": "keychainpass",
+            "accounts": '["default"]',
+            "default_account": "default",
+            "default:imap_server": "keychain.server.com",
+            "default:imap_port": "993",
+            "default:imap_username": "keychainuser",
+            "default:imap_password": "keychainpass",
         }.get(key)
 
         server, port, username, password = get_credentials()
@@ -94,9 +98,11 @@ class TestGetCredentials:
 
         # Mock keyring - no port set
         mock_keyring.side_effect = lambda service, key: {
-            "imap_server": "server.com",
-            "imap_username": "user",
-            "imap_password": "pass",
+            "accounts": '["work"]',
+            "default_account": "work",
+            "work:imap_server": "server.com",
+            "work:imap_username": "user",
+            "work:imap_password": "pass",
         }.get(key)
 
         server, port, username, password = get_credentials()
@@ -135,6 +141,129 @@ class TestGetCredentials:
 
         with pytest.raises(IMAPError, match="not configured"):
             get_credentials()
+
+    @patch('imap_client.keyring.get_password')
+    def test_multi_account_uses_prefixed_keys(self, mock_keyring, monkeypatch):
+        """Should use account-prefixed keys for multi-account config."""
+        monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
+
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["work", "personal"]',
+            "default_account": "work",
+            "work:imap_server": "mail.company.com",
+            "work:imap_port": "993",
+            "work:imap_username": "me@company.com",
+            "work:imap_password": "workpass",
+        }.get(key)
+
+        server, port, username, password = get_credentials("work")
+
+        assert server == "mail.company.com"
+        assert port == "993"
+        assert username == "me@company.com"
+        assert password == "workpass"
+
+    @patch('imap_client.keyring.get_password')
+    def test_multi_account_default_when_no_account_specified(self, mock_keyring, monkeypatch):
+        """Should use default account when account not specified."""
+        monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
+
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["work", "personal"]',
+            "default_account": "personal",
+            "personal:imap_server": "imap.gmail.com",
+            "personal:imap_port": "993",
+            "personal:imap_username": "me@gmail.com",
+            "personal:imap_password": "gmailpass",
+        }.get(key)
+
+        server, port, username, password = get_credentials()
+
+        assert server == "imap.gmail.com"
+        assert username == "me@gmail.com"
+        assert password == "gmailpass"
+
+    @patch('imap_client.keyring.get_password')
+    def test_multi_account_nonexistent_raises(self, mock_keyring, monkeypatch):
+        """Should raise error for nonexistent account."""
+        monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
+
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["work"]',
+            "default_account": "work",
+        }.get(key)
+
+        with pytest.raises(IMAPError, match="Account 'nonexistent' not found"):
+            get_credentials("nonexistent")
+
+class TestListAccounts:
+    """Tests for list_accounts function."""
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_empty_list_when_no_accounts(self, mock_keyring):
+        """Should return empty list when no accounts configured."""
+        mock_keyring.return_value = None
+
+        accounts = list_accounts()
+
+        assert accounts == []
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_accounts_from_keychain(self, mock_keyring):
+        """Should return list of account names from keychain."""
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["work", "personal"]',
+        }.get(key)
+
+        accounts = list_accounts()
+
+        assert accounts == ["work", "personal"]
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_single_account(self, mock_keyring):
+        """Should handle single account."""
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["default"]',
+        }.get(key)
+
+        accounts = list_accounts()
+
+        assert accounts == ["default"]
+
+class TestGetDefaultAccount:
+    """Tests for get_default_account function."""
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_none_when_no_accounts(self, mock_keyring):
+        """Should return None when no accounts configured."""
+        mock_keyring.return_value = None
+
+        default = get_default_account()
+
+        assert default is None
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_default_account_from_keychain(self, mock_keyring):
+        """Should return default account name from keychain."""
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["work", "personal"]',
+            "default_account": "work",
+        }.get(key)
+
+        default = get_default_account()
+
+        assert default == "work"
+
+    @patch('imap_client.keyring.get_password')
+    def test_returns_first_account_when_no_default_set(self, mock_keyring):
+        """Should return first account when no default explicitly set."""
+        mock_keyring.side_effect = lambda service, key: {
+            "accounts": '["personal", "work"]',
+        }.get(key)
+
+        default = get_default_account()
+
+        assert default == "personal"
 
 
 class TestDecodeHeaderValue:

@@ -30,30 +30,45 @@ class IMAPError(Exception):
     pass
 
 
-def get_credentials() -> tuple[str, str, str, str]:
+def get_credentials(account: str | None = None) -> tuple[str, str, str, str]:
     """Fetch IMAP credentials from keychain or environment.
 
     Primary: System keychain (cross-platform via keyring)
     Fallback: Environment variables (for automation/Docker/CI)
 
+    Args:
+        account: Account name. None = default account.
+
     Returns:
         Tuple of (server, port, username, password)
 
     Raises:
-        IMAPError: If credentials not configured
+        IMAPError: If credentials not configured or account not found
     """
-    # PRIMARY: System keychain (cross-platform)
-    server = keyring.get_password(SERVICE_NAME, "imap_server")
-    if server:
-        port = keyring.get_password(SERVICE_NAME, "imap_port")
-        username = keyring.get_password(SERVICE_NAME, "imap_username")
-        password = keyring.get_password(SERVICE_NAME, "imap_password")
-    else:
-        # FALLBACK: Environment variables (automation/Docker)
-        server = os.environ.get("IMAP_STREAM_SERVER")
-        port = os.environ.get("IMAP_STREAM_PORT")
-        username = os.environ.get("IMAP_STREAM_USERNAME")
-        password = os.environ.get("IMAP_STREAM_PASSWORD")
+    accounts = list_accounts()
+
+    if accounts:
+        # Use account from keychain
+        if account is None:
+            account = get_default_account()
+        if account not in accounts:
+            raise IMAPError(f"Account '{account}' not found. Available: {', '.join(accounts)}")
+
+        server = keyring.get_password(SERVICE_NAME, f"{account}:imap_server")
+        port = keyring.get_password(SERVICE_NAME, f"{account}:imap_port")
+        username = keyring.get_password(SERVICE_NAME, f"{account}:imap_username")
+        password = keyring.get_password(SERVICE_NAME, f"{account}:imap_password")
+
+        if not all([server, username, password]):
+            raise IMAPError(f"Account '{account}' credentials incomplete.")
+
+        return server, port or "993", username, password
+
+    # Fallback: Environment variables (automation/Docker)
+    server = os.environ.get("IMAP_STREAM_SERVER")
+    port = os.environ.get("IMAP_STREAM_PORT")
+    username = os.environ.get("IMAP_STREAM_USERNAME")
+    password = os.environ.get("IMAP_STREAM_PASSWORD")
 
     if not all([server, username, password]):
         raise IMAPError(
@@ -62,6 +77,37 @@ def get_credentials() -> tuple[str, str, str, str]:
         )
 
     return server, port or "993", username, password
+
+
+def list_accounts() -> list[str]:
+    """Return list of configured account names.
+
+    Returns:
+        List of account names, empty if none configured
+    """
+    accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
+    if accounts_json:
+        return json.loads(accounts_json)
+    return []
+
+
+def get_default_account() -> str | None:
+    """Return default account name.
+
+    Returns:
+        Default account name, or None if no accounts configured
+    """
+    accounts = list_accounts()
+    if not accounts:
+        return None
+
+    # Check for explicit default
+    default = keyring.get_password(SERVICE_NAME, "default_account")
+    if default and default in accounts:
+        return default
+
+    # Return first account
+    return accounts[0]
 
 
 @contextmanager
