@@ -23,6 +23,8 @@ No flattery or empty compliments. FAIL: "Good thinking", "Great idea", "You're r
    - YAGNI + KISS + DRY + Avoid Wordiness + NO CODE before tests
    - Testability: Pure functions + thin `main()` glue. No DI frameworks. See `prefilter_comments.py`
    - Use "uv" for python development environment management
+   - Type hints throughout
+   - Google style docstrings
    - NOT writing documentation or a book
 3. Before Commit
    - Keep Documentation in Sync
@@ -70,3 +72,9 @@ Keep Documentation in Sync:
 - TESTING.md when test instructions change
 - .claude-plugin/marketplace.json plugin descriptions and version numbers
 - README.md when skill description and marketing speech should be updated
+
+## MCP Development Guidelines
+
+- **Token efficiency** - Single tool with action dispatcher (~500 tokens vs 15,000+)
+- **Self-documenting** - `help` action provides all documentation
+- **Postel's Law** - Liberal in inputs, strict in outputs
