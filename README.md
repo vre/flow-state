@@ -1,6 +1,6 @@
 # Flow State - a Claude Plugin Marketplace
 
-For now Youtube extraction.
+YouTube extraction and email integration.
 
 ## Skills
 
@@ -20,15 +20,32 @@ For now Youtube extraction.
 
 **Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
 
+## MCP Servers
+
+**IMAP Stream MCP** - Lightweight email client.
+- 🪶 **~500 tokens** vs typical 15,000+ MCP servers - single tool with action dispatcher
+- 📧 **Read & search**: List, read, and search IMAP folders
+- ✍️ **Draft replies**: Markdown converted to HTML + plain text alternatives
+- 📎 **Attachments**: Download for further processing
+- 🔐 **Secure**: Credentials in OS keychain (or env variables for Docker/CI)
+- 🏢 **Multi-account**: Multiple email accounts with named switching
+
 ## Quick Start
 
-**Installation:**
+**Skills installation:**
 
 Add the marketplace and install skills:
 ```
 /plugin marketplace add vre/flow-state
 /plugin install youtube-to-markdown@flow-state
 /plugin install youtube-comment-analysis@flow-state
+```
+
+**MCP installation:**
+
+```bash
+cd imap-stream-mcp && uv sync && uv run python setup.py  # Configure account
+claude mcp add imap-stream -- uv --directory /path/to/flow-state/imap-stream-mcp run imap-stream
 ```
 
 **Usage:**

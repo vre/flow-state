@@ -2,10 +2,15 @@
 __pycache__/
 .pytest_cache
 .coverage
+htmlcov/
 *.py[cod]
 *$py.class
 *.so
 .Python
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # Virtual environments
 venv/
@@ -31,6 +36,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+*.bak
 temp/
 tmp/
 
