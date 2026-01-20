@@ -28,7 +28,7 @@ YouTube extraction and email integration.
 - ✍️ **Draft replies**: Markdown converted to HTML + plain text alternatives
 - 📎 **Attachments**: Download for further processing
 - 🔐 **Secure**: Credentials in OS keychain (or env variables for Docker/CI)
-- 🏢 **Multi-account**: Multiple email accounts with named switching
+- 🏢 **Multi-account**: Multiple email account support with named switching
 
 ## Quick Start
 
