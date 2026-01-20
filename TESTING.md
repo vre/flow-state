@@ -33,30 +33,19 @@ tests/imap-stream-mcp/
 
 ## Running Tests
 
-### Skills
-
 ```bash
-# youtube-to-markdown
-cd tests/youtube-to-markdown && pytest
+# Run all tests
+cd tests && uv run pytest
 
-# youtube-comment-analysis
-cd tests/youtube-comment-analysis && pytest
-```
+# Run specific project tests
+cd tests && uv run pytest youtube-to-markdown/
+cd tests && uv run pytest youtube-comment-analysis/
+cd tests && uv run pytest imap-stream-mcp/
 
-### MCP Servers
-
-```bash
-# imap-stream-mcp (uses uv for dependency management)
-cd tests/imap-stream-mcp && uv run pytest
-```
-
-### Common Options
-
-```bash
-pytest -v              # Verbose
-pytest -q              # Quiet
-pytest -x              # Stop on first failure
-pytest -k "pattern"    # Run tests matching pattern
+# Common options
+uv run pytest -v              # Verbose
+uv run pytest -x              # Stop on first failure
+uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
 ## Design Principles

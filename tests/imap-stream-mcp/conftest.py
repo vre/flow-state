@@ -8,8 +8,8 @@ from dataclasses import dataclass, field
 from contextlib import contextmanager
 import pytest
 
-# Add parent directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add imap-stream-mcp directory to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-stream-mcp"))
 
 
 @dataclass
