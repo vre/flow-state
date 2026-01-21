@@ -21,11 +21,29 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 
 ## Installation
 
+### Plugin (Recommended)
+
 ```bash
-cd imap-stream-mcp
+# Add marketplace and install
+/plugin marketplace add vre/flow-state
+/plugin install imap-stream-mcp@flow-state
+
+# Configure IMAP account (run once)
+cd ~/.claude/plugins/cache/flow-state/imap-stream-mcp/0.1.0
+uv sync && uv run python setup.py
+```
+
+### Manual
+
+```bash
+git clone https://github.com/vre/flow-state.git
+cd flow-state/imap-stream-mcp
 uv sync
-uv run python setup.py      # Configure IMAP account
+uv run python setup.py       # Configure IMAP account
 uv run python imap_client.py # Test connection
+
+# Add to Claude Code
+claude mcp add imap-stream -- uv --directory $(pwd) run imap-stream
 ```
 
 ## Account Setup
@@ -56,15 +74,7 @@ export IMAP_STREAM_USERNAME="user@example.com"
 export IMAP_STREAM_PASSWORD="app-password"
 ```
 
-## Claude Configuration
-
-### Claude Code
-
-```bash
-claude mcp add imap-stream -- uv --directory /path/to/imap-stream-mcp run imap-stream
-```
-
-### Claude Desktop
+## Claude Desktop (Manual)
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
