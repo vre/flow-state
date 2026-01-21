@@ -44,8 +44,11 @@ Add the marketplace and install skills:
 **MCP installation:**
 
 ```bash
-cd imap-stream-mcp && uv sync && uv run python setup.py  # Configure account
-claude mcp add imap-stream -- uv --directory /path/to/flow-state/imap-stream-mcp run imap-stream
+/plugin install imap-stream-mcp@flow-state
+
+# Configure IMAP account (run once after install)
+cd ~/.claude/plugins/cache/flow-state/imap-stream-mcp/0.1.0
+uv sync && uv run python setup.py
 ```
 
 **Usage:**
