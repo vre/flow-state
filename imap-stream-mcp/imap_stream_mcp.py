@@ -298,10 +298,18 @@ async def use_mail(params: MailAction) -> str:
                 plugin_dir = Path(__file__).parent.resolve()
                 return f"""# No Accounts Configured
 
-Run setup to add an account:
-
+**Option 1:** Run setup (stores in OS keychain):
 ```bash
 uv run --directory {plugin_dir} python setup.py
+```
+
+**Option 2:** Set environment variables in MCP config:
+```json
+"env": {{
+  "IMAP_STREAM_SERVER": "imap.example.com",
+  "IMAP_STREAM_USERNAME": "you@example.com",
+  "IMAP_STREAM_PASSWORD": "app-password"
+}}
 ```"""
 
             lines = ["# Configured Accounts", ""]
