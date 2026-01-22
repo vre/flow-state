@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "imap-stream": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "./imap-stream-mcp",
+        "run",
+        "imap-stream"
+      ],
+      "env": {}
+    }
+  }
+}

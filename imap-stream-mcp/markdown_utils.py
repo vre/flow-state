@@ -35,6 +35,7 @@ def preprocess_markdown(text: str) -> str:
 
     Ensures blank lines before block elements (lists, code blocks,
     blockquotes, headings) as required by markdown parsers.
+    Only adds blank line at START of a list, not between items.
 
     Args:
         text: Raw markdown text
@@ -48,28 +49,41 @@ def preprocess_markdown(text: str) -> str:
     lines = text.split('\n')
     result = []
     prev_was_blank = True  # Start as if there was a blank line
+    prev_was_list_item = False
 
     for line in lines:
         stripped = line.strip()
         is_blank = stripped == ''
 
-        # Check if line starts a block element
-        is_block_start = (
+        # Check if line is a list item
+        is_list_item = (
             stripped.startswith('- ') or
             stripped.startswith('* ') or
             stripped.startswith('+ ') or
-            re.match(r'^\d+\. ', stripped) or  # ordered list
+            bool(re.match(r'^\d+\. ', stripped))
+        )
+
+        # Check if line starts other block elements (not list items)
+        is_other_block = (
             stripped.startswith('> ') or  # blockquote
             stripped.startswith('```') or  # code block
             stripped.startswith('#')  # heading
         )
 
         # Add blank line before block element if previous line wasn't blank
-        if is_block_start and not prev_was_blank:
+        # For list items: only at list START (not between items)
+        needs_blank = False
+        if is_other_block and not prev_was_blank:
+            needs_blank = True
+        elif is_list_item and not prev_was_blank and not prev_was_list_item:
+            needs_blank = True
+
+        if needs_blank:
             result.append('')
 
         result.append(line)
         prev_was_blank = is_blank
+        prev_was_list_item = is_list_item
 
     return '\n'.join(result)
 
