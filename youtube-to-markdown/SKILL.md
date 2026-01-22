@@ -23,7 +23,7 @@ python3 ./check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 
 **Integrity check:**
 - If `summary_valid: false`: Show issues to user, ask "Tiedosto epätäydellinen: [issues]. Prosessoidaanko uudelleen?" If yes, continue to Step 1.
-- If `transcript_valid: false`: Ask user, if yes re-run Steps 2-3, 7-9.
+- If `transcript_valid: false`: Ask user, if yes re-run Steps 2-3, 6-9.
 - If `comments_valid: false`: Ask user, if yes re-run comment analysis.
 
 If returns `exists: true` AND all valid fields are true: Read and follow UPDATE_MODE.md for update workflow.
@@ -75,36 +75,7 @@ Set BASE_NAME from Step 1 output (youtube_{VIDEO_ID})
 python3 ./deduplicate_vtt.py "<output_directory>/${BASE_NAME}_transcript.vtt" "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_no_timestamps.txt"
 ```
 
-## Step 4: Add natural paragraph breaks
-
-Parallel with Step 5.
-
-task_tool:
-- subagent_type: "general-purpose"
-- model: "sonnet"
-- prompt:
-```
-INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
-CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
-OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
-
-Analyze INPUT and identify natural paragraph break line numbers.
-
-Read CHAPTERS. If it contains chapters, use chapter timestamps as primary break points.
-
-Target ~500 chars per paragraph. Find natural break points at topic shifts or sentence endings.
-
-Write to OUTPUT in format:
-15,42,78,103,...
-```
-
-```bash
-python3 ./apply_paragraph_breaks.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
-```
-
-## Step 5: Summarize transcript
-
-Parallel with Step 4.
+## Step 4: Summarize transcript
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -133,7 +104,7 @@ FORMATS: ./summary_formats.md
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
 ```
 
-## Step 6: Review and tighten summary
+## Step 5: Review and tighten summary
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -155,6 +126,31 @@ Rules:
 Preserve original language - do not translate.
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+```
+
+## Step 6: Add natural paragraph breaks
+
+task_tool:
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt:
+```
+INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
+CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
+
+Analyze INPUT and identify natural paragraph break line numbers.
+
+Read CHAPTERS. If it contains chapters, use chapter timestamps as primary break points.
+
+Target ~500 chars per paragraph. Find natural break points at topic shifts or sentence endings.
+
+Write to OUTPUT in format:
+15,42,78,103,...
+```
+
+```bash
+python3 ./apply_paragraph_breaks.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
 ```
 
 ## Step 7: Clean speech artifacts
