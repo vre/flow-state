@@ -37,7 +37,7 @@ python3 extract_data.py "<YOUTUBE_URL>" "<output_directory>"
 
 Creates: youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
 
-IMPORTANT: If you ask which language transcript to extract then do not translate that language to english and require that subagent do not translate either. Only if the user requests another language that the original then translate.
+Language policy: Prefer original language. Instruct subagents to preserve the original language - never translate unless user explicitly requests it.
 
 ## Step 2: Extract transcript
 
