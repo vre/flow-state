@@ -32,24 +32,18 @@ YouTube extraction and email integration.
 
 ## Quick Start
 
-**Skills installation:**
+**Installation:**
 
 Add the marketplace and install skills:
-```
+```bash
 /plugin marketplace add vre/flow-state
+
 /plugin install youtube-to-markdown@flow-state
 /plugin install youtube-comment-analysis@flow-state
-```
-
-**MCP installation:**
-
-```bash
 /plugin install imap-stream-mcp@flow-state
-
-# Configure IMAP account (run once after install)
-cd ~/.claude/plugins/cache/flow-state/imap-stream-mcp/0.1.0
-uv sync && uv run python setup.py
 ```
+
+Configure IMAP (first use will show setup instructions).
 
 **Usage:**
 

@@ -21,17 +21,14 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 
 ## Installation
 
-### Plugin (Recommended)
+### Plugin
 
 ```bash
-# Add marketplace and install
 /plugin marketplace add vre/flow-state
 /plugin install imap-stream-mcp@flow-state
-
-# Configure IMAP account (run once)
-cd ~/.claude/plugins/cache/flow-state/imap-stream-mcp/0.1.0
-uv sync && uv run python setup.py
 ```
+
+Then configure credentials (see below).
 
 ### Manual
 
@@ -39,39 +36,31 @@ uv sync && uv run python setup.py
 git clone https://github.com/vre/flow-state.git
 cd flow-state/imap-stream-mcp
 uv sync
-uv run python setup.py       # Configure IMAP account
-uv run python imap_client.py # Test connection
-
-# Add to Claude Code
 claude mcp add imap-stream -- uv --directory $(pwd) run imap-stream
 ```
 
-## Account Setup
+## Configuration
 
-### Add Account
+### Option 1: OS Keychain (Recommended)
 
 ```bash
 uv run python setup.py                 # Interactive setup
 uv run python setup.py --add work      # Add named account
-uv run python setup.py --add personal  # Add another account
+uv run python setup.py --list          # Show accounts
+uv run python setup.py --default work  # Set default
+uv run python setup.py --remove work   # Remove account
 ```
 
-### Manage Accounts
+### Option 2: Environment Variables (Automation/Docker)
 
-```bash
-uv run python setup.py --list            # Show accounts
-uv run python setup.py --default work    # Set default
-uv run python setup.py --remove personal # Remove account
-uv run python setup.py --clear           # Remove all
-```
+Add to your MCP config:
 
-### Environment Variables (Automation/Docker)
-
-```bash
-export IMAP_STREAM_SERVER="mail.example.com"
-export IMAP_STREAM_PORT="993"
-export IMAP_STREAM_USERNAME="user@example.com"
-export IMAP_STREAM_PASSWORD="app-password"
+```json
+"env": {
+  "IMAP_STREAM_SERVER": "imap.example.com",
+  "IMAP_STREAM_USERNAME": "you@example.com",
+  "IMAP_STREAM_PASSWORD": "app-password"
+}
 ```
 
 ## Claude Desktop (Manual)
