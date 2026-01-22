@@ -29,6 +29,18 @@ MARKDOWN_EXTENSION_CONFIGS = {
     }
 }
 
+# URL pattern for autolinking (no email - avoids obfuscation issues)
+# Negative lookbehind: skip URLs already in href="..."
+URL_PATTERN = re.compile(r'(?<!href=")(https?://[^\s<>"]+)')
+
+
+def autolink_urls(html: str) -> str:
+    """Convert bare URLs to links in HTML, skip already linked URLs."""
+    def replace_url(match):
+        url = match.group(1)
+        return f'<a href="{url}">{url}</a>'
+    return URL_PATTERN.sub(replace_url, html)
+
 
 def preprocess_markdown(text: str) -> str:
     """Fix common markdown issues before conversion.
@@ -148,6 +160,7 @@ def convert_body(body: str, format_type: str = "markdown") -> tuple[Optional[str
             extensions=MARKDOWN_EXTENSIONS,
             extension_configs=MARKDOWN_EXTENSION_CONFIGS
         )
+        html_body = autolink_urls(html_body)
         plain_body = markdown_to_plain(body)
         return html_body, plain_body
     else:
