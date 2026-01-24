@@ -1,40 +1,8 @@
----
-name: youtube-comment-analysis
-description: Use when user requests YouTube comments. Run standalone for comment analysis or sequential with youtube-to-markdown for cross-analysis with video summary.
-allowed-tools:
-  - Bash
-  - Read
-  - Write
-  - Task
-  - AskUserQuestion
-  - Skill
----
+# Comment Summarize Module
 
-# YouTube Comment Analysis
+Analyzes comments against video summary to extract unique insights.
 
-Execute all steps sequentially without asking for user approval. Use TodoWrite to track progress, update Todolist.
-
-## Step 0: Check for video summary
-
-Check if `<output_directory>/youtube - * ({video_id}).md` exists. If found, use it for context in later steps.
-
-## Step 1: Extract comments
-
-```bash
-python3 ./extract_comments.py "<YOUTUBE_URL>" "<output_directory>"
-```
-
-Creates: youtube_{VIDEO_ID}_name.txt, youtube_{VIDEO_ID}_comments.md
-
-## Step 2: Prefilter comments
-
-```bash
-python3 ./prefilter_comments.py "<output_directory>/${BASE_NAME}_comments.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md"
-```
-
-Creates: youtube_{VIDEO_ID}_comments_prefiltered.md
-
-## Step 3: Extract Insightful Comments
+## Step 1: Extract Insightful Comments
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -86,7 +54,7 @@ Rules:
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
 ```
 
-## Step 4: Review and tighten comment insights
+## Step 2: Review and tighten comment insights
 
 task_tool:
 - subagent_type: "general-purpose"
@@ -107,13 +75,3 @@ Rules:
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
 ```
-
-## Step 5: Finalize
-
-```bash
-python3 ./finalize_comments.py "${BASE_NAME}" "<output_directory>"
-```
-
-Output: `youtube - {title} - comments ({video_id}).md`
-
-Use `--debug` flag to keep intermediate work files for inspection.

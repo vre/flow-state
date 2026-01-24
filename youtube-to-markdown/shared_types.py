@@ -27,6 +27,11 @@ class CommandNotFoundError(YouTubeToMarkdownError):
     pass
 
 
+class YTDLPNotFoundError(YouTubeToMarkdownError):
+    """yt-dlp command not found."""
+    pass
+
+
 class TranscriptNotAvailableError(YouTubeToMarkdownError):
     """No transcript available for the video."""
     pass
@@ -34,6 +39,16 @@ class TranscriptNotAvailableError(YouTubeToMarkdownError):
 
 class FileOperationError(YouTubeToMarkdownError):
     """File operation failed."""
+    pass
+
+
+class VideoDataFetchError(YouTubeToMarkdownError):
+    """Failed to fetch video data from YouTube."""
+    pass
+
+
+class TemplateNotFoundError(YouTubeToMarkdownError):
+    """Template file not found."""
     pass
 
 
@@ -66,6 +81,24 @@ class TranscriptLine:
     """Single line of transcript with timestamp."""
     timestamp: str
     text: str
+
+
+@dataclass(frozen=True)
+class Comment:
+    """Represents a YouTube comment."""
+    id: str
+    author: str
+    text: str
+    like_count: int
+    parent: str  # 'root' for top-level, otherwise parent comment ID
+
+
+@dataclass(frozen=True)
+class CommentVideoData:
+    """Represents YouTube video data for comment extraction."""
+    title: str
+    video_id: str
+    comments: list[Comment]
 
 
 # Protocols for Dependency Injection
