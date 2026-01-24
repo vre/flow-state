@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.2.0] - 2026-01-23
+
+### Architecture
+- Merged youtube-comment-analysis into youtube-to-markdown as modular plugin
+- User selects output: Summary only, Transcript only, Comments only, Summary+Comments, or Full
+- Dependency graph enables parallel execution of independent modules
+- 5 modules: transcript_extract, transcript_summarize, transcript_polish, comment_extract, comment_summarize
+
+### Technical
+- finalize.py supports output flags: --summary-only, --transcript-only, --comments-only, --summary-comments
+- shared_types.py extended with Comment and CommentVideoData types
+- extract_comments.py updated to use shared_types
+- Added template_comments.md and template_comments_standalone.md
+
+### Removed
+- youtube-comment-analysis plugin (merged into youtube-to-markdown)
+
 ## [2.1.1] - 2026-01-13
 
 ### Bug fixes

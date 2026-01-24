@@ -13,13 +13,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from types_and_exceptions import (
+sys.path.insert(0, str(Path(__file__).parent))
+from shared_types import (
     Comment,
     CommandRunner,
+    CommentVideoData,
     FileSystem,
-    VideoData,
+    RealFileSystem,
     VideoDataFetchError,
-    VideoIDExtractionError,
+    VideoIdExtractionError,
     YTDLPNotFoundError,
 )
 
@@ -36,7 +38,7 @@ def extract_video_id(url: str) -> str:
         Video ID string
 
     Raises:
-        VideoIDExtractionError: If video ID cannot be extracted
+        VideoIdExtractionError: If video ID cannot be extracted
     """
     # Handle youtu.be format
     if "youtu.be/" in url:
@@ -49,10 +51,10 @@ def extract_video_id(url: str) -> str:
     if match:
         return match.group(1)
 
-    raise VideoIDExtractionError(f"Could not extract video ID from URL: {url}")
+    raise VideoIdExtractionError(f"Could not extract video ID from URL: {url}")
 
 
-def parse_video_data(json_data: dict[str, Any]) -> VideoData:
+def parse_video_data(json_data: dict[str, Any]) -> CommentVideoData:
     """
     Parse video data from yt-dlp JSON output.
 
@@ -60,7 +62,7 @@ def parse_video_data(json_data: dict[str, Any]) -> VideoData:
         json_data: JSON data from yt-dlp
 
     Returns:
-        VideoData object with title and comments
+        CommentVideoData object with title and comments
     """
     title = json_data.get("title", "Untitled")
     video_id = json_data.get("id", "")
@@ -77,7 +79,7 @@ def parse_video_data(json_data: dict[str, Any]) -> VideoData:
         for c in comments_raw
     ]
 
-    return VideoData(title=title, video_id=video_id, comments=comments)
+    return CommentVideoData(title=title, video_id=video_id, comments=comments)
 
 
 def build_comment_hierarchy(
@@ -235,7 +237,7 @@ class CommentExtractor:
                 "  - All systems: pip3 install yt-dlp"
             )
 
-    def fetch_video_data(self, video_url: str, output_dir: Path) -> VideoData:
+    def fetch_video_data(self, video_url: str, output_dir: Path) -> CommentVideoData:
         """
         Fetch video data from YouTube using yt-dlp.
 
@@ -244,7 +246,7 @@ class CommentExtractor:
             output_dir: Directory to store temporary JSON file
 
         Returns:
-            VideoData object
+            CommentVideoData object
 
         Raises:
             VideoDataFetchError: If fetching or parsing fails
@@ -303,7 +305,7 @@ class CommentExtractor:
             Tuple of (name_file_path, comments_file_path)
 
         Raises:
-            VideoIDExtractionError: If video ID cannot be extracted
+            VideoIdExtractionError: If video ID cannot be extracted
             VideoDataFetchError: If fetching fails
             YTDLPNotFoundError: If yt-dlp is not installed
         """
@@ -356,30 +358,6 @@ class SubprocessRunner:
             return result.returncode, result.stdout, result.stderr
         except FileNotFoundError:
             return 1, "", f"Command not found: {cmd[0]}"
-
-
-class RealFileSystem:
-    """Real file system implementation."""
-
-    def read_text(self, path: Path) -> str:
-        """Read text from file."""
-        return path.read_text(encoding="utf-8")
-
-    def write_text(self, path: Path, content: str) -> None:
-        """Write text to file."""
-        path.write_text(content, encoding="utf-8")
-
-    def exists(self, path: Path) -> bool:
-        """Check if path exists."""
-        return path.exists()
-
-    def mkdir(self, path: Path, parents: bool = False, exist_ok: bool = False) -> None:
-        """Create directory."""
-        path.mkdir(parents=parents, exist_ok=exist_ok)
-
-    def remove(self, path: Path) -> None:
-        """Remove file."""
-        path.unlink()
 
 
 def main() -> None:
