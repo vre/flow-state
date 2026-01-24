@@ -16,6 +16,7 @@ Systematic testing of token usage across different skill configurations to find 
 | 03-no-polish | $0.60 | -46% | Remove polish steps |
 | 04-combined | $0.89 | -20% | Combine workflow steps |
 | **05-lite** | **$0.52** | **-53%** | Both optimizations |
+| 06-modules | $0.98 | -12% | Modular architecture (option E) |
 
 ### Validated Hypotheses
 
@@ -31,16 +32,22 @@ Systematic testing of token usage across different skill configurations to find 
 │   ├── full/SKILL.md       # 7 subagents - baseline
 │   ├── no-polish/SKILL.md  # 3 subagents - no steps 4,7,8
 │   ├── combined/SKILL.md   # 5 subagents - merged workflows
-│   └── lite/SKILL.md       # 2 subagents - both optimizations
+│   ├── lite/SKILL.md       # 2 subagents - both optimizations
+│   └── modules/            # Modular architecture with user choice
+├── harness/                 # Reusable test harness
+│   ├── run-test.sh         # Main test runner
+│   ├── template/           # Template for test runs
+│   └── README.md           # Harness documentation
 ├── tools/
 │   ├── analyze_steps.py    # Token analysis from OTel metrics
-│   └── run-test.sh         # Test runner script
+│   └── run-test.sh         # Legacy test runner
 └── runs/                    # Test results (not committed)
     ├── 01-full-opus/
     ├── 02-full-sonnet/
     ├── 03-no-polish/
     ├── 04-combined/
-    └── 05-lite/
+    ├── 05-lite/
+    └── 06-modules/
 ```
 
 ## Skill Variants
@@ -74,6 +81,16 @@ Both optimizations - minimum cost:
 - Step 5: Summarize + tighten (combined)
 - Step 10: Comments (combined)
 
+### Modules (5 modules) - `code/modules/`
+User-selectable modular architecture:
+- transcript_extract: metadata, transcript, deduplicate
+- transcript_summarize: summarize, tighten
+- transcript_polish: paragraphs, clean, headings
+- comment_extract: extract, prefilter
+- comment_summarize: analyze against summary
+
+Options: A=Summary only, B=Transcript only, C=Comments only, D=Summary+Comments, E=Full
+
 ## Cost Analysis
 
 ### Isolated Variable Effects
@@ -105,17 +122,15 @@ Orchestration                    $0.24  █████████░░░  46
 ## Running Tests
 
 ```bash
-# From repo root
-cd docs/research/2026.01.14\ token\ usage\ test/
+cd docs/youtube-to-markdown/research/2026.01.14\ token\ usage\ test/
 
-# Copy desired variant to plugin
-cp code/lite/SKILL.md ~/.claude/plugins/cache/flow-state/youtube-to-markdown/2.1.1/
+# Using the test harness (recommended)
+./harness/run-test.sh <test-name> <skill-directory> [youtube-url] [option]
 
-# Run test
-./tools/run-test.sh --model sonnet --name test-name
+# Example: test a new skill variant
+./harness/run-test.sh 07-new ../code/new E
 
-# Analyze results
-python3 tools/analyze_steps.py runs/test-name/agent_trace.log runs/test-name/otel_metrics.log
+# Options: A=Summary, B=Transcript, C=Comments, D=Summary+Comments, E=Full
 ```
 
 ## Hook Configuration (for reference)
@@ -168,8 +183,8 @@ The `log_tool.py` script logs tool invocations with timestamps to `agent_trace.l
 
 ## Raw Data
 
-| Metric | 01-opus | 02-sonnet | 03-no-polish | 04-combined | 05-lite |
-|--------|---------|-----------|--------------|-------------|---------|
-| Cost | $3.77 | $1.11 | $0.60 | $0.89 | $0.52 |
-| Duration | 521s | 477s | 225s | 380s | 237s |
-| Subagents | 7 | 7 | 3 | 5 | 2 |
+| Metric | 01-opus | 02-sonnet | 03-no-polish | 04-combined | 05-lite | 06-modules |
+|--------|---------|-----------|--------------|-------------|---------|------------|
+| Cost | $3.77 | $1.11 | $0.60 | $0.89 | $0.52 | $0.98 |
+| Duration | 521s | 477s | 225s | 380s | 237s | 433s |
+| Subagents | 7 | 7 | 3 | 5 | 2 | 5 modules |
