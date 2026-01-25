@@ -136,12 +136,18 @@ def extract_metadata_from_file(content: str) -> dict:
     - Old: "- **Views:** 2,183,167 | Likes: 71,220 | Duration: 05:28"
     """
     metadata = {
+        "title": None,
         "views": None,
         "likes": None,
         "comments": None,
         "published": None,
         "extracted": None,
     }
+
+    # Extract title: **Title:** [Title Text](url) · duration
+    title_match = re.search(r"\*\*Title:\*\*\s*\[([^\]]+)\]", content)
+    if title_match:
+        metadata["title"] = title_match.group(1)
 
     # Try new engagement format first
     engagement_match = re.search(

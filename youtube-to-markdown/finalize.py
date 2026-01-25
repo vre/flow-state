@@ -19,6 +19,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from shared_types import FileSystem, RealFileSystem, clean_title_for_filename, FileOperationError
+from intermediate_files import (
+    get_summary_work_files,
+    get_transcript_work_files,
+    get_comments_work_files,
+    get_all_work_files,
+)
 
 
 class Finalizer:
@@ -133,53 +139,6 @@ class Finalizer:
         self.fs.write_text(summary_path, updated_content)
         print(f"Inserted Comment Insights into summary file: {summary_path.name}")
 
-    def get_summary_work_files(self, base_name: str) -> list[str]:
-        """Get work files for summary mode."""
-        return [
-            f"{base_name}_title.txt",
-            f"{base_name}_metadata.md",
-            f"{base_name}_summary.md",
-            f"{base_name}_summary_tight.md",
-            f"{base_name}_quick_summary.md",
-            f"{base_name}_chapters.json",
-            f"{base_name}_transcript.vtt",
-            f"{base_name}_transcript_dedup.md",
-            f"{base_name}_transcript_no_timestamps.txt",
-        ]
-
-    def get_transcript_work_files(self, base_name: str) -> list[str]:
-        """Get work files for transcript mode."""
-        return [
-            f"{base_name}_title.txt",
-            f"{base_name}_description.md",
-            f"{base_name}_chapters.json",
-            f"{base_name}_transcript.vtt",
-            f"{base_name}_transcript_dedup.md",
-            f"{base_name}_transcript_no_timestamps.txt",
-            f"{base_name}_transcript_paragraphs.txt",
-            f"{base_name}_transcript_paragraphs.md",
-            f"{base_name}_transcript_cleaned.md",
-            f"{base_name}_transcript.md",
-        ]
-
-    def get_comments_work_files(self, base_name: str) -> list[str]:
-        """Get work files for comments mode."""
-        return [
-            f"{base_name}_name.txt",
-            f"{base_name}_comments.md",
-            f"{base_name}_comments_prefiltered.md",
-            f"{base_name}_comment_insights.md",
-            f"{base_name}_comment_insights_tight.md",
-        ]
-
-    def get_full_work_files(self, base_name: str) -> list[str]:
-        """Get all work files for full mode."""
-        return (
-            self.get_summary_work_files(base_name) +
-            self.get_transcript_work_files(base_name) +
-            self.get_comments_work_files(base_name)
-        )
-
     def cleanup_work_files(self, work_files: list[str], output_dir: Path) -> None:
         """Remove intermediate work files."""
         # Deduplicate while preserving order
@@ -220,7 +179,7 @@ class Finalizer:
         print(f"Created summary file: {filename}")
 
         if not debug:
-            self.cleanup_work_files(self.get_summary_work_files(base_name), output_dir)
+            self.cleanup_work_files(get_summary_work_files(base_name), output_dir)
 
         return output_path
 
@@ -247,7 +206,7 @@ class Finalizer:
         print(f"Created transcript file: {filename}")
 
         if not debug:
-            self.cleanup_work_files(self.get_transcript_work_files(base_name), output_dir)
+            self.cleanup_work_files(get_transcript_work_files(base_name), output_dir)
 
         return output_path
 
@@ -279,7 +238,7 @@ class Finalizer:
         print(f"Created comments file: {filename}")
 
         if not debug:
-            self.cleanup_work_files(self.get_comments_work_files(base_name), output_dir)
+            self.cleanup_work_files(get_comments_work_files(base_name), output_dir)
 
         return output_path
 
@@ -321,7 +280,7 @@ class Finalizer:
         print(f"Created comments file: {comments_filename}")
 
         if not debug:
-            work_files = self.get_summary_work_files(base_name) + self.get_comments_work_files(base_name)
+            work_files = get_summary_work_files(base_name) + get_comments_work_files(base_name)
             self.cleanup_work_files(work_files, output_dir)
 
         return summary_path, comments_path
@@ -372,7 +331,7 @@ class Finalizer:
         print(f"Created comments file: {comments_filename}")
 
         if not debug:
-            self.cleanup_work_files(self.get_full_work_files(base_name), output_dir)
+            self.cleanup_work_files(get_all_work_files(base_name), output_dir)
 
         return summary_path, transcript_path, comments_path
 

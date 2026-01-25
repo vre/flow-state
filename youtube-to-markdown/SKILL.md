@@ -20,9 +20,11 @@ Multiple videos: Process one video at a time, sequentially. Do not run parallel 
 python3 ./check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 ```
 
-If any `*_valid: false`: Show the issues to user and proceed.
-
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
+
+If `exists: false`: Continue to Step 1.
+
+If `exists: true`: Read and follow `./modules/update_flow.md`.
 
 ## Step 1: Choose output
 

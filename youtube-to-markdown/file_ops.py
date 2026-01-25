@@ -16,24 +16,7 @@ from pathlib import Path
 from typing import Optional
 
 from shared_types import FileOperationError, FileSystem, RealFileSystem
-
-
-# Intermediate file patterns (from finalize.py)
-INTERMEDIATE_PATTERNS = [
-    "{base_name}_title.txt",
-    "{base_name}_metadata.md",
-    "{base_name}_summary.md",
-    "{base_name}_summary_tight.md",
-    "{base_name}_description.md",
-    "{base_name}_chapters.json",
-    "{base_name}_transcript.vtt",
-    "{base_name}_transcript_dedup.md",
-    "{base_name}_transcript_no_timestamps.txt",
-    "{base_name}_transcript_paragraphs.txt",
-    "{base_name}_transcript_paragraphs.md",
-    "{base_name}_transcript_cleaned.md",
-    "{base_name}_transcript.md",
-]
+from intermediate_files import get_all_work_files
 
 
 class FileOps:
@@ -60,10 +43,10 @@ class FileOps:
 
         content = self.fs.read_text(file_path)
 
-        today = datetime.now().strftime("%Y%m%d")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         stem = file_path.stem
         suffix = file_path.suffix
-        backup_name = f"{stem}_backup_{today}{suffix}"
+        backup_name = f"{stem}_backup_{timestamp}{suffix}"
         backup_path = file_path.parent / backup_name
 
         self.fs.write_text(backup_path, content)
@@ -83,8 +66,7 @@ class FileOps:
         base_name = f"youtube_{video_id}"
         removed_count = 0
 
-        for pattern in INTERMEDIATE_PATTERNS:
-            filename = pattern.format(base_name=base_name)
+        for filename in get_all_work_files(base_name):
             file_path = output_dir / filename
             if self.fs.exists(file_path):
                 self.fs.remove(file_path)

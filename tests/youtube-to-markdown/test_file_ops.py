@@ -10,7 +10,7 @@ class TestBackup:
     """Tests for backup command."""
 
     def test_backup_creates_timestamped_copy(self, mock_fs):
-        """Test backup creates file with date suffix."""
+        """Test backup creates file with timestamp suffix."""
         file_ops = FileOps(fs=mock_fs)
 
         original = Path("/output/test_file.md")
@@ -18,10 +18,10 @@ class TestBackup:
 
         backup_path = file_ops.backup(original)
 
-        # Check backup was created with today's date
+        # Check backup was created with timestamp (YYYYMMDD_HHMMSS)
         today = datetime.now().strftime("%Y%m%d")
-        expected_name = f"test_file_backup_{today}.md"
-        assert backup_path.name == expected_name
+        assert backup_path.name.startswith(f"test_file_backup_{today}_")
+        assert backup_path.name.endswith(".md")
         assert backup_path.parent == original.parent
         assert mock_fs.exists(backup_path)
         assert mock_fs.read_text(backup_path) == "Original content"
@@ -57,8 +57,8 @@ class TestBackup:
         backup_path = file_ops.backup(original)
 
         today = datetime.now().strftime("%Y%m%d")
-        expected_name = f"youtube - Video Title (abc123)_backup_{today}.md"
-        assert backup_path.name == expected_name
+        assert backup_path.name.startswith(f"youtube - Video Title (abc123)_backup_{today}_")
+        assert backup_path.name.endswith(".md")
 
 
 class TestCleanup:
