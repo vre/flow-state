@@ -23,7 +23,7 @@
       "name": "imap-stream-mcp",
       "source": "./imap-stream-mcp",
       "description": "Lightweight IMAP email MCP server. ~500 tokens vs 15,000+. Read, search, draft emails with markdown support.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "category": "productivity",
       "keywords": ["email", "imap", "mcp"]
     }
