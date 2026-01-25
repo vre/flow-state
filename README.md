@@ -10,8 +10,7 @@ YouTube extraction and email integration.
 - 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings into own file
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
-
-- 🎛️ **Modular**: Choose output - Summary only, Transcript only, Comments only, or Full
+- 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, Comments only.
 
 **Skip the Video - Get the Knowledge.**
 
@@ -31,7 +30,7 @@ YouTube extraction and email integration.
 
 **Installation:**
 
-Add the marketplace and install skills:
+Add the marketplace and install:
 ```bash
 /plugin marketplace add vre/flow-state
 
@@ -39,7 +38,7 @@ Add the marketplace and install skills:
 /plugin install imap-stream-mcp@flow-state
 ```
 
-Configure IMAP (first use will show setup instructions).
+Additionally configure IMAP (first use will show setup instructions).
 
 **Usage:**
 
@@ -47,11 +46,6 @@ Configure IMAP (first use will show setup instructions).
 extract https://www.youtube.com/watch?v=dQw4w9WgXcQ
 
 ('get', 'fetch', 'transcript', 'subtitles', 'captions', etc. works too)
-```
-
-Or for comments only
-```
-comments https://www.youtube.com/watch?v=dQw4w9WgXcQ
 ```
 
 ## Examples
@@ -77,6 +71,16 @@ Transform YouTube videos into storagable knowledge. Get TL;DR, content-specific 
 - **Category**: Media Extraction
 - **Dependencies**: yt-dlp, Python 3
 - **Output options**: First a markdown file with metadata and summary with insights from comments. Second a markdown file with cleaned transcript with chapters and timestamp links. Third a markdown file with extracted comments.
+
+## Available MCP Servers
+
+### imap-stream-mcp
+
+Lightweight IMAP email client following Jesse Vincent's MCP design philosophy. Single `use_mail` tool with action dispatcher keeps context usage minimal (~500 tokens vs 15,000+). Self-documenting via built-in `help` action.
+
+- **Category**: Email Integration
+- **Dependencies**: Python 3, keyring
+- **Actions**: list, read, search, draft, folders, accounts, attachment, cleanup, help
 
 ## The Backstory
 

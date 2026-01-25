@@ -269,36 +269,45 @@ class TestInsertCommentInsightsIntoSummary:
 
 
 class TestGetWorkFiles:
-    """Tests for get_*_work_files methods."""
+    """Tests for get_*_work_files functions from intermediate_files module."""
 
-    def test_get_summary_work_files(self, finalizer):
+    def test_get_summary_work_files(self):
         """Test getting summary work files list."""
-        files = finalizer.get_summary_work_files("youtube_test123")
+        from intermediate_files import get_summary_work_files
+        files = get_summary_work_files("youtube_test123")
 
         assert "youtube_test123_title.txt" in files
         assert "youtube_test123_metadata.md" in files
         assert "youtube_test123_summary_tight.md" in files
 
-    def test_get_transcript_work_files(self, finalizer):
+    def test_get_transcript_work_files(self):
         """Test getting transcript work files list."""
-        files = finalizer.get_transcript_work_files("youtube_test123")
+        from intermediate_files import get_transcript_work_files
+        files = get_transcript_work_files("youtube_test123")
 
         assert "youtube_test123_transcript.md" in files
         assert "youtube_test123_description.md" in files
 
-    def test_get_comments_work_files(self, finalizer):
+    def test_get_comments_work_files(self):
         """Test getting comments work files list."""
-        files = finalizer.get_comments_work_files("youtube_test123")
+        from intermediate_files import get_comments_work_files
+        files = get_comments_work_files("youtube_test123")
 
         assert "youtube_test123_comments.md" in files
         assert "youtube_test123_comment_insights_tight.md" in files
 
-    def test_get_full_work_files_combines_all(self, finalizer):
-        """Test getting full work files combines all lists."""
-        full_files = finalizer.get_full_work_files("youtube_test123")
-        summary_files = finalizer.get_summary_work_files("youtube_test123")
-        transcript_files = finalizer.get_transcript_work_files("youtube_test123")
-        comments_files = finalizer.get_comments_work_files("youtube_test123")
+    def test_get_all_work_files_combines_all(self):
+        """Test getting all work files combines all lists."""
+        from intermediate_files import (
+            get_all_work_files,
+            get_summary_work_files,
+            get_transcript_work_files,
+            get_comments_work_files,
+        )
+        full_files = get_all_work_files("youtube_test123")
+        summary_files = get_summary_work_files("youtube_test123")
+        transcript_files = get_transcript_work_files("youtube_test123")
+        comments_files = get_comments_work_files("youtube_test123")
 
         for f in summary_files:
             assert f in full_files
