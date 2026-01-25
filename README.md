@@ -5,16 +5,13 @@ YouTube extraction and email integration.
 ## Skills
 
 **Youtube to Markdown** - Transform streaming content into storagable knowledge as Markdown.
-- ✨ **TL;DR + structured summary**: Core insights with four content spesific summarization formats
+- ✨ **TL;DR + structured summary**: Core insights with four content specific summarization formats
 - 💎 **Hidden Gems**: Collects insights that normal summarization loses
 - 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings into own file
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
 
-**Youtube Comment Analysis** - Filter out the content from the cesspool.
-- 🥇 **Comment insights**: Curates top voted comments and discussion threads
-- 🗑️ **Spam-free**: Filters low-value comments, duplicates, and off-topic noise
-- ⚔️ **Solo-analysis**: Optional standalone comment analysis without transcript
+- 🎛️ **Modular**: Choose output - Summary only, Transcript only, Comments only, or Full
 
 **Skip the Video - Get the Knowledge.**
 
@@ -39,7 +36,6 @@ Add the marketplace and install skills:
 /plugin marketplace add vre/flow-state
 
 /plugin install youtube-to-markdown@flow-state
-/plugin install youtube-comment-analysis@flow-state
 /plugin install imap-stream-mcp@flow-state
 ```
 
@@ -80,18 +76,7 @@ Transform YouTube videos into storagable knowledge. Get TL;DR, content-specific 
 
 - **Category**: Media Extraction
 - **Dependencies**: yt-dlp, Python 3
-- **Output**: Markdown file with metadata, summary, description, and formatted transcript
-
-### youtube-comment-analysis
-
-Extract and analyze YouTube comments. Supports standalone or sequential workflows.
-
-- **Category**: Media Extraction
-- **Dependencies**: yt-dlp, Python 3
-- **Output**: Markdown file with comment insights and curated comments
-- **Modes**:
-  - Sequential: Adds viewpoints from comments to video summary
-  - Standalone: Analyzes comments only
+- **Output options**: First a markdown file with metadata and summary with insights from comments. Second a markdown file with cleaned transcript with chapters and timestamp links. Third a markdown file with extracted comments.
 
 ## The Backstory
 

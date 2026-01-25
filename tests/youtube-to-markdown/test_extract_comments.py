@@ -15,13 +15,13 @@ from extract_comments import (
     generate_comments_markdown,
     parse_video_data,
 )
-from types_and_exceptions import (
+from shared_types import (
     Comment,
     CommandRunner,
     FileSystem,
-    VideoData,
+    CommentVideoData,
     VideoDataFetchError,
-    VideoIDExtractionError,
+    VideoIdExtractionError,
     YTDLPNotFoundError,
 )
 
@@ -41,13 +41,13 @@ def sample_comments() -> list[Comment]:
 
 
 @pytest.fixture
-def sample_video_data() -> VideoData:
+def sample_video_data() -> CommentVideoData:
     """Sample video data for testing."""
     comments = [
         Comment(id="1", author="Alice", text="Great video!", like_count=42, parent="root"),
         Comment(id="2", author="Bob", text="Thanks Alice!", like_count=10, parent="1"),
     ]
-    return VideoData(title="Test Video", video_id="abc123", comments=comments)
+    return CommentVideoData(title="Test Video", video_id="abc123", comments=comments)
 
 
 @pytest.fixture
@@ -142,13 +142,13 @@ class TestExtractVideoId:
         assert extract_video_id(url) == "dQw4w9WgXcQ"
 
     def test_invalid_url_raises_error(self):
-        """Test that invalid URL raises VideoIDExtractionError."""
-        with pytest.raises(VideoIDExtractionError):
+        """Test that invalid URL raises VideoIdExtractionError."""
+        with pytest.raises(VideoIdExtractionError):
             extract_video_id("https://www.example.com/not-a-youtube-url")
 
     def test_empty_url_raises_error(self):
         """Test that empty URL raises error."""
-        with pytest.raises(VideoIDExtractionError):
+        with pytest.raises(VideoIdExtractionError):
             extract_video_id("")
 
 
@@ -437,7 +437,7 @@ class TestCommentExtractor:
         mock_runner.set_return_value(["yt-dlp", "--version"], 0, "2023.01.01", "")
         extractor = CommentExtractor(mock_runner, mock_filesystem)
 
-        with pytest.raises(VideoIDExtractionError):
+        with pytest.raises(VideoIdExtractionError):
             extractor.extract_and_save("https://invalid.com", Path("/tmp/test"))
 
 

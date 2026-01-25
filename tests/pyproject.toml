@@ -14,7 +14,6 @@ imap-stream-mcp = { path = "../imap-stream-mcp" }
 [tool.pytest.ini_options]
 testpaths = [
     "youtube-to-markdown",
-    "youtube-comment-analysis",
     "imap-stream-mcp",
 ]
 python_files = "test_*.py"

@@ -42,18 +42,18 @@ Backup = `python3 ./file_ops.py backup {file}` (file modified in place, keep ori
 1. Move summary aside
 2. Move transcript aside
 3. Run Steps 2-9 from main SKILL.md
-4. If comment file exists: move comment-file aside, run youtube-comment-analysis
+4. If comment file exists: move comment-file aside, run comment modules (comment_extract + comment_summarize)
 
 ### Re-analyze comments
 If comment file exists:
 1. Move comment-file aside
 2. Backup summary (copy)
 3. Remove `## Comment Insights` section from summary (to next `##` or end)
-4. Run youtube-comment-analysis
+4. Run comment modules (comment_extract + comment_summarize)
 
 If no comment file:
 1. Ask user: "No comment analysis exists. Run now?"
-2. If yes: run youtube-comment-analysis
+2. If yes: run comment modules (comment_extract + comment_summarize)
 
 ### Update metadata only
 1. Backup summary (copy)
