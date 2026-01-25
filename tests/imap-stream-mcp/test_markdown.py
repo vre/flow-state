@@ -80,15 +80,15 @@ class TestPreprocessMarkdown:
         assert result == "- just a list item"
 
     def test_nested_list_items(self):
-        """Test nested list items also get blank lines (current behavior).
+        """Test nested list items do NOT get blank lines between them.
 
-        Note: Implementation checks stripped line, so nested items match.
-        This may be unintended but documents current behavior.
+        Implementation tracks prev_was_list_item to avoid adding blank
+        lines between consecutive list items (including nested ones).
         """
         text = "- item\n  - nested"
         result = preprocess_markdown(text)
-        # Stripped "  - nested" becomes "- nested" which matches block pattern
-        assert result == "- item\n\n  - nested"
+        # No blank line between list items
+        assert result == "- item\n  - nested"
 
 
 class TestMarkdownToPlain:

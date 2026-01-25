@@ -1,6 +1,6 @@
 ## Curated Comments
 
-Sample of top discussion threads. Full extraction available via youtube-comment-analysis skill.
+Sample of top discussion threads. Full extraction available via youtube-to-markdown skill (Comments only option).
 
 ### 1. @IcaroAlvarez (1500 likes)
 
