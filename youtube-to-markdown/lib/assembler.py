@@ -78,7 +78,10 @@ class Finalizer:
         base_name: str,
         output_dir: Path
     ) -> str:
-        """Assemble transcript content from template and components."""
+        """Assemble transcript content from template and components.
+
+        Note: Description is pre-wrapped in safety delimiters at extraction time.
+        """
         description = self.read_component_or_empty(output_dir / f"{base_name}_description.md")
         transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript.md")
 
@@ -94,7 +97,10 @@ class Finalizer:
         output_dir: Path,
         standalone: bool = False
     ) -> str:
-        """Assemble comments content from template and components."""
+        """Assemble comments content from template and components.
+
+        Note: Comments are pre-wrapped in safety delimiters at extraction time.
+        """
         comment_insights = self.read_component_or_empty(output_dir / f"{base_name}_comment_insights_tight.md")
         comments = self.read_component_or_empty(output_dir / f"{base_name}_comments_prefiltered.md")
 

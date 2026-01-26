@@ -14,6 +14,10 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Comment analysis** - Curated comments cross-analyzed against video content
 - **Update mode** - Refresh existing extractions when video metadata changes
 
+## Security
+
+Defends against prompt injection in YouTube content. User-generated content (descriptions, comments, transcripts) is wrapped in `<untrusted_xxx_content>` XML tags with warnings, and injection patterns are escaped.
+
 ## Installation for Claude Code
 
 ### As a Plugin
