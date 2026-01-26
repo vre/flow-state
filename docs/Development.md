@@ -1,6 +1,36 @@
-# Development - Local Plugin Installation Behavior
+# Development
 
-## Files Are Referenced In Place
+## Project-Level Development Setup
+
+When developing this project, skills and MCP servers point directly to local directories:
+
+**Skills** (`.claude/skills/`):
+```
+youtube-to-markdown -> ../../youtube-to-markdown  (symlink)
+```
+
+**MCP Servers** (`.mcp.json`):
+```json
+{
+  "mcpServers": {
+    "imap-stream": {
+      "command": "uv",
+      "args": ["--directory", "./imap-stream-mcp", "run", "imap-stream"]
+    }
+  }
+}
+```
+
+This setup ensures:
+- Always using latest development version
+- No reinstall needed after changes
+- Same pattern for both skills and MCP servers
+
+Note: Each sub-project (e.g., `imap-stream-mcp`) also has its own `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}` for standalone installation.
+
+## Local Plugin Installation Behavior
+
+### Files Are Referenced In Place
 
 When installing marketplace from local directory (`/plugin marketplace add /xxx/flow-state`):
 
