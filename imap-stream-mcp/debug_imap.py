@@ -39,7 +39,7 @@ def debug_connection():
     print(f"   Server:   {server}")
     print(f"   Port:     {port}")
     print(f"   Username: {username}")
-    print(f"   Password: {'*' * len(password) if password else '(not set)'}")
+    print(f"   Password: {'(set)' if password else '(not set)'}")
     print()
 
     if not all([server, username, password]):
