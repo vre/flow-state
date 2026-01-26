@@ -6,10 +6,11 @@ import re
 from pathlib import Path
 
 from lib.shared_types import extract_video_id
+from lib.intermediate_files import get_key_intermediate_files
 
 
 def find_existing_files(video_id: str, output_dir: Path) -> dict:
-    """Find existing summary and comment files for a video ID."""
+    """Find existing summary, comment, and intermediate files for a video ID."""
     # Use broad pattern first, then filter
     all_files = list(output_dir.glob(f"youtube - * ({video_id}).md"))
 
@@ -30,10 +31,19 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
             # Main summary file (no suffix before video ID)
             summary_file = f
 
+    # Check for intermediate files from incomplete extraction
+    base_name = f"youtube_{video_id}"
+    key_files = get_key_intermediate_files(base_name)
+    found_intermediate = [
+        str(output_dir / f) for f in key_files
+        if (output_dir / f).exists()
+    ]
+
     return {
         "summary_file": str(summary_file) if summary_file else None,
         "comment_file": str(comment_file) if comment_file else None,
         "transcript_file": str(transcript_file) if transcript_file else None,
+        "intermediate_files": found_intermediate if found_intermediate else None,
     }
 
 
@@ -180,10 +190,12 @@ def check_existing(video_url: str, output_dir: Path) -> dict:
 
     Returns:
         Dictionary with:
-        - exists: bool
+        - exists: bool (final files exist)
+        - has_intermediate: bool (incomplete extraction detected)
         - summary_file: path or None
         - comment_file: path or None
         - transcript_file: path or None
+        - intermediate_files: list of paths or None
         - summary_v1: bool (if summary exists)
         - comments_v1: bool (if comments exist)
         - stored_metadata: dict (if summary exists)
@@ -194,6 +206,7 @@ def check_existing(video_url: str, output_dir: Path) -> dict:
     result = {
         "video_id": video_id,
         "exists": files["summary_file"] is not None,
+        "has_intermediate": files["intermediate_files"] is not None,
         **files,
     }
 
