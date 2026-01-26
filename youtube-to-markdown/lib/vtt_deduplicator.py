@@ -6,6 +6,7 @@ import re
 from pathlib import Path
 
 from lib.shared_types import FileSystem, RealFileSystem, FileOperationError
+from lib.content_safety import wrap_untrusted_content
 
 
 class VTTDeduplicator:
@@ -63,7 +64,10 @@ class VTTDeduplicator:
 
         if no_timestamps_path:
             plain_lines = [line[15:] for line in output_lines]
-            self.fs.write_text(no_timestamps_path, '\n'.join(plain_lines))
+            plain_text = '\n'.join(plain_lines)
+            # Wrap in safety delimiters to defend against prompt injection
+            safe_transcript = wrap_untrusted_content(plain_text, "transcript")
+            self.fs.write_text(no_timestamps_path, safe_transcript)
 
         print(f"SUCCESS: {output_path} ({len(output_lines)} lines)")
         return len(output_lines)

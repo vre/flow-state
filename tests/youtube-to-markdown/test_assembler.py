@@ -194,48 +194,81 @@ class TestAssembleTranscriptContent:
     """Tests for assemble_transcript_content method."""
 
     def test_assemble_transcript_content(self, finalizer, mock_fs):
-        """Test assembling transcript content."""
+        """Test assembling transcript content (pre-wrapped at extraction)."""
         output_dir = Path("/output")
         base_name = "youtube_test123"
         template = "Desc: {description}\n\nTrans: {transcription}"
 
-        mock_fs.files[output_dir / f"{base_name}_description.md"] = "Description here"
+        # Content is pre-wrapped at extraction time
+        mock_fs.files[output_dir / f"{base_name}_description.md"] = "[UNTRUSTED]\n\n<|description|>\nDescription here\n<|/description|>"
         mock_fs.files[output_dir / f"{base_name}_transcript.md"] = "Transcript here"
 
         result = finalizer.assemble_transcript_content(template, base_name, output_dir)
 
-        assert "Desc: Description here" in result
-        assert "Trans: Transcript here" in result
+        # Pre-wrapped content passes through
+        assert "<|description|>" in result
+        assert "Description here" in result
+        assert "Transcript here" in result
+
+    def test_assemble_transcript_content_empty_components(self, finalizer, mock_fs):
+        """Test assembling with empty components."""
+        output_dir = Path("/output")
+        base_name = "youtube_test123"
+        template = "Desc: {description}\n\nTrans: {transcription}"
+
+        # No files = empty content
+        result = finalizer.assemble_transcript_content(template, base_name, output_dir)
+
+        assert "Desc:" in result
+        assert "Trans:" in result
 
 
 class TestAssembleCommentsContent:
     """Tests for assemble_comments_content method."""
 
     def test_assemble_comments_standalone(self, finalizer, mock_fs):
-        """Test assembling comments in standalone mode."""
+        """Test assembling comments in standalone mode (pre-wrapped at extraction)."""
         output_dir = Path("/output")
         base_name = "youtube_test123"
         template = "Insights: {comment_insights}\n\nComments: {comments}"
 
         mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "Insights here"
-        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments here"
+        # Comments are pre-wrapped at extraction time
+        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "[UNTRUSTED]\n\n<|comments|>\nComments here\n<|/comments|>"
 
         result = finalizer.assemble_comments_content(template, base_name, output_dir, standalone=True)
 
+        # Insights are LLM-generated, not wrapped
         assert "Insights: Insights here" in result
-        assert "Comments: Comments here" in result
+        # Pre-wrapped comments pass through
+        assert "<|comments|>" in result
+        assert "Comments here" in result
 
     def test_assemble_comments_not_standalone(self, finalizer, mock_fs):
-        """Test assembling comments not standalone (insights go to summary)."""
+        """Test assembling comments not standalone (pre-wrapped at extraction)."""
         output_dir = Path("/output")
         base_name = "youtube_test123"
         template = "Comments: {comments}"
 
-        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments here"
+        # Comments are pre-wrapped at extraction time
+        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "[UNTRUSTED]\n\n<|comments|>\nComments here\n<|/comments|>"
 
         result = finalizer.assemble_comments_content(template, base_name, output_dir, standalone=False)
 
-        assert "Comments: Comments here" in result
+        # Pre-wrapped comments pass through
+        assert "<|comments|>" in result
+        assert "Comments here" in result
+
+    def test_assemble_comments_empty(self, finalizer, mock_fs):
+        """Test empty comments."""
+        output_dir = Path("/output")
+        base_name = "youtube_test123"
+        template = "Comments: {comments}"
+
+        # No files = empty comments
+        result = finalizer.assemble_comments_content(template, base_name, output_dir, standalone=False)
+
+        assert "Comments:" in result
 
 
 class TestInsertCommentInsightsIntoSummary:

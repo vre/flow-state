@@ -4,6 +4,8 @@ Comment filtering library.
 
 import re
 
+from lib.content_safety import wrap_untrusted_content
+
 MAX_COMMENTS = 200
 
 
@@ -23,10 +25,22 @@ def filter_comments(comments: list[dict], max_comments: int = MAX_COMMENTS) -> l
     return filtered[:max_comments]
 
 
-def format_comments(comments: list[dict]) -> str:
-    """Format filtered comments back to markdown."""
+def format_comments(comments: list[dict], wrap_safe: bool = True) -> str:
+    """Format filtered comments back to markdown.
+
+    Args:
+        comments: List of comment dicts with author, likes, text
+        wrap_safe: If True, wrap output in safety delimiters (default True)
+
+    Returns:
+        Formatted markdown string, optionally wrapped in safety delimiters
+    """
     lines = []
     for i, c in enumerate(comments, 1):
         lines.append(f"### {i}. @{c['author']} ({c['likes']} likes)\n")
         lines.append(f"{c['text']}\n")
-    return '\n'.join(lines)
+    content = '\n'.join(lines)
+
+    if wrap_safe:
+        return wrap_untrusted_content(content, "comments")
+    return content

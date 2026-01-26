@@ -155,15 +155,20 @@ class TestFormatComments:
     """Tests for format_comments function."""
 
     def test_format_single_comment(self):
-        """Test formatting a single comment."""
+        """Test formatting a single comment with safety wrappers."""
         comments = [{'author': 'user1', 'likes': 42, 'text': 'Test comment'}]
         result = format_comments(comments)
 
+        # Content present
         assert "### 1. @user1 (42 likes)" in result
         assert "Test comment" in result
+        # Safety wrappers present (warning before tags)
+        assert "UNTRUSTED" in result
+        assert "<untrusted_comments_content>" in result
+        assert "</untrusted_comments_content>" in result
 
     def test_format_multiple_comments(self):
-        """Test formatting multiple comments with renumbering."""
+        """Test formatting multiple comments with safety wrappers."""
         comments = [
             {'author': 'user1', 'likes': 100, 'text': 'First'},
             {'author': 'user2', 'likes': 50, 'text': 'Second'},
@@ -172,9 +177,10 @@ class TestFormatComments:
 
         assert "### 1. @user1 (100 likes)" in result
         assert "### 2. @user2 (50 likes)" in result
+        assert "<untrusted_comments_content>" in result
 
     def test_format_empty_list(self):
-        """Test formatting empty list."""
+        """Test formatting empty list returns empty (no wrapper)."""
         result = format_comments([])
         assert result == ''
 
@@ -184,3 +190,11 @@ class TestFormatComments:
         result = format_comments(comments)
 
         assert "Line1\nLine2\nLine3" in result
+
+    def test_format_without_wrapping(self):
+        """Test formatting with wrap_safe=False returns raw markdown."""
+        comments = [{'author': 'user1', 'likes': 42, 'text': 'Test'}]
+        result = format_comments(comments, wrap_safe=False)
+
+        assert "### 1. @user1 (42 likes)" in result
+        assert "<untrusted_comments_content>" not in result

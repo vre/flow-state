@@ -117,7 +117,7 @@ Same text
         assert content.count("Different text") == 1
 
     def test_deduplicate_vtt_with_no_timestamps_output(self, mock_fs, sample_vtt_content):
-        """Test writing additional file without timestamps."""
+        """Test writing additional file without timestamps, wrapped in safety delimiters."""
         dedup = VTTDeduplicator(fs=mock_fs)
 
         input_path = Path("/input.vtt")
@@ -132,12 +132,15 @@ Same text
         content = mock_fs.read_text(output_path)
         assert "[00:00:01.000] First line of text" in content
 
-        # Check plain output (no timestamps)
+        # Check plain output - wrapped in safety delimiters
         plain_content = mock_fs.read_text(no_timestamps_path)
-        lines = plain_content.split('\n')
-        assert len(lines) == 3
-        assert lines[0] == "First line of text"
-        assert lines[1] == "Second line of text"
-        assert lines[2] == "Third line of text"
+        # Content present
+        assert "First line of text" in plain_content
+        assert "Second line of text" in plain_content
+        assert "Third line of text" in plain_content
+        # Safety wrappers present (warning before tags)
+        assert "UNTRUSTED" in plain_content
+        assert "<untrusted_transcript_content>" in plain_content
+        assert "</untrusted_transcript_content>" in plain_content
         # Verify no timestamps in plain output
         assert "[00:00:" not in plain_content

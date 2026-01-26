@@ -20,6 +20,7 @@ from lib.shared_types import (
     CommandNotFoundError,
     FileOperationError,
 )
+from lib.content_safety import wrap_untrusted_content
 
 
 class YouTubeDataExtractor:
@@ -213,6 +214,9 @@ class YouTubeDataExtractor:
         """
         Create description markdown file.
 
+        Wraps content in safety delimiters to defend against prompt
+        injection from creator-controlled content.
+
         Args:
             metadata: Video metadata
             base_name: Base filename
@@ -222,7 +226,8 @@ class YouTubeDataExtractor:
             Path to created description file
         """
         filename = output_dir / f"{base_name}_description.md"
-        self.fs.write_text(filename, metadata.description)
+        safe_description = wrap_untrusted_content(metadata.description, "description")
+        self.fs.write_text(filename, safe_description)
 
         print(f"SUCCESS: {filename}")
         return filename
