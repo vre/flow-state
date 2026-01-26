@@ -1,25 +1,11 @@
-#!/usr/bin/env python3
 """
-Creates final markdown files from template and component files, cleans up intermediate work files.
-
-Usage: finalize.py [options] <BASE_NAME> <OUTPUT_DIR>
-
-Options:
-  --summary-only     Create only summary file
-  --transcript-only  Create only transcript file
-  --comments-only    Create only comments file
-  --summary-comments Create summary and comments files
-  --debug            Keep intermediate work files
-
-Default (no mode flag): Create summary, transcript, and comments files (Full mode)
+Final assembly library for YouTube to Markdown conversion.
 """
 
-import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-from shared_types import FileSystem, RealFileSystem, clean_title_for_filename, FileOperationError
-from intermediate_files import (
+from lib.shared_types import FileSystem, RealFileSystem, clean_title_for_filename, FileOperationError
+from lib.intermediate_files import (
     get_summary_work_files,
     get_transcript_work_files,
     get_comments_work_files,
@@ -31,12 +17,11 @@ class Finalizer:
     """Finalizes YouTube to Markdown conversion."""
 
     def __init__(self, fs: FileSystem = RealFileSystem()):
-        """Initialize finalizer with dependencies."""
         self.fs = fs
 
-    def read_template(self, script_dir: Path, template_name: str) -> str:
+    def read_template(self, template_dir: Path, template_name: str) -> str:
         """Read template file."""
-        template_file = script_dir / template_name
+        template_file = template_dir / template_name
         if not self.fs.exists(template_file):
             raise FileOperationError(f"{template_file} not found")
         return self.fs.read_text(template_file)
@@ -114,10 +99,8 @@ class Finalizer:
         comments = self.read_component_or_empty(output_dir / f"{base_name}_comments_prefiltered.md")
 
         if standalone:
-            # Include comment insights in the file
             content = template.replace("{comment_insights}", comment_insights.strip())
         else:
-            # Comment insights will be appended to summary
             content = template
 
         content = content.replace("{comments}", comments.strip())
@@ -141,7 +124,6 @@ class Finalizer:
 
     def cleanup_work_files(self, work_files: list[str], output_dir: Path) -> None:
         """Remove intermediate work files."""
-        # Deduplicate while preserving order
         seen = set()
         unique_files = []
         for f in work_files:
@@ -160,11 +142,11 @@ class Finalizer:
         self,
         base_name: str,
         output_dir: Path,
+        template_dir: Path,
         debug: bool = False
     ) -> Path:
         """Create only summary file."""
-        script_dir = Path(__file__).parent
-        template = self.read_template(script_dir, "template.md")
+        template = self.read_template(template_dir, "summary.md")
 
         content = self.assemble_summary_content(template, base_name, output_dir)
         cleaned_title, video_id = self.get_filenames(base_name, output_dir)
@@ -187,11 +169,11 @@ class Finalizer:
         self,
         base_name: str,
         output_dir: Path,
+        template_dir: Path,
         debug: bool = False
     ) -> Path:
         """Create only transcript file."""
-        script_dir = Path(__file__).parent
-        template = self.read_template(script_dir, "template_transcript.md")
+        template = self.read_template(template_dir, "transcript.md")
 
         content = self.assemble_transcript_content(template, base_name, output_dir)
         cleaned_title, video_id = self.get_filenames(base_name, output_dir)
@@ -214,15 +196,14 @@ class Finalizer:
         self,
         base_name: str,
         output_dir: Path,
+        template_dir: Path,
         debug: bool = False
     ) -> Path:
         """Create only comments file (standalone with insights)."""
-        script_dir = Path(__file__).parent
-        template = self.read_template(script_dir, "template_comments_standalone.md")
+        template = self.read_template(template_dir, "comments_standalone.md")
 
         content = self.assemble_comments_content(template, base_name, output_dir, standalone=True)
 
-        # For comments-only, get title from _name.txt instead of _title.txt
         name_path = output_dir / f"{base_name}_name.txt"
         title = self.read_component_or_empty(name_path).strip()
         video_id = base_name.replace('youtube_', '')
@@ -246,13 +227,11 @@ class Finalizer:
         self,
         base_name: str,
         output_dir: Path,
+        template_dir: Path,
         debug: bool = False
     ) -> tuple[Path, Path]:
         """Create summary and comments files, insert insights into summary."""
-        script_dir = Path(__file__).parent
-
-        # Create summary file
-        summary_template = self.read_template(script_dir, "template.md")
+        summary_template = self.read_template(template_dir, "summary.md")
         summary_content = self.assemble_summary_content(summary_template, base_name, output_dir)
         cleaned_title, video_id = self.get_filenames(base_name, output_dir)
 
@@ -267,12 +246,10 @@ class Finalizer:
         self.fs.write_text(summary_path, summary_content)
         print(f"Created summary file: {summary_filename}")
 
-        # Insert comment insights into summary
         comment_insights = self.read_component_or_empty(output_dir / f"{base_name}_comment_insights_tight.md")
         self.insert_comment_insights_into_summary(summary_path, comment_insights)
 
-        # Create comments file (without insights, they're in summary)
-        comments_template = self.read_template(script_dir, "template_comments.md")
+        comments_template = self.read_template(template_dir, "comments.md")
         comments_content = self.assemble_comments_content(comments_template, base_name, output_dir, standalone=False)
 
         comments_path = output_dir / comments_filename
@@ -289,13 +266,12 @@ class Finalizer:
         self,
         base_name: str,
         output_dir: Path,
+        template_dir: Path,
         debug: bool = False
     ) -> tuple[Path, Path, Path]:
         """Create summary, transcript, and comments files."""
-        script_dir = Path(__file__).parent
         cleaned_title, video_id = self.get_filenames(base_name, output_dir)
 
-        # Determine filenames
         if cleaned_title:
             summary_filename = f"youtube - {cleaned_title} ({video_id}).md"
             transcript_filename = f"youtube - {cleaned_title} - transcript ({video_id}).md"
@@ -305,26 +281,22 @@ class Finalizer:
             transcript_filename = f"{base_name}_transcript.md"
             comments_filename = f"{base_name}_comments.md"
 
-        # Create summary file
-        summary_template = self.read_template(script_dir, "template.md")
+        summary_template = self.read_template(template_dir, "summary.md")
         summary_content = self.assemble_summary_content(summary_template, base_name, output_dir)
         summary_path = output_dir / summary_filename
         self.fs.write_text(summary_path, summary_content)
         print(f"Created summary file: {summary_filename}")
 
-        # Insert comment insights into summary
         comment_insights = self.read_component_or_empty(output_dir / f"{base_name}_comment_insights_tight.md")
         self.insert_comment_insights_into_summary(summary_path, comment_insights)
 
-        # Create transcript file
-        transcript_template = self.read_template(script_dir, "template_transcript.md")
+        transcript_template = self.read_template(template_dir, "transcript.md")
         transcript_content = self.assemble_transcript_content(transcript_template, base_name, output_dir)
         transcript_path = output_dir / transcript_filename
         self.fs.write_text(transcript_path, transcript_content)
         print(f"Created transcript file: {transcript_filename}")
 
-        # Create comments file
-        comments_template = self.read_template(script_dir, "template_comments.md")
+        comments_template = self.read_template(template_dir, "comments.md")
         comments_content = self.assemble_comments_content(comments_template, base_name, output_dir, standalone=False)
         comments_path = output_dir / comments_filename
         self.fs.write_text(comments_path, comments_content)
@@ -334,58 +306,3 @@ class Finalizer:
             self.cleanup_work_files(get_all_work_files(base_name), output_dir)
 
         return summary_path, transcript_path, comments_path
-
-
-def main() -> None:
-    """CLI entry point."""
-    # Parse options
-    debug = False
-    mode = "full"
-    args = []
-
-    for arg in sys.argv[1:]:
-        if arg == '--debug':
-            debug = True
-        elif arg == '--summary-only':
-            mode = "summary-only"
-        elif arg == '--transcript-only':
-            mode = "transcript-only"
-        elif arg == '--comments-only':
-            mode = "comments-only"
-        elif arg == '--summary-comments':
-            mode = "summary-comments"
-        else:
-            args.append(arg)
-
-    if len(args) < 1:
-        print("ERROR: No BASE_NAME provided", file=sys.stderr)
-        print(__doc__, file=sys.stderr)
-        sys.exit(1)
-
-    base_name = args[0]
-    output_dir = Path(args[1]) if len(args) > 1 else Path(".")
-
-    try:
-        finalizer = Finalizer()
-
-        if debug:
-            print("Debug mode: keeping intermediate work files")
-
-        if mode == "summary-only":
-            finalizer.finalize_summary_only(base_name, output_dir, debug)
-        elif mode == "transcript-only":
-            finalizer.finalize_transcript_only(base_name, output_dir, debug)
-        elif mode == "comments-only":
-            finalizer.finalize_comments_only(base_name, output_dir, debug)
-        elif mode == "summary-comments":
-            finalizer.finalize_summary_comments(base_name, output_dir, debug)
-        else:
-            finalizer.finalize_full(base_name, output_dir, debug)
-
-    except Exception as e:
-        print(f"ERROR: {str(e)}", file=sys.stderr)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

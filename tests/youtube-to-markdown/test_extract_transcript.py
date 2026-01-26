@@ -2,8 +2,8 @@
 
 import pytest
 from pathlib import Path
-from extract_transcript import TranscriptExtractor
-from shared_types import CommandNotFoundError, TranscriptNotAvailableError, FileOperationError
+from lib.transcript_extractor import TranscriptExtractor
+from lib.shared_types import CommandNotFoundError, TranscriptNotAvailableError, FileOperationError
 
 
 class TestTranscriptExtractor:

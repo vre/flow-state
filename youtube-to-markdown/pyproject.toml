@@ -1,0 +1,16 @@
+[project]
+name = "youtube-to-markdown"
+version = "2.3.1"
+description = "Claude Code skill for YouTube video extraction"
+requires-python = ">=3.10"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-cov>=7.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,21 +1,24 @@
-#!/usr/bin/env python3
 """
-Extracts YouTube video data: metadata, description, and chapters
-Usage: extract_data.py <YOUTUBE_URL> <OUTPUT_DIR>
-Output: Creates youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
+YouTube data extraction library.
 """
 
 import json
-import sys
-from pathlib import Path
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
-from shared_types import (
-    FileSystem, CommandRunner, RealFileSystem, RealCommandRunner,
-    VideoMetadata, extract_video_id, format_upload_date, format_subscribers,
-    format_duration, format_count, CommandNotFoundError, FileOperationError
+from lib.shared_types import (
+    FileSystem,
+    CommandRunner,
+    RealFileSystem,
+    RealCommandRunner,
+    VideoMetadata,
+    extract_video_id,
+    format_upload_date,
+    format_subscribers,
+    format_duration,
+    format_count,
+    CommandNotFoundError,
+    FileOperationError,
 )
 
 
@@ -286,30 +289,3 @@ class YouTubeDataExtractor:
         chapters_file = self.create_chapters_file(metadata, base_name, output_dir)
 
         return metadata_file, description_file, chapters_file
-
-
-def main() -> None:
-    """CLI entry point."""
-    # Parse arguments
-    if len(sys.argv) != 3:
-        print("Usage: extract_data.py <YOUTUBE_URL> <OUTPUT_DIR>", file=sys.stderr)
-        sys.exit(1)
-
-    video_url = sys.argv[1]
-    output_dir = Path(sys.argv[2])
-
-    # Validate arguments
-    if not video_url:
-        print("ERROR: No YouTube URL provided", file=sys.stderr)
-        sys.exit(1)
-
-    try:
-        extractor = YouTubeDataExtractor()
-        extractor.extract_all(video_url, output_dir)
-    except Exception as e:
-        print(f"ERROR: {str(e)}", file=sys.stderr)
-        sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

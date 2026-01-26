@@ -3,7 +3,7 @@
 import pytest
 from pathlib import Path
 from datetime import datetime
-from file_ops import FileOps
+from lib.file_ops import FileOps
 
 
 class TestBackup:
@@ -40,7 +40,7 @@ class TestBackup:
 
     def test_backup_nonexistent_file_raises_error(self, mock_fs):
         """Test backup of nonexistent file raises FileOperationError."""
-        from shared_types import FileOperationError
+        from lib.shared_types import FileOperationError
 
         file_ops = FileOps(fs=mock_fs)
 

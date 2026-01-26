@@ -1,7 +1,7 @@
 """Tests for shared types and utilities."""
 
 import pytest
-from shared_types import (
+from lib.shared_types import (
     extract_video_id, format_upload_date, format_subscribers,
     format_duration, clean_title_for_filename,
     VideoIdExtractionError

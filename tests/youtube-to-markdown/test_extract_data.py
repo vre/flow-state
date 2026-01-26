@@ -3,8 +3,8 @@
 import pytest
 import json
 from pathlib import Path
-from extract_data import YouTubeDataExtractor
-from shared_types import CommandNotFoundError, FileOperationError
+from lib.youtube_extractor import YouTubeDataExtractor
+from lib.shared_types import CommandNotFoundError, FileOperationError
 
 
 class TestYouTubeDataExtractor:

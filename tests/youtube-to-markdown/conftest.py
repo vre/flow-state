@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Any
 import pytest
 
-# Add youtube-to-markdown directory to Python path for imports
+# Add youtube-to-markdown directory to Python path for lib imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "youtube-to-markdown"))
 
-from shared_types import CommandResult
+from lib.shared_types import CommandResult
 
 
 class MockFileSystem:
