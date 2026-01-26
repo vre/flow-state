@@ -84,6 +84,10 @@ subskills/           # LLM instructions for Claude
 SKILL.md             # Main skill definition
 ```
 
+## Attribution
+
+Youtube transcription skill is based on [tapestry-skills-for-claude-code](https://github.com/michalparkola/tapestry-skills-for-claude-code/blob/main/youtube-transcript/SKILL.md) youtube-transcript skill by Michał Parkoła.
+
 ## License
 
 MIT, See [LICENSE](LICENSE) for more information.
