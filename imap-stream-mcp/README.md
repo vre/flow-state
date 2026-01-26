@@ -13,15 +13,16 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **list** - List messages in any folder
 - **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text
-- **draft** - Create/modify draft replies
+- **draft** - Create/modify draft replies (adding attachments to drafts not supported)
 - **folders** - List available folders
 - **accounts** - List configured email accounts
-- **attachment** - Download attachments
+- **attachment** - Download attachments to temp directory (`{tempdir}/streammail/`)
+- **cleanup** - Remove downloaded attachments (auto-cleared on reboot on macOS/Linux, persists on Windows until user cleans)
 - **help** - Built-in documentation
 
-## Installation
+## Installation for Claude Code
 
-### Plugin
+### As a Plugin
 
 ```bash
 /plugin marketplace add vre/flow-state
@@ -30,7 +31,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 
 Then configure credentials (see below).
 
-### Manual
+### Manual Installation
 
 ```bash
 git clone https://github.com/vre/flow-state.git
@@ -38,6 +39,7 @@ cd flow-state/imap-stream-mcp
 uv sync
 claude mcp add imap-stream -- uv --directory $(pwd) run imap-stream
 ```
+(you can define the [installation scope](https://code.claude.com/docs/en/mcp#mcp-installation-scopes) with "claude mcp add --scope local|user|project ...")
 
 ## Configuration
 
@@ -63,7 +65,7 @@ Add to your MCP config:
 }
 ```
 
-## Claude Desktop (Manual)
+## Installation for Claude Desktop (Manual)
 
 Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -78,7 +80,33 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-## Usage
+## Workflow: Reply to Email
+
+1. **List todays messages from INBOX** to find the email one you want
+2. **Read the message from XXX** to load the content into context
+3. **I would like to answer...** create reply with Claude's help
+4. **Send via email client** → Drafts → Review and send
+
+## Security
+
+- **Read-only for mailboxes** - Only creates/modifies drafts in Drafts folder; no delete, move, or modify operations on messages in INBOX, Sent, or other folders
+- **Content safety** - Email content encapsulated to prevent prompt injection / context poisoning
+- **Keychain storage** - Credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
+- **No credential leaks** - Password fetched by script only when IMAP connection opens, LLM gets the details
+- **Encrypted connection** - SSL/TLS required
+
+## Project Structure
+
+```
+imap_stream_mcp.py   # MCP server entry point, action dispatcher
+imap_client.py       # IMAP operations (list, read, search, draft)
+markdown_utils.py    # Markdown → HTML conversion for drafts
+setup.py             # Credential configuration utility
+debug_imap.py        # Connection troubleshooting utility
+.mcp.json            # MCP server configuration for plugin install
+```
+
+## MCP API - Usage
 
 ```
 # List messages
@@ -113,7 +141,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {action: "help", payload: "draft"}
 ```
 
-## Multi-Account Usage
+## MCP API - Multi-Account Usage
 
 ```
 # Use default account
@@ -123,20 +151,6 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 {action: "list", folder: "INBOX", account: "work"}
 ```
 
-## Workflow: Reply to Email
-
-1. **List messages** to find the one you want
-2. **Read the message** to see content and Message-ID
-3. **Create draft** with Claude's help
-4. **Open email client** → Drafts → Review and send
-
-## Security
-
-- Credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
-- Password fetched only when IMAP connection opens
-- Password never in logs or output
-- SSL/TLS connection
-
 ## License
 
-MIT
+MIT, See [LICENSE](LICENSE) for more information.

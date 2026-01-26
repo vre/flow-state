@@ -4,31 +4,36 @@ YouTube extraction and email integration.
 
 ## Skills
 
+**Skip the Video - Extract the Knowledge.**
+
 **Youtube to Markdown** - Transform streaming content into storagable knowledge as Markdown.
 - ✨ **TL;DR + structured summary**: Core insights with four content specific summarization formats
 - 💎 **Hidden Gems**: Collects insights that normal summarization loses
+- 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, or Comments only.
 - 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings into own file
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
-- 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, Comments only.
 
-**Skip the Video - Get the Knowledge.**
-
-**Markdown ready**: Drop into Obsidian, Notion, or any note-taking system
+Drop into Obsidian, Notion, or any note-taking system.
 
 ## MCP Servers
 
-**IMAP Stream MCP** - Lightweight email client.
+**Your Inbox, Minimal Context.**
+
+**IMAP Stream MCP** - Lightweight IMAP email client.
 - 🪶 **~500 tokens** vs typical 15,000+ MCP servers - single tool with action dispatcher
 - 📧 **Read & search**: List, read, and search IMAP folders
 - ✍️ **Draft replies**: Markdown converted to HTML + plain text alternatives
 - 📎 **Attachments**: Download for further processing
 - 🔐 **Secure**: Credentials in OS keychain (or env variables for Docker/CI)
-- 🏢 **Multi-account**: Multiple email account support with named switching
+- 🛡️ **Content Safety**: Encapsulates email content to avoid context poisoning
+- 🏢 **Multi-account**: Multiple account support with named switching
+
+Low-overhead email access. No destructive operations.
 
 ## Quick Start
 
-**Installation:**
+### Installation
 
 Add the marketplace and install:
 ```bash
@@ -38,15 +43,17 @@ Add the marketplace and install:
 /plugin install imap-stream-mcp@flow-state
 ```
 
-Additionally configure IMAP (first use will show setup instructions).
+### Usage
 
-**Usage:**
-
-```
-extract https://www.youtube.com/watch?v=dQw4w9WgXcQ
-
+**Youtube-to-Markdown:**
+In your Claude Code:
+`extract https://www.youtube.com/watch?v=dQw4w9WgXcQ`
 ('get', 'fetch', 'transcript', 'subtitles', 'captions', etc. works too)
-```
+
+**IMAP-Stream-MCP:**
+In your Claude Code:
+`what email accounts I have?`
+As you don't have any configured yet, it will show you how to set up.
 
 ## Examples
 
@@ -62,29 +69,14 @@ All examples are CC-licensed videos with full summary and comment analysis.
 | Interview | [Chris Rock on starting standup](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20(M6rBiCnntng).md) | [transcript](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20-%20transcript%20(M6rBiCnntng).md) · [video](https://www.youtube.com/watch?v=M6rBiCnntng) |
 | Interview | [Interview with Senior JS Developer](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20(Uo3cL4nrGOk).md) | [transcript](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20transcript%20(Uo3cL4nrGOk).md) · [comments](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20comments%20(Uo3cL4nrGOk).md) · [video](https://www.youtube.com/watch?v=Uo3cL4nrGOk) |
 
-## Available Skills
+## Documentation
 
-### youtube-to-markdown
-
-Transform YouTube videos into storagable knowledge. Get TL;DR, content-specific summary, separate file with cleaned transcript broken into paragraphs with topic headings and timestamp links. Continues analyzing comments to bring the audience view to the content.
-
-- **Category**: Media Extraction
-- **Dependencies**: yt-dlp, Python 3
-- **Output options**: First a markdown file with metadata and summary with insights from comments. Second a markdown file with cleaned transcript with chapters and timestamp links. Third a markdown file with extracted comments.
-
-## Available MCP Servers
-
-### imap-stream-mcp
-
-Lightweight IMAP email client following Jesse Vincent's MCP design philosophy. Single `use_mail` tool with action dispatcher keeps context usage minimal (~500 tokens vs 15,000+). Self-documenting via built-in `help` action.
-
-- **Category**: Email Integration
-- **Dependencies**: Python 3, keyring
-- **Actions**: list, read, search, draft, folders, accounts, attachment, cleanup, help
+- [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
+- [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
 
 ## The Backstory
 
-I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found a youtube extractor skill to build upon.
+I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found a youtube extractor skill to build upon. Four months later I added IMAP email access as well, as I wanted to have email reading and drafting capabilities in Claude Code in lightweight manner.
 
 Many ideas for the future - maybe knowledge work, context management, and productivity tools for Claude Code and beyond. Let's see where this goes and is there time for it..
 

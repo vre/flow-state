@@ -8,15 +8,17 @@ Tests are organized in `tests/` directory by project type.
 
 ```
 tests/youtube-to-markdown/
-├── test_apply_paragraph_breaks.py (20 tests)
-├── test_deduplicate_vtt.py (10 tests)
-├── test_extract_comments.py (31 tests)
-├── test_extract_data.py (7 tests)
-├── test_extract_transcript.py (10 tests)
+├── test_assembler.py (32 tests)
+├── test_comment_extractor.py (31 tests)
+├── test_comment_filter.py (18 tests)
 ├── test_file_ops.py (9 tests)
-├── test_finalize.py (32 tests)
-├── test_prefilter_comments.py (18 tests)
-└── test_shared_types.py (17 tests)
+├── test_paragraph_breaker.py (20 tests)
+├── test_prepare_update.py (28 tests)
+├── test_shared_types.py (17 tests)
+├── test_transcript_extractor.py (10 tests)
+├── test_update_metadata.py (7 tests)
+├── test_vtt_deduplicator.py (10 tests)
+└── test_youtube_extractor.py (7 tests)
 ```
 
 ### MCP Servers

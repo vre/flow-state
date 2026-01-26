@@ -2,15 +2,21 @@
 
 Transform YouTube videos into storable knowledge as Markdown.
 
-## Features
-
 - **TL;DR + structured summary** - Core insights with content-specific summarization
 - **Hidden Gems** - Insights that normal summarization loses
-- **Cleaned transcript** - Chapters and paragraphs with topic headings
-- **Timestamp links** - Jump back to specific moments in the video
-- **Comment analysis** - Curated comments cross-analyzed against summary
+- **Modular output** - Choose from summary, transcript, comments, or all
 
-## Installation
+## Features
+
+- **Summary** - TL;DR + structured summary with four content-specific formats (Tips, Interview, Educational, Tutorial)
+- **Transcript** - Cleaned and formatted with chapters, paragraphs, and topic headings
+- **Timestamp links** - Jump back to specific moments in the original video
+- **Comment analysis** - Curated comments cross-analyzed against video content
+- **Update mode** - Refresh existing extractions when video metadata changes
+
+## Installation for Claude Code
+
+### As a Plugin
 
 ```bash
 /plugin marketplace add vre/flow-state
@@ -19,7 +25,7 @@ Transform YouTube videos into storable knowledge as Markdown.
 
 ### Dependencies
 
-- Python 3
+- Python 3.10+
 - yt-dlp (`brew install yt-dlp` or `pip install yt-dlp`)
 
 ## Usage
@@ -30,9 +36,14 @@ extract https://www.youtube.com/watch?v=VIDEO_ID
 
 Also works: `get`, `fetch`, `transcript`, `subtitles`, `captions`
 
-## Output Options
+## Workflow: Extract Video
 
-When invoked, you choose what to extract:
+1. **Provide YouTube URL** - paste the video link
+2. **Choose output** - Summary only, Transcript only, Comments only, Summary+Comments, or Full
+3. **Wait for extraction** - Claude processes video data and generates markdown
+4. **Get files** - Drop into Obsidian, Notion, or any note-taking system
+
+## Output Options
 
 | Option | Output |
 |--------|--------|
@@ -44,10 +55,31 @@ When invoked, you choose what to extract:
 
 ## Output Files
 
-- `youtube_{video_id}.md` - Summary with metadata
-- `youtube_{video_id}_transcript.md` - Cleaned transcript with timestamps
-- `youtube_{video_id}_comments.md` - Curated comments
+- `youtube - {title} ({video_id}).md` - Summary with metadata
+- `youtube - {title} - transcript ({video_id}).md` - Cleaned transcript with timestamps
+- `youtube - {title} - comments ({video_id}).md` - Curated comments
+
+## Project Structure
+
+```
+scripts/             # CLI entry points (numbered by pipeline order)
+  10_extract_metadata.py
+  11_extract_transcript.py
+  13_extract_comments.py
+  20_check_existing.py
+  21_prepare_update.py
+  30_clean_vtt.py
+  31_format_transcript.py
+  32_filter_comments.py
+  40_backup.py
+  41_update_metadata.py
+  50_assemble.py
+lib/                 # Importable library modules
+templates/           # Markdown output templates
+subskills/           # LLM instructions for Claude
+SKILL.md             # Main skill definition
+```
 
 ## License
 
-MIT
+MIT, See [LICENSE](LICENSE) for more information.
