@@ -26,8 +26,6 @@
 - 🛡️ **Content Safety**: Encapsulates email content to avoid context poisoning
 - 🏢 **Multi-account**: Multiple account support with named switching
 
-
-
 ## Quick Start
 
 ### Installation
@@ -44,12 +42,16 @@ Add the marketplace and install:
 
 **Youtube-to-Markdown:**
 In your Claude Code:
-```extract https://www.youtube.com/watch?v=dQw4w9WgXcQ```
+```
+extract https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
 ('get', 'fetch', 'transcript', 'subtitles', 'captions', etc. works too)
 
 **IMAP-Stream-MCP:**
 In your Claude Code:
-```what email accounts I have?```
+```
+what email accounts I have?
+```
 As you don't have any configured yet, it will show you how to set up.
 
 ## Documentation
