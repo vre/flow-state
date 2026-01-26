@@ -1,12 +1,11 @@
 # Flow State - a Claude Plugin Marketplace
 
-YouTube extraction and email integration.
+## **Youtube to Markdown Skill**
 
-## Skills
+> **Skip the Video - Extract the Knowledge.**
+> Transform streaming content into storagable knowledge as Markdown.
+> Drop into Obsidian, Notion, or any note-taking system.
 
-**Skip the Video - Extract the Knowledge.**
-
-**Youtube to Markdown** - Transform streaming content into storagable knowledge as Markdown.
 - ✨ **TL;DR + structured summary**: Core insights with four content specific summarization formats
 - 💎 **Hidden Gems**: Collects insights that normal summarization loses
 - 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, or Comments only.
@@ -14,13 +13,11 @@ YouTube extraction and email integration.
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
 
-Drop into Obsidian, Notion, or any note-taking system.
+## **IMAP Stream MCP Server** 
 
-## MCP Servers
+> **Your Inbox, Minimal Context.**
+> Lightweight IMAP email client. No destructive operations.
 
-**Your Inbox, Minimal Context.**
-
-**IMAP Stream MCP** - Lightweight IMAP email client.
 - 🪶 **~500 tokens** vs typical 15,000+ MCP servers - single tool with action dispatcher
 - 📧 **Read & search**: List, read, and search IMAP folders
 - ✍️ **Draft replies**: Markdown converted to HTML + plain text alternatives
@@ -29,7 +26,7 @@ Drop into Obsidian, Notion, or any note-taking system.
 - 🛡️ **Content Safety**: Encapsulates email content to avoid context poisoning
 - 🏢 **Multi-account**: Multiple account support with named switching
 
-Low-overhead email access. No destructive operations.
+
 
 ## Quick Start
 
@@ -47,15 +44,20 @@ Add the marketplace and install:
 
 **Youtube-to-Markdown:**
 In your Claude Code:
-`extract https://www.youtube.com/watch?v=dQw4w9WgXcQ`
+```extract https://www.youtube.com/watch?v=dQw4w9WgXcQ```
 ('get', 'fetch', 'transcript', 'subtitles', 'captions', etc. works too)
 
 **IMAP-Stream-MCP:**
 In your Claude Code:
-`what email accounts I have?`
+```what email accounts I have?```
 As you don't have any configured yet, it will show you how to set up.
 
-## Examples
+## Documentation
+
+- [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
+- [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
+
+## Examples of Youtube to Markdown Output
 
 All examples are CC-licensed videos with full summary and comment analysis.
 
@@ -69,11 +71,6 @@ All examples are CC-licensed videos with full summary and comment analysis.
 | Interview | [Chris Rock on starting standup](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20(M6rBiCnntng).md) | [transcript](examples/youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20-%20transcript%20(M6rBiCnntng).md) · [video](https://www.youtube.com/watch?v=M6rBiCnntng) |
 | Interview | [Interview with Senior JS Developer](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20(Uo3cL4nrGOk).md) | [transcript](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20transcript%20(Uo3cL4nrGOk).md) · [comments](examples/youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20comments%20(Uo3cL4nrGOk).md) · [video](https://www.youtube.com/watch?v=Uo3cL4nrGOk) |
 
-## Documentation
-
-- [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
-- [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
-
 ## The Backstory
 
 I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found one youtube skill to build upon. Four months later I added IMAP email access as well, as I wanted to have email reading and drafting capabilities in Claude Code in lightweight manner.
@@ -81,8 +78,7 @@ I have been thinking a while to extract YouTube transcripts into Markdown format
 Many ideas for the future - maybe knowledge work, context management, and productivity tools for Claude Code and beyond. Let's see where this goes and is there time for it..
 
 ## Development
-
-See [Development](docs/Development.md)
+See [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## License
 
