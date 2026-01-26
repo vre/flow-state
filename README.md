@@ -76,17 +76,13 @@ All examples are CC-licensed videos with full summary and comment analysis.
 
 ## The Backstory
 
-I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found a youtube extractor skill to build upon. Four months later I added IMAP email access as well, as I wanted to have email reading and drafting capabilities in Claude Code in lightweight manner.
+I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found one youtube skill to build upon. Four months later I added IMAP email access as well, as I wanted to have email reading and drafting capabilities in Claude Code in lightweight manner.
 
 Many ideas for the future - maybe knowledge work, context management, and productivity tools for Claude Code and beyond. Let's see where this goes and is there time for it..
 
 ## Development
 
 See [Development](docs/Development.md)
-
-## Attribution
-
-Youtube transcript download based on [tapestry-skills-for-claude-code](https://github.com/michalparkola/tapestry-skills-for-claude-code) youtube-transcript skill by Michał Parkoła.
 
 ## License
 

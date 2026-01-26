@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.3.2] - 2026-01-26
+
+### Security
+- Prompt injection defense: user-generated content (descriptions, comments, transcripts) wrapped in `<untrusted_xxx_content>` XML tags with warnings
+- Injection patterns escaped (tag closing attempts, legacy delimiters)
+- New lib/content_safety.py module
+
+### Bug Fixes
+- check_existing.py now detects intermediate files from incomplete extractions
+- Returns `has_intermediate: true` when partial extraction files exist
+
 ## [2.3.1] - 2026-01-26
 
 ### Project Structure Reorganization
