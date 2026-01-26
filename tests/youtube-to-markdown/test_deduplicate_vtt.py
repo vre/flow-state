@@ -2,8 +2,8 @@
 
 import pytest
 from pathlib import Path
-from deduplicate_vtt import VTTDeduplicator
-from shared_types import FileOperationError
+from lib.vtt_deduplicator import VTTDeduplicator
+from lib.shared_types import FileOperationError
 
 
 class TestVTTDeduplicator:

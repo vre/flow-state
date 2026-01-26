@@ -70,7 +70,7 @@ Code Organization:
 Keep Documentation in Sync:
 - CHANGELOG.md and TODO.md when features added or changed
 - TESTING.md when test instructions change
-- .claude-plugin/marketplace.json plugin descriptions and version numbers
+- pyproject.toml and .claude-plugin/marketplace.json version numbers
 - README.md when skill description and marketing speech should be updated
 
 ## MCP Development Guidelines

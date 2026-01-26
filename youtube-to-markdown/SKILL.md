@@ -17,14 +17,14 @@ Multiple videos: Process one video at a time, sequentially. Do not run parallel 
 ## Step 0: Check if extracted before
 
 ```bash
-python3 ./check_existing.py "<YOUTUBE_URL>" "<output_directory>"
+python3 ./scripts/20_check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 ```
 
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
 
 If `exists: false`: Continue to Step 1.
 
-If `exists: true`: Read and follow `./modules/update_flow.md`.
+If `exists: true`: Read and follow `./subskills/update_flow.md`.
 
 ## Step 1: Choose output
 
@@ -41,7 +41,7 @@ AskUserQuestion:
 
 ## Step 2: Execute modules
 
-Based on user's choice, read and follow each module instruction in `./modules/{file}`. "|" marks possibility to run concurrently.
+Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" marks possibility to run concurrently.
 
 - A: transcript_extract.md → transcript_summarize.md
 - B: transcript_extract.md → transcript_polish.md
@@ -52,7 +52,7 @@ Based on user's choice, read and follow each module instruction in `./modules/{f
 ## Step 3: Finalize
 
 ```bash
-python3 finalize.py [flag] "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/50_assemble.py [flag] "${BASE_NAME}" "<output_directory>"
 ```
 
 Flags: A=`--summary-only`, B=`--transcript-only`, C=`--comments-only`, D=`--summary-comments`, E=(none)

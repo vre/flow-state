@@ -2,8 +2,8 @@
 
 import pytest
 from pathlib import Path
-from apply_paragraph_breaks import ParagraphBreaker, ParsedLine, extract_video_id_from_path
-from shared_types import FileOperationError
+from lib.paragraph_breaker import ParagraphBreaker, ParsedLine, extract_video_id_from_path
+from lib.shared_types import FileOperationError
 
 
 class TestParagraphBreaker:

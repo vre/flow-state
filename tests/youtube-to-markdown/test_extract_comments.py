@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from extract_comments import (
+from lib.comment_extractor import (
     CommentExtractor,
     SubprocessRunner,
     build_comment_hierarchy,
@@ -15,7 +15,7 @@ from extract_comments import (
     generate_comments_markdown,
     parse_video_data,
 )
-from shared_types import (
+from lib.shared_types import (
     Comment,
     CommandRunner,
     FileSystem,

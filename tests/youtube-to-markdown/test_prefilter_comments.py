@@ -1,7 +1,7 @@
 """Tests for prefilter_comments.py."""
 
 import pytest
-from prefilter_comments import (
+from lib.comment_filter import (
     parse_comments,
     filter_comments,
     format_comments,

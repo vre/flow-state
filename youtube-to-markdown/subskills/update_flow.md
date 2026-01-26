@@ -5,7 +5,7 @@ Existing extraction found. Analyze and offer update options.
 ## Step U1: Analyze
 
 ```bash
-python3 ./prepare_update.py "<YOUTUBE_URL>" "<output_directory>"
+python3 ./scripts/21_prepare_update.py "<YOUTUBE_URL>" "<output_directory>"
 ```
 
 If `video_available: false`: Inform user "Video no longer available on YouTube", STOP.
@@ -44,13 +44,13 @@ AskUserQuestion:
 
 **If "Update metadata only":**
 ```bash
-python3 ./update_metadata.py "<summary_path>" "<output_directory>/${BASE_NAME}_metadata.md"
+python3 ./scripts/41_update_metadata.py "<summary_path>" "<output_directory>/${BASE_NAME}_metadata.md"
 ```
 DONE - inform user metadata updated.
 
 **If "Accept" or "Choose different":**
 ```bash
-python3 ./file_ops.py backup <file>  # for each file in files_to_backup
+python3 ./scripts/40_backup.py backup <file>  # for each file in files_to_backup
 ```
 Return to main SKILL.md Step 1.
 

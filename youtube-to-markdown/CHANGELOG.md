@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.3.1] - 2026-01-26
+
+### Project Structure Reorganization
+- `scripts/` - CLI wrappers with numbered prefixes (10-59) indicating pipeline order
+- `lib/` - Library modules (importable code)
+- `templates/` - Markdown templates with cleaner names
+- `subskills/` - LLM instructions (formerly modules/)
+
+### Naming Convention
+- 10-19: Data extraction (extract)
+- 20-29: Existing file check/update analysis (check/prepare)
+- 30-39: Data processing (clean/format/filter)
+- 40-49: File management (backup/update)
+- 50-59: Final assembly (assemble)
+
 ## [2.3.0] - 2026-01-26
 
 ### Update Mode Redesign

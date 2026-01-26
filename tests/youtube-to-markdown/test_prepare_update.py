@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from prepare_update import (
+from lib.prepare_update import (
     parse_count,
     compare_counts,
     compare_strings,
@@ -172,6 +172,7 @@ class TestGenerateRecommendation:
             "summary_v1": False,
             "comments_v1": False,
             "summary_file": "/path/summary.md",
+            "comment_file": "/path/comments.md",
         }
         changes = {
             "views": {"old": 1000, "new": 1500, "changed": True, "significant": False},
