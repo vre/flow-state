@@ -2,7 +2,7 @@
 
 ## Future Ideas
 
-- [ ] Cache - Folder listing/message caching
+- [x] Cache - Folder listing/message caching (v0.4.0)
 - [ ] Search operators - Complex criteria (AND/OR)
 - [x] Flag management - Mark as read/important (v0.3.0)
 - [ ] Safe Moving messages from folder to another

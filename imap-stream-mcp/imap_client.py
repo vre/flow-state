@@ -148,7 +148,10 @@ def get_default_account() -> str | None:
 
 @contextmanager
 def imap_connection():
-    """Context manager for IMAP connection.
+    """Context manager for standalone IMAP connection.
+
+    NOTE: Only used by test_connection() utility. All other operations
+    should use session.connection_ctx() for connection pooling and caching.
 
     Yields:
         Connected IMAPClient instance
@@ -252,91 +255,50 @@ def parse_folder_path(imap_url: str) -> str:
     raise IMAPError(f"Invalid IMAP URL format: {imap_url}")
 
 
-def list_folders() -> list[dict]:
+def list_folders(account: str = None) -> list[dict]:
     """List all available IMAP folders.
+
+    Args:
+        account: Account name. None uses default.
 
     Returns:
         List of folder info dicts with 'name' and 'flags'
     """
-    with imap_connection() as client:
-        folders = client.list_folders()
-        return [
-            {
-                "name": to_str(folder_name),
-                "flags": [to_str(f) for f in flags]
-            }
-            for flags, delimiter, folder_name in folders
-        ]
+    from session import get_session
+    session = get_session(account)
+    return session.get_folders()
 
 
-def list_messages(folder: str, limit: int = 20) -> list[dict]:
+def list_messages(folder: str, limit: int = 20, account: str = None) -> list[dict]:
     """List messages in a folder.
 
     Args:
         folder: Folder path (e.g., 'INBOX' or 'INBOX/Subfolder')
         limit: Maximum messages to return (newest first)
+        account: Account name. None uses default.
 
     Returns:
         List of message summaries
     """
-    with imap_connection() as client:
-        # Select folder
-        try:
-            client.select_folder(folder, readonly=True)
-        except Exception as e:
-            raise IMAPError(f"Cannot open folder '{folder}': {e}")
-
-        # Search for all messages, get newest
-        message_ids = client.search(['ALL'])
-
-        if not message_ids:
-            return []
-
-        # Get newest messages (last N)
-        selected_ids = message_ids[-limit:] if len(message_ids) > limit else message_ids
-        selected_ids = list(reversed(selected_ids))  # Newest first
-
-        # Fetch headers
-        messages = client.fetch(selected_ids, ['ENVELOPE', 'FLAGS', 'RFC822.SIZE'])
-
-        results = []
-        for msg_id, data in messages.items():
-            envelope = data[b'ENVELOPE']
-
-            # Parse sender
-            from_addr = format_address(envelope.from_[0]) if envelope.from_ else ""
-
-            # Parse date
-            date_str = ""
-            if envelope.date:
-                try:
-                    date_str = envelope.date.strftime("%Y-%m-%d %H:%M")
-                except Exception:
-                    date_str = str(envelope.date)
-
-            results.append({
-                "id": msg_id,
-                "subject": decode_header_value(envelope.subject) if envelope.subject else "(no subject)",
-                "from": from_addr,
-                "date": date_str,
-                "size": data.get(b'RFC822.SIZE', 0),
-                "flags": [normalize_flag_output(to_str(f)) for f in data.get(b'FLAGS', [])]
-            })
-
-        return results
+    from session import get_session
+    session = get_session(account)
+    return session.get_messages(folder, limit)
 
 
-def read_message(folder: str, message_id: int) -> dict:
+def read_message(folder: str, message_id: int, account: str = None) -> dict:
     """Read a specific message.
 
     Args:
         folder: Folder path
         message_id: Message ID (UID)
+        account: Account name. None uses default.
 
     Returns:
         Full message data including body
     """
-    with imap_connection() as client:
+    from session import get_session
+    session = get_session(account)
+    with session.connection_ctx() as client:
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
@@ -407,18 +369,21 @@ def read_message(folder: str, message_id: int) -> dict:
         }
 
 
-def download_attachment(folder: str, message_id: int, attachment_index: int) -> dict:
+def download_attachment(folder: str, message_id: int, attachment_index: int, account: str = None) -> dict:
     """Download an attachment from a message.
 
     Args:
         folder: Folder path
         message_id: Message ID (UID)
         attachment_index: Zero-based index of the attachment
+        account: Account name. None uses default.
 
     Returns:
         Dict with saved_to path, content_type, size, filename
     """
-    with imap_connection() as client:
+    from session import get_session
+    session = get_session(account)
+    with session.connection_ctx() as client:
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
@@ -488,7 +453,7 @@ def cleanup_attachments() -> dict:
     return {"deleted": deleted, "freed_bytes": freed_bytes}
 
 
-def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
+def search_messages(folder: str, query: str, limit: int = 20, account: str = None) -> list[dict]:
     """Search messages in a folder.
 
     Args:
@@ -500,11 +465,14 @@ def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
             - since:YYYY-MM-DD
             - before:YYYY-MM-DD
         limit: Maximum results
+        account: Account name. None uses default.
 
     Returns:
         List of matching message summaries
     """
-    with imap_connection() as client:
+    from session import get_session
+    session = get_session(account)
+    with session.connection_ctx() as client:
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
@@ -561,7 +529,8 @@ def search_messages(folder: str, query: str, limit: int = 20) -> list[dict]:
 def create_draft(folder: str, to: str, subject: str, body: str,
                  in_reply_to: Optional[str] = None,
                  cc: Optional[str] = None,
-                 html: Optional[str] = None) -> dict:
+                 html: Optional[str] = None,
+                 account: str = None) -> dict:
     """Create a draft message in IMAP Drafts folder.
 
     Args:
@@ -572,11 +541,14 @@ def create_draft(folder: str, to: str, subject: str, body: str,
         in_reply_to: Message-ID to reply to
         cc: CC addresses (comma-separated)
         html: HTML body (if provided, creates multipart/alternative)
+        account: Account name. None uses default.
 
     Returns:
         Info about created draft
     """
-    with imap_connection() as client:
+    from session import get_session
+    session = get_session(account)
+    with session.connection_ctx() as client:
         # Build email message
         msg = email.message.EmailMessage()
 
@@ -631,6 +603,10 @@ def create_draft(folder: str, to: str, subject: str, body: str,
             flags=[b'\\Draft', b'\\Seen']
         )
 
+        # Invalidate cache for drafts folder
+        from session import invalidate_message_cache
+        invalidate_message_cache(session.account, drafts_folder)
+
         return {
             "status": "created",
             "folder": drafts_folder,
@@ -644,7 +620,8 @@ def modify_draft(folder: str, message_id: int, body: str,
                  subject: Optional[str] = None,
                  to: Optional[str] = None,
                  cc: Optional[str] = None,
-                 html: Optional[str] = None) -> dict:
+                 html: Optional[str] = None,
+                 account: str = None) -> dict:
     """Modify an existing draft message.
 
     Reads the original draft, preserves threading info (In-Reply-To, References),
@@ -658,11 +635,14 @@ def modify_draft(folder: str, message_id: int, body: str,
         to: New recipient (optional, keeps original if not provided)
         cc: New CC (optional, keeps original if not provided)
         html: HTML body (if provided, creates multipart/alternative)
+        account: Account name. None uses default.
 
     Returns:
         Info about the modified draft
     """
-    with imap_connection() as client:
+    from session import get_session
+    session = get_session(account)
+    with session.connection_ctx() as client:
         # Select folder
         try:
             client.select_folder(folder, readonly=False)
@@ -751,6 +731,12 @@ def modify_draft(folder: str, message_id: int, body: str,
             flags=[b'\\Draft', b'\\Seen']
         )
 
+        # Invalidate cache for affected folders
+        from session import invalidate_message_cache
+        invalidate_message_cache(session.account, folder)  # Original folder
+        if drafts_folder != folder:
+            invalidate_message_cache(session.account, drafts_folder)
+
         return {
             "status": "modified",
             "folder": drafts_folder,
@@ -762,7 +748,8 @@ def modify_draft(folder: str, message_id: int, body: str,
 
 
 def modify_flags(folder: str, message_ids: list[int],
-                 add_flags: list[str], remove_flags: list[str]) -> dict:
+                 add_flags: list[str], remove_flags: list[str],
+                 account: str = None) -> dict:
     """Add or remove flags from messages.
 
     Args:
@@ -770,10 +757,14 @@ def modify_flags(folder: str, message_ids: list[int],
         message_ids: List of message IDs to modify
         add_flags: Flags to add (user format: 'Flagged', '$label1')
         remove_flags: Flags to remove
+        account: Account name. None uses default.
 
     Returns:
         Dict with modified count, flags_added, flags_removed, failed list
     """
+    from session import get_session
+    session = get_session(account)
+
     result = {
         "modified": 0,
         "flags_added": list(set(add_flags)),
@@ -784,7 +775,7 @@ def modify_flags(folder: str, message_ids: list[int],
     if not message_ids:
         return result
 
-    with imap_connection() as client:
+    with session.connection_ctx() as client:
         try:
             client.select_folder(folder, readonly=False)
         except Exception as e:
@@ -830,6 +821,16 @@ def modify_flags(folder: str, message_ids: list[int],
                         continue
 
                 result["modified"] += 1
+
+                # Update cache for successfully modified message
+                try:
+                    msg_data = client.fetch([msg_id], ['FLAGS'])
+                    if msg_id in msg_data:
+                        current_flags = [normalize_flag_output(to_str(f)) for f in msg_data[msg_id].get(b'FLAGS', [])]
+                        from session import update_cached_flags
+                        update_cached_flags(session.account, folder, msg_id, current_flags)
+                except Exception:
+                    pass  # Cache update failure is not critical
 
             except Exception as e:
                 result["failed"].append({

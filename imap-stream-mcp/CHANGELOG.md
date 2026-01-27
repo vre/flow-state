@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0] - 2026-01-27
+
+### Added
+- Connection keepalive (5 min idle timeout) reduces connection overhead
+- Folder list caching (persists until MCP shutdown)
+- Message list caching with IMAP metadata validation (UIDVALIDITY, UIDNEXT, EXISTS)
+- Cache automatically updated on flag operations
+- Cache invalidated on draft create/modify operations
+
 ## [0.3.0] - 2026-01-27
 
 ### Added
