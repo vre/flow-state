@@ -26,6 +26,7 @@ from imap_client import (
     modify_draft,
     IMAPError,
 )
+import session
 from conftest import MockIMAPClient, MockEnvelope, MockAddress
 
 
@@ -393,12 +394,14 @@ class TestParseFolderPath:
 class TestListFolders:
     """Tests for list_folders function."""
 
-    @patch('imap_client.imap_connection')
-    def test_list_folders_basic(self, mock_conn):
+    @patch('session._create_connection')
+    def test_list_folders_basic(self, mock_create):
         """Test basic folder listing."""
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        
+        # Reset session cache
+        session._sessions.clear()
 
         result = list_folders()
 
@@ -410,24 +413,24 @@ class TestListFolders:
 class TestListMessages:
     """Tests for list_messages function."""
 
-    @patch('imap_client.imap_connection')
-    def test_list_empty_folder(self, mock_conn):
+    @patch('session._create_connection')
+    def test_list_empty_folder(self, mock_create):
         """Test listing empty folder."""
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = list_messages("INBOX", limit=20)
 
         assert result == []
 
-    @patch('imap_client.imap_connection')
-    def test_list_messages_with_content(self, mock_conn, sample_envelope):
+    @patch('session._create_connection')
+    def test_list_messages_with_content(self, mock_create, sample_envelope):
         """Test listing folder with messages."""
         mock_client = MockIMAPClient()
         mock_client.add_message("INBOX", 1, sample_envelope)
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = list_messages("INBOX", limit=20)
 
@@ -435,13 +438,27 @@ class TestListMessages:
         assert result[0]["id"] == 1
         assert result[0]["subject"] == "Test Email Subject"
 
-    @patch('imap_client.imap_connection')
-    def test_list_messages_folder_not_found(self, mock_conn):
+    @patch('session._create_connection')
+    def test_list_messages_folder_not_found(self, mock_create):
         """Test listing non-existent folder."""
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
-
+        # Mock select_folder to raise when folder doesn't exist
+        # Wait, MockIMAPClient might not simulate this automatically?
+        # In the original test, it just works?
+        # IMAPClient usually raises if select fails.
+        # I need to ensure MockIMAPClient behaves correctly or I configure it.
+        # Original test didn't configure it.
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+        
+        # Configure mock to raise error for select_folder("NonExistent")
+        # Assuming MockIMAPClient implementation handles it, or we mock the method.
+        # But MockIMAPClient probably mimics 'INBOX' and 'Drafts' only.
+        
+        # If I look at the failure, it was connecting to REAL server.
+        # Now I am patching _create_connection, so it won't connect to real server.
+        # But MockIMAPClient needs to simulate failure.
+        
         with pytest.raises(IMAPError, match="Cannot open folder"):
             list_messages("NonExistent", limit=20)
 
@@ -449,18 +466,18 @@ class TestListMessages:
 class TestReadMessage:
     """Tests for read_message function."""
 
-    @patch('imap_client.imap_connection')
-    def test_read_message_not_found(self, mock_conn):
+    @patch('session._create_connection')
+    def test_read_message_not_found(self, mock_create):
         """Test reading non-existent message."""
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         with pytest.raises(IMAPError, match="not found"):
             read_message("INBOX", 999)
 
-    @patch('imap_client.imap_connection')
-    def test_read_message_basic(self, mock_conn, sample_envelope, sample_raw_email):
+    @patch('session._create_connection')
+    def test_read_message_basic(self, mock_create, sample_envelope, sample_raw_email):
         """Test reading a basic message."""
         mock_client = MockIMAPClient()
         mock_client.add_message(
@@ -468,8 +485,8 @@ class TestReadMessage:
             body_text="This is the email body.",
             raw_email=sample_raw_email
         )
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = read_message("INBOX", 1)
 
@@ -481,12 +498,12 @@ class TestReadMessage:
 class TestSearchMessages:
     """Tests for search_messages function."""
 
-    @patch('imap_client.imap_connection')
-    def test_search_no_results(self, mock_conn):
+    @patch('session._create_connection')
+    def test_search_no_results(self, mock_create):
         """Test search with no results."""
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = search_messages("INBOX", "nonexistent")
 
@@ -496,14 +513,14 @@ class TestSearchMessages:
 class TestCreateDraft:
     """Tests for create_draft function."""
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_create_draft_basic(self, mock_creds, mock_conn):
+    def test_create_draft_basic(self, mock_creds, mock_create):
         """Test creating a basic draft."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = create_draft(
             folder="INBOX",
@@ -524,14 +541,14 @@ class TestCreateDraft:
         assert b"Test Subject" in appended["message"]
         assert b"Test body content" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_create_draft_with_html(self, mock_creds, mock_conn):
+    def test_create_draft_with_html(self, mock_creds, mock_create):
         """Test creating a draft with HTML content."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = create_draft(
             folder="INBOX",
@@ -550,14 +567,14 @@ class TestCreateDraft:
         assert b"text/html" in appended["message"]
         assert b"<html>" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_create_draft_with_reply(self, mock_creds, mock_conn):
+    def test_create_draft_with_reply(self, mock_creds, mock_create):
         """Test creating a draft reply with In-Reply-To."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = create_draft(
             folder="INBOX",
@@ -574,14 +591,14 @@ class TestCreateDraft:
         assert b"In-Reply-To: <original@example.com>" in appended["message"]
         assert b"References: <original@example.com>" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_create_draft_with_cc(self, mock_creds, mock_conn):
+    def test_create_draft_with_cc(self, mock_creds, mock_create):
         """Test creating a draft with CC."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = create_draft(
             folder="INBOX",
@@ -600,21 +617,21 @@ class TestCreateDraft:
 class TestModifyDraft:
     """Tests for modify_draft function."""
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_modify_draft_not_found(self, mock_creds, mock_conn):
+    def test_modify_draft_not_found(self, mock_creds, mock_create):
         """Test modifying non-existent draft."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         with pytest.raises(IMAPError, match="not found"):
             modify_draft("Drafts", 999, body="New body")
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_modify_draft_basic(self, mock_creds, mock_conn):
+    def test_modify_draft_basic(self, mock_creds, mock_create):
         """Test modifying a draft with new body."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
@@ -634,8 +651,8 @@ Original body content.
         )
         mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
 
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = modify_draft("Drafts", 1, body="Updated body content")
 
@@ -651,9 +668,9 @@ Original body content.
         appended = mock_client.appended_messages[0]
         assert b"Updated body content" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_modify_draft_preserve_reply_threading(self, mock_creds, mock_conn):
+    def test_modify_draft_preserve_reply_threading(self, mock_creds, mock_create):
         """Test modifying draft preserves In-Reply-To and References."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
@@ -675,8 +692,8 @@ Reply body.
         )
         mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
 
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = modify_draft("Drafts", 1, body="Updated reply")
 
@@ -687,9 +704,9 @@ Reply body.
         assert b"In-Reply-To: <thread@example.com>" in appended["message"]
         assert b"References: <thread@example.com>" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_modify_draft_change_subject(self, mock_creds, mock_conn):
+    def test_modify_draft_change_subject(self, mock_creds, mock_create):
         """Test modifying draft with new subject."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
@@ -708,8 +725,8 @@ Body.
         )
         mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
 
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = modify_draft("Drafts", 1, body="New body", subject="New Subject")
 
@@ -718,9 +735,9 @@ Body.
         appended = mock_client.appended_messages[0]
         assert b"Subject: New Subject" in appended["message"]
 
-    @patch('imap_client.imap_connection')
+    @patch('session._create_connection')
     @patch('imap_client.get_credentials')
-    def test_modify_draft_with_html(self, mock_creds, mock_conn):
+    def test_modify_draft_with_html(self, mock_creds, mock_create):
         """Test modifying draft with HTML content."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
@@ -739,8 +756,8 @@ Plain text.
         )
         mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
 
-        mock_conn.return_value.__enter__ = MagicMock(return_value=mock_client)
-        mock_conn.return_value.__exit__ = MagicMock(return_value=False)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
 
         result = modify_draft(
             "Drafts", 1,

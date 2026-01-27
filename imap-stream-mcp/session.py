@@ -3,6 +3,7 @@
 Provides AccountSession for connection keepalive and folder/message caching.
 """
 import socket
+import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -51,7 +52,8 @@ def invalidate_message_cache(account: str, folder: str):
     """
     session = _sessions.get(account)
     if session:
-        session.message_cache.pop(folder, None)
+        with session.lock:
+            session.message_cache.pop(folder, None)
 
 
 def update_cached_flags(account: str, folder: str, message_id: int, new_flags: list[str]):
@@ -69,14 +71,15 @@ def update_cached_flags(account: str, folder: str, message_id: int, new_flags: l
     if not session:
         return
 
-    cache = session.message_cache.get(folder)
-    if not cache:
-        return
+    with session.lock:
+        cache = session.message_cache.get(folder)
+        if not cache:
+            return
 
-    for msg in cache.messages:
-        if msg.get("id") == message_id:
-            msg["flags"] = new_flags
-            break
+        for msg in cache.messages:
+            if msg.get("id") == message_id:
+                msg["flags"] = new_flags
+                break
 
 
 def _create_connection(account: str) -> IMAPClient:
@@ -113,6 +116,7 @@ class AccountSession:
     last_activity: float = 0.0
     folder_cache: Optional[FolderCache] = None
     message_cache: dict[str, MessageListCache] = field(default_factory=dict)
+    lock: threading.RLock = field(default_factory=threading.RLock)
 
     def get_connection(self) -> IMAPClient:
         """Get or create IMAP connection."""
@@ -128,7 +132,11 @@ class AccountSession:
                     self._close_connection()
 
         if not self.connection:
-            self.connection = _create_connection(self.account)
+            try:
+                self.connection = _create_connection(self.account)
+            except Exception:
+                self.connection = None
+                raise
 
         self.last_activity = now
         return self.connection
@@ -189,30 +197,39 @@ class AccountSession:
         """
         conn = self.get_connection()
 
-        # Get cheap metadata for validation
-        status = conn.folder_status(folder, ['UIDVALIDITY', 'UIDNEXT', 'MESSAGES'])
-        uidvalidity = status[b'UIDVALIDITY']
-        uidnext = status[b'UIDNEXT']
-        exists = status[b'MESSAGES']
+        # Use select_folder to get atomic state for validation
+        try:
+            select_res = conn.select_folder(folder, readonly=True)
+        except Exception as e:
+            from imap_client import IMAPError
+            raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
+        
+        # Parse metadata from select response
+        # IMAPClient usually returns dict with keys like b'UIDVALIDITY', b'UIDNEXT', b'EXISTS'
+        uidvalidity = select_res.get(b'UIDVALIDITY')
+        uidnext = select_res.get(b'UIDNEXT')
+        exists = select_res.get(b'EXISTS')
 
-        cached = self.message_cache.get(folder)
-        if (cached and
-            cached.uidvalidity == uidvalidity and
-            cached.uidnext == uidnext and
-            cached.exists == exists):
-            return cached.messages[:limit]
+        with self.lock:
+            cached = self.message_cache.get(folder)
+            if (cached and
+                cached.uidvalidity == uidvalidity and
+                cached.uidnext == uidnext and
+                cached.exists == exists):
+                return cached.messages[:limit]
 
         # Cache miss - fetch fresh
-        conn.select_folder(folder, readonly=True)
+        # Folder is already selected
         message_ids = conn.search(['ALL'])
 
         if not message_ids:
-            self.message_cache[folder] = MessageListCache(
-                messages=[],
-                uidvalidity=uidvalidity,
-                uidnext=uidnext,
-                exists=exists
-            )
+            with self.lock:
+                self.message_cache[folder] = MessageListCache(
+                    messages=[],
+                    uidvalidity=uidvalidity,
+                    uidnext=uidnext,
+                    exists=exists
+                )
             return []
 
         # Get newest messages
@@ -251,12 +268,13 @@ class AccountSession:
                 "flags": [_to_str(f).lstrip('\\') for f in msg_data.get(b'FLAGS', [])]
             })
 
-        self.message_cache[folder] = MessageListCache(
-            messages=messages,
-            uidvalidity=uidvalidity,
-            uidnext=uidnext,
-            exists=exists
-        )
+        with self.lock:
+            self.message_cache[folder] = MessageListCache(
+                messages=messages,
+                uidvalidity=uidvalidity,
+                uidnext=uidnext,
+                exists=exists
+            )
         return messages
 
 

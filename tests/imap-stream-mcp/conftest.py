@@ -66,6 +66,12 @@ class MockIMAPClient:
         if folder not in self.folders:
             raise Exception(f"Folder '{folder}' not found")
         self.selected_folder = folder
+        messages = self.folders.get(folder, [])
+        return {
+            b'UIDVALIDITY': 1,
+            b'UIDNEXT': len(messages) + 1,
+            b'EXISTS': len(messages),
+        }
 
     def search(self, criteria: list) -> list[int]:
         """Return message IDs matching criteria."""

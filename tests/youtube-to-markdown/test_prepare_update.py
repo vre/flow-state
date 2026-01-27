@@ -114,12 +114,6 @@ class TestDetectIssues:
         issues = detect_issues(existing, changes)
         assert any("title changed" in issue for issue in issues)
 
-    def test_chapters_added(self):
-        existing = {}
-        changes = {"chapters": {"old": 0, "new": 5, "changed": True}}
-        issues = detect_issues(existing, changes)
-        assert any("chapters added" in issue for issue in issues)
-
     def test_summary_issues_reported(self):
         existing = {"summary_issues": ["empty_video_section", "missing_tldr"]}
         changes = {}

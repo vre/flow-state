@@ -25,15 +25,15 @@ def parse_count(value: str | None) -> int | None:
     if value is None or value == "N/A":
         return None
     value = value.replace(",", "")
-    if value.endswith("B"):
-        return int(float(value[:-1]) * 1_000_000_000)
-    if value.endswith("M"):
-        return int(float(value[:-1]) * 1_000_000)
-    if value.endswith("K"):
-        return int(float(value[:-1]) * 1_000)
     try:
+        if value.endswith("B"):
+            return int(float(value[:-1]) * 1_000_000_000)
+        if value.endswith("M"):
+            return int(float(value[:-1]) * 1_000_000)
+        if value.endswith("K"):
+            return int(float(value[:-1]) * 1_000)
         return int(value)
-    except ValueError:
+    except (ValueError, TypeError):
         return None
 
 
@@ -98,11 +98,6 @@ def detect_issues(existing: dict, changes: dict) -> list[str]:
     title_change = changes.get("title", {})
     if title_change.get("changed"):
         issues.append("title changed")
-
-    # Check for chapters added
-    chapters_change = changes.get("chapters", {})
-    if chapters_change.get("changed") and chapters_change.get("new", 0) > chapters_change.get("old", 0):
-        issues.append("chapters added")
 
     # Check summary issues
     if existing.get("summary_issues"):

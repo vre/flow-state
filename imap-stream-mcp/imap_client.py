@@ -798,12 +798,12 @@ def modify_flags(folder: str, message_ids: list[int],
                     try:
                         client.add_flags([msg_id], imap_flags)
                     except Exception as e:
-                        for flag in add_flags:
-                            result["failed"].append({
-                                "id": msg_id,
-                                "flag": flag,
-                                "error": str(e)
-                            })
+                        result["failed"].append({
+                            "id": msg_id,
+                            "operation": "add_flags",
+                            "flags": add_flags,
+                            "error": str(e)
+                        })
                         continue
 
                 # Remove flags
@@ -812,12 +812,12 @@ def modify_flags(folder: str, message_ids: list[int],
                     try:
                         client.remove_flags([msg_id], imap_flags)
                     except Exception as e:
-                        for flag in remove_flags:
-                            result["failed"].append({
-                                "id": msg_id,
-                                "flag": flag,
-                                "error": str(e)
-                            })
+                        result["failed"].append({
+                            "id": msg_id,
+                            "operation": "remove_flags",
+                            "flags": remove_flags,
+                            "error": str(e)
+                        })
                         continue
 
                 result["modified"] += 1
