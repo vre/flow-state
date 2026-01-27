@@ -40,6 +40,7 @@ from imap_client import (
     search_messages,
     create_draft,
     modify_draft,
+    modify_flags,
     parse_folder_path,
 )
 from markdown_utils import convert_body
@@ -107,6 +108,61 @@ def _wrap_email(headers: str, body: str) -> tuple[str, bool]:
     return wrapped, injection_detected
 
 
+def parse_flag_payload(payload: str) -> tuple[list[int], list[str], list[str]]:
+    """Parse flag payload into message IDs and flag lists.
+
+    Args:
+        payload: Format "MSG_ID:+FLAG,-FLAG" or "MSG1,MSG2:+FLAG"
+
+    Returns:
+        Tuple of (message_ids, add_flags, remove_flags)
+
+    Raises:
+        ValueError: If payload format is invalid
+    """
+    payload = payload.strip()
+
+    if ':' not in payload:
+        raise ValueError("Invalid payload format. Expected 'MSG_ID:+FLAG,-FLAG'")
+
+    ids_part, flags_part = payload.split(':', 1)
+    ids_part = ids_part.strip()
+    flags_part = flags_part.strip()
+
+    # Parse message IDs
+    message_ids = []
+    for id_str in ids_part.split(','):
+        id_str = id_str.strip()
+        try:
+            message_ids.append(int(id_str))
+        except ValueError:
+            raise ValueError(f"Invalid message ID: '{id_str}'")
+
+    # Parse flags
+    if not flags_part:
+        raise ValueError("No flags specified")
+
+    add_flags = []
+    remove_flags = []
+
+    for flag_str in flags_part.split(','):
+        flag_str = flag_str.strip()
+        if not flag_str:
+            continue
+
+        if flag_str.startswith('+'):
+            add_flags.append(flag_str[1:])
+        elif flag_str.startswith('-'):
+            remove_flags.append(flag_str[1:])
+        else:
+            raise ValueError(f"Flag '{flag_str}' must start with '+' or '-'")
+
+    if not add_flags and not remove_flags:
+        raise ValueError("No flags specified")
+
+    return message_ids, add_flags, remove_flags
+
+
 # Initialize MCP server - token-efficient naming
 mcp = FastMCP("imap_stream_mcp")
 
@@ -118,7 +174,7 @@ class MailAction(BaseModel):
 
     action: str = Field(
         ...,
-        description="Action: list|read|search|draft|folders|accounts|help"
+        description="Action: list|read|search|draft|flag|folders|accounts|help"
     )
     folder: Optional[str] = Field(
         default=None,
@@ -126,7 +182,7 @@ class MailAction(BaseModel):
     )
     payload: Optional[str] = Field(
         default=None,
-        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?}"
+        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?} | flag=MSG_ID:+FLAG,-FLAG"
     )
     limit: Optional[int] = Field(
         default=20,
@@ -138,7 +194,7 @@ class MailAction(BaseModel):
     @field_validator('action')
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup', 'accounts'}
+        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup', 'accounts', 'flag'}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -156,6 +212,7 @@ HELP_TOPICS = {
 - **read** - Read a specific message
 - **search** - Search messages
 - **draft** - Create draft reply (saved to Drafts folder)
+- **flag** - Add or remove flags/labels on messages
 - **folders** - List available folders
 - **accounts** - List configured email accounts
 - **help** - Show this help (help topic=<topic> for details)
@@ -166,6 +223,7 @@ List inbox: {action: "list", folder: "INBOX"}
 Read message: {action: "read", folder: "INBOX", payload: "123"}
 Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com"}
 Create draft: {action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
+Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 """,
 
     "list": """
@@ -261,6 +319,29 @@ None required.
 
 ## Returns
 List of folders with their names and IMAP flags.
+""",
+
+    "flag": """
+# flag - Add or Remove Flags/Labels
+
+Modify flags on messages. No EXPUNGE - Deleted flag only marks for deletion.
+
+## Parameters
+- folder: Folder containing message(s)
+- payload: "MSG_ID:+FLAG,-FLAG"
+
+## Flags (case-insensitive)
+Seen, Flagged, Answered, Deleted, Draft
+
+## Keywords/labels
+$label1-5 (Thunderbird), or any server-supported keyword
+
+## Examples
+{action: "flag", folder: "INBOX", payload: "123:+Flagged"}
+{action: "flag", folder: "INBOX", payload: "123:-Seen"}
+{action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
+{action: "flag", folder: "INBOX", payload: "123,124,125:+Deleted"}
+{action: "flag", folder: "INBOX", payload: "123:+$label1"}
 """,
 
     "attachment": """
@@ -594,6 +675,41 @@ Open Thunderbird → Drafts to review and send."""
 **Saved to:** {result['saved_to']}
 
 Use Read tool for images, pdf/docx skills for documents."""
+
+        # Flag
+        if action == "flag":
+            if not folder:
+                return "Error: folder required. Example: {action:'flag', folder:'INBOX', payload:'123:+Flagged'}"
+            if not params.payload:
+                return "Error: payload required. Use 'help flag' for details."
+
+            try:
+                msg_ids, add_flags, remove_flags = parse_flag_payload(params.payload)
+            except ValueError as e:
+                return f"Error: {e}"
+
+            result = modify_flags(folder, msg_ids, add_flags, remove_flags)
+
+            # Build response
+            lines = ["# Flag Operation"]
+
+            if result["modified"] > 0:
+                lines.append(f"\nModified {result['modified']} message(s)")
+
+            if result["flags_added"]:
+                lines.append(f"Added: {', '.join(result['flags_added'])}")
+            if result["flags_removed"]:
+                lines.append(f"Removed: {', '.join(result['flags_removed'])}")
+
+            if result["failed"]:
+                lines.append(f"\n**Failed:** ({len(result['failed'])})")
+                for fail in result["failed"]:
+                    if "flag" in fail:
+                        lines.append(f"  - Message {fail['id']}, flag '{fail['flag']}': {fail['error']}")
+                    else:
+                        lines.append(f"  - Message {fail['id']}: {fail['error']}")
+
+            return "\n".join(lines)
 
         # Cleanup
         if action == "cleanup":

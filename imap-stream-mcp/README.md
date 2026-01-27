@@ -14,6 +14,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text
 - **draft** - Create/modify draft replies (adding attachments to drafts not supported)
+- **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)
 - **folders** - List available folders
 - **accounts** - List configured email accounts
 - **attachment** - Download attachments to temp directory (`{tempdir}/streammail/`)
@@ -89,10 +90,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ## Security
 
-- **Read-only for mailboxes** - Only creates/modifies drafts in Drafts folder; no delete, move, or modify operations on messages in INBOX, Sent, or other folders
+- **No destructive operations** - No EXPUNGE, no permanent deletion. `\Deleted` flag only marks messages (recoverable). Creates/modifies drafts in Drafts folder only.
 - **Content safety** - Email content encapsulated to prevent prompt injection / context poisoning
 - **Keychain storage** - Credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
-- **No credential leaks** - Password fetched by script only when IMAP connection opens, LLM gets the details
+- **No credential leaks** - Password fetched by script only when IMAP connection opens, LLM never sees the password
 - **Encrypted connection** - SSL/TLS required
 
 ## Project Structure
@@ -123,6 +124,12 @@ debug_imap.py        # Connection troubleshooting utility
 
 # Create draft
 {action: "draft", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"Thanks!","in_reply_to":"<msgid>"}'}
+
+# Flag messages
+{action: "flag", folder: "INBOX", payload: "123:+Flagged"}
+{action: "flag", folder: "INBOX", payload: "123:-Seen"}
+{action: "flag", folder: "INBOX", payload: "123,124,125:+Deleted"}
+{action: "flag", folder: "INBOX", payload: "123:+$label1"}
 
 # List folders
 {action: "folders"}

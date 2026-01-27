@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0] - 2026-01-27
+
+### Added
+- `flag` action to add/remove flags and labels on messages
+- Batch flag operations on multiple messages
+- Support for standard IMAP flags (Seen, Flagged, Answered, Deleted, Draft)
+- Support for keywords/labels ($label1-5, custom)
+- Unit tests for flag parsing functions
+
+### Changed
+- Flags displayed without backslash prefix (Seen instead of \Seen)
+- Security description updated: "No destructive operations" instead of "Read-only"
+
 ## [0.2.0] - 2026-01-22
 
 ### Added

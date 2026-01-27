@@ -24,6 +24,42 @@ from imapclient import IMAPClient
 
 SERVICE_NAME = "imap-stream"
 
+# Standard IMAP flags (RFC 3501)
+STANDARD_FLAGS = {'seen', 'flagged', 'answered', 'deleted', 'draft'}
+
+
+def normalize_flag_output(flag: str) -> str:
+    """Strip backslash from IMAP flags for display.
+
+    Args:
+        flag: IMAP flag (e.g., '\\Seen' or '$label1')
+
+    Returns:
+        Flag without leading backslash (e.g., 'Seen' or '$label1')
+    """
+    if flag.startswith("\\"):
+        return flag[1:]
+    return flag
+
+
+def normalize_flag_input(flag: str) -> str:
+    """Prepare flag for IMAP: add backslash to standard flags.
+
+    Args:
+        flag: User-provided flag (e.g., 'seen', 'Flagged', '$label1')
+
+    Returns:
+        IMAP-ready flag (e.g., '\\Seen', '\\Flagged', '$label1')
+    """
+    # Strip existing backslash for normalization
+    clean = flag.lstrip("\\")
+    clean_lower = clean.lower()
+
+    if clean_lower in STANDARD_FLAGS:
+        # Capitalize standard flags consistently
+        return "\\" + clean_lower.capitalize()
+    return flag.lstrip("\\")  # Return keyword as-is
+
 
 class IMAPError(Exception):
     """IMAP operation error with helpful message."""
@@ -284,7 +320,7 @@ def list_messages(folder: str, limit: int = 20) -> list[dict]:
                 "from": from_addr,
                 "date": date_str,
                 "size": data.get(b'RFC822.SIZE', 0),
-                "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
+                "flags": [normalize_flag_output(to_str(f)) for f in data.get(b'FLAGS', [])]
             })
 
         return results
@@ -367,7 +403,7 @@ def read_message(folder: str, message_id: int) -> dict:
             "body_text": body_text,
             "body_html": body_html,
             "attachments": attachments,
-            "flags": [to_str(f) for f in data.get(b'FLAGS', [])]
+            "flags": [normalize_flag_output(to_str(f)) for f in data.get(b'FLAGS', [])]
         }
 
 
@@ -723,6 +759,85 @@ def modify_draft(folder: str, message_id: int, body: str,
             "message_id": new_msg['Message-ID'],
             "preserved_reply_to": bool(in_reply_to)
         }
+
+
+def modify_flags(folder: str, message_ids: list[int],
+                 add_flags: list[str], remove_flags: list[str]) -> dict:
+    """Add or remove flags from messages.
+
+    Args:
+        folder: IMAP folder path
+        message_ids: List of message IDs to modify
+        add_flags: Flags to add (user format: 'Flagged', '$label1')
+        remove_flags: Flags to remove
+
+    Returns:
+        Dict with modified count, flags_added, flags_removed, failed list
+    """
+    result = {
+        "modified": 0,
+        "flags_added": list(set(add_flags)),
+        "flags_removed": list(set(remove_flags)),
+        "failed": []
+    }
+
+    if not message_ids:
+        return result
+
+    with imap_connection() as client:
+        try:
+            client.select_folder(folder, readonly=False)
+        except Exception as e:
+            raise IMAPError(f"Cannot open folder '{folder}': {e}")
+
+        for msg_id in message_ids:
+            try:
+                # Verify message exists
+                exists = client.search(['UID', msg_id])
+                if not exists:
+                    result["failed"].append({
+                        "id": msg_id,
+                        "error": "Message not found"
+                    })
+                    continue
+
+                # Add flags
+                if add_flags:
+                    imap_flags = [normalize_flag_input(f).encode() for f in add_flags]
+                    try:
+                        client.add_flags([msg_id], imap_flags)
+                    except Exception as e:
+                        for flag in add_flags:
+                            result["failed"].append({
+                                "id": msg_id,
+                                "flag": flag,
+                                "error": str(e)
+                            })
+                        continue
+
+                # Remove flags
+                if remove_flags:
+                    imap_flags = [normalize_flag_input(f).encode() for f in remove_flags]
+                    try:
+                        client.remove_flags([msg_id], imap_flags)
+                    except Exception as e:
+                        for flag in remove_flags:
+                            result["failed"].append({
+                                "id": msg_id,
+                                "flag": flag,
+                                "error": str(e)
+                            })
+                        continue
+
+                result["modified"] += 1
+
+            except Exception as e:
+                result["failed"].append({
+                    "id": msg_id,
+                    "error": str(e)
+                })
+
+    return result
 
 
 def test_connection():
