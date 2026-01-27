@@ -22,7 +22,7 @@ NEVER START IMPLEMENTATION BEFORE APPROVAL. Autopilot is FAILURE.
    - Plan has acceptance criteria and validation approach defined
    - Mission Command: plan contains the intent, goal, proper guidance with constraints and necessary situational context. You do the reasearch to write the constraints and situational context.
    - Implementation is delegated to an agent who is as knowledgeabe and skilled as you are but does not have anything above when starting, it shound't need to do double research.
-   - End with opening git worktree under .git/worktrees/[short_description]
+   - End with opening git worktree under .worktrees/[short_description]
 2. Implement
    - NO CODE before tests + YAGNI + KISS + DRY + Avoid Wordiness
    - Testability: Pure functions + thin `main()` glue. No DI frameworks.

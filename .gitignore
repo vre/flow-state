@@ -24,6 +24,9 @@ uv.lock
 # IDE etc.
 .claude/
 .vscode/
+
+# Git worktrees (working directories)
+.worktrees/
 .idea/
 *.swp
 *.swo
