@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.3] - 2026-01-29
+
+### Update Flow Improvements
+- Added metadata comparison table (Views/Likes/Comments: Stored vs Current)
+- Added "Re-extract comments" option for refreshing comments without full reload
+- Added "Re-extract transcript" option for different language or refresh
+- Re-ordered options: most common use cases (re-extract) shown first
+
 ## [2.3.2] - 2026-01-26
 
 ### Security

@@ -262,7 +262,9 @@ def prepare_update(video_url: str, output_dir: Path) -> dict:
     issues = detect_issues(existing, changes)
     recommendation = generate_recommendation(existing, changes, issues)
 
-    intermediate = get_key_intermediate_files(video_id, output_dir)
+    base_name = f"youtube_{video_id}"
+    intermediate_patterns = get_key_intermediate_files(base_name)
+    intermediate = [f for f in intermediate_patterns if (output_dir / f).exists()]
 
     return {
         "status": "EXISTS",
