@@ -61,6 +61,56 @@ def normalize_flag_input(flag: str) -> str:
     return flag.lstrip("\\")  # Return keyword as-is
 
 
+# Flag query -> IMAP search criterion mapping
+# Liberal parsing: "flagged", "flagged:yes", "is:flagged", "starred" all work
+_FLAG_QUERY_MAP: dict[str, str] = {
+    # Flagged/starred
+    "flagged": "FLAGGED",
+    "flagged:yes": "FLAGGED",
+    "is:flagged": "FLAGGED",
+    "starred": "FLAGGED",
+    "is:starred": "FLAGGED",
+    "unflagged": "UNFLAGGED",
+    "flagged:no": "UNFLAGGED",
+    "is:unflagged": "UNFLAGGED",
+    "unstarred": "UNFLAGGED",
+    # Seen/read
+    "seen": "SEEN",
+    "seen:yes": "SEEN",
+    "read": "SEEN",
+    "is:seen": "SEEN",
+    "is:read": "SEEN",
+    "unseen": "UNSEEN",
+    "seen:no": "UNSEEN",
+    "unread": "UNSEEN",
+    "is:unseen": "UNSEEN",
+    "is:unread": "UNSEEN",
+    # Answered
+    "answered": "ANSWERED",
+    "answered:yes": "ANSWERED",
+    "is:answered": "ANSWERED",
+    "unanswered": "UNANSWERED",
+    "answered:no": "UNANSWERED",
+    "is:unanswered": "UNANSWERED",
+    # Deleted
+    "deleted": "DELETED",
+    "deleted:yes": "DELETED",
+    "is:deleted": "DELETED",
+}
+
+
+def parse_flag_query(query: str) -> str | None:
+    """Parse flag-based search query to IMAP criterion.
+
+    Args:
+        query: User query (e.g., 'flagged', 'is:unread', 'seen:no')
+
+    Returns:
+        IMAP search criterion string or None if not a flag query.
+    """
+    return _FLAG_QUERY_MAP.get(query.lower().strip())
+
+
 class IMAPError(Exception):
     """IMAP operation error with helpful message."""
     pass
@@ -464,11 +514,13 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
             - subject:text
             - since:YYYY-MM-DD
             - before:YYYY-MM-DD
+            - Flag queries: flagged, unread, seen, answered, deleted
+              Also: is:flagged, flagged:yes, flagged:no, starred, etc.
         limit: Maximum results
         account: Account name. None uses default.
 
     Returns:
-        List of matching message summaries
+        List of matching message summaries with id, subject, from, date, flags.
     """
     from session import get_session
     session = get_session(account)
@@ -479,21 +531,20 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
             raise IMAPError(f"Cannot open folder '{folder}': {e}")
 
         # Build IMAP search criteria
-        criteria = []
+        query_lower = query.lower().strip()
 
-        # Parse query
-        query_lower = query.lower()
-
-        if query_lower.startswith("from:"):
+        # Try flag-based query first
+        flag_criterion = parse_flag_query(query)
+        if flag_criterion:
+            criteria = [flag_criterion]
+        elif query_lower.startswith("from:"):
             criteria = ['FROM', query[5:].strip()]
         elif query_lower.startswith("subject:"):
             criteria = ['SUBJECT', query[8:].strip()]
         elif query_lower.startswith("since:"):
-            date_str = query[6:].strip()
-            criteria = ['SINCE', date_str]
+            criteria = ['SINCE', query[6:].strip()]
         elif query_lower.startswith("before:"):
-            date_str = query[7:].strip()
-            criteria = ['BEFORE', date_str]
+            criteria = ['BEFORE', query[7:].strip()]
         else:
             # General text search - search subject OR body
             criteria = ['OR', 'SUBJECT', query, 'BODY', query]
@@ -516,11 +567,13 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
             envelope = data[b'ENVELOPE']
             from_addr = format_address(envelope.from_[0]) if envelope.from_ else ""
 
+            flags = [f.decode() if isinstance(f, bytes) else str(f) for f in data.get(b"FLAGS", [])]
             results.append({
                 "id": msg_id,
                 "subject": decode_header_value(envelope.subject) if envelope.subject else "",
                 "from": from_addr,
-                "date": str(envelope.date) if envelope.date else ""
+                "date": str(envelope.date) if envelope.date else "",
+                "flags": flags,
             })
 
         return results

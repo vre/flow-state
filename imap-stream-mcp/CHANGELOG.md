@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] - 2026-01-30
+
+### Added
+- Flag-based search: `flagged`, `unread`, `seen`, `answered`, `deleted` and variants (`is:flagged`, `flagged:yes`, `starred`)
+- Flags displayed in search results (matching list action format)
+
 ## [0.4.0] - 2026-01-27
 
 ### Added
