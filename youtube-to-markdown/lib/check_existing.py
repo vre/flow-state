@@ -68,10 +68,21 @@ def detect_v1_summary(content: str) -> bool:
     return has_w5h and not has_type_markers
 
 
-def detect_v1_comments(content: str) -> bool:
+def detect_comments_state(content: str) -> str:
     """
-    Detect if comment insights use v1.0 format (no type-specific sections).
+    Detect comment file state.
+
+    Returns:
+        'curated_only': Has Curated Comments but no Comment Insights section
+        'v1': Has Comment Insights but no type-specific sections
+        'v2': Has Comment Insights with type-specific sections
     """
+    has_insights = "## Comment Insights" in content
+
+    if not has_insights:
+        return "curated_only"
+
+    # Has insights - check for v2 type-specific sections
     type_sections = [
         "**Common Failures**",
         "**Success Patterns**",
@@ -83,7 +94,23 @@ def detect_v1_comments(content: str) -> bool:
         "**Corrections/Extensions**",
         "**Debates**",
     ]
-    return not any(section in content for section in type_sections)
+
+    if any(section in content for section in type_sections):
+        return "v2"
+
+    return "v1"
+
+
+def detect_v1_comments(content: str) -> bool:
+    """
+    Detect if comment insights use v1.0 format (no type-specific sections).
+
+    DEPRECATED: Use detect_comments_state() instead.
+    Kept for backward compatibility.
+    """
+    state = detect_comments_state(content)
+    # v1 or curated_only both count as "needs update" in old logic
+    return state != "v2"
 
 
 def has_section_content(content: str, section: str) -> bool:
@@ -229,7 +256,8 @@ def check_existing(video_url: str, output_dir: Path) -> dict:
     # Analyze comments if they exist
     if files["comment_file"]:
         content = Path(files["comment_file"]).read_text()
-        result["comments_v1"] = detect_v1_comments(content)
+        result["comments_state"] = detect_comments_state(content)
+        result["comments_v1"] = result["comments_state"] != "v2"  # backward compat
         valid, issues = validate_comments_integrity(content)
         result["comments_valid"] = valid
         result["comments_issues"] = issues

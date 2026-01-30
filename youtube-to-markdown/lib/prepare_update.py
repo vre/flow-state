@@ -86,7 +86,12 @@ def detect_issues(existing: dict, changes: dict) -> list[str]:
     # Check format versions
     if existing.get("summary_v1"):
         issues.append("summary_v1: outdated format")
-    if existing.get("comments_v1"):
+
+    # Check comments state
+    comments_state = existing.get("comments_state")
+    if comments_state == "curated_only":
+        issues.append("comments_curated_only: no insights analysis")
+    elif comments_state == "v1":
         issues.append("comments_v1: outdated format")
 
     # Check for significant comment increase
@@ -135,6 +140,16 @@ def generate_recommendation(existing: dict, changes: dict, issues: list[str]) ->
         return {
             "action": "update_summary",
             "reason": "Summary uses outdated v1 format",
+            "files_to_backup": files_to_backup,
+        }
+
+    # Comments curated only - needs insights analysis
+    if any("comments_curated_only" in issue for issue in issues):
+        if existing.get("comment_file"):
+            files_to_backup.append(existing["comment_file"])
+        return {
+            "action": "update_comments",
+            "reason": "Comments missing insights analysis",
             "files_to_backup": files_to_backup,
         }
 
@@ -274,6 +289,7 @@ def prepare_update(video_url: str, output_dir: Path) -> dict:
             "transcript": existing.get("transcript_file"),
             "comments": existing.get("comment_file"),
         },
+        "comments_state": existing.get("comments_state"),
         "intermediate_files": intermediate,
         "stored_metadata": stored_meta,
         "current_metadata": {

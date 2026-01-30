@@ -97,10 +97,22 @@ class TestDetectIssues:
         assert any("summary_v1" in issue for issue in issues)
 
     def test_comments_v1_detected(self):
-        existing = {"comments_v1": True}
+        existing = {"comments_state": "v1"}
         changes = {}
         issues = detect_issues(existing, changes)
         assert any("comments_v1" in issue for issue in issues)
+
+    def test_comments_curated_only_detected(self):
+        existing = {"comments_state": "curated_only"}
+        changes = {}
+        issues = detect_issues(existing, changes)
+        assert any("comments_curated_only" in issue for issue in issues)
+
+    def test_comments_v2_no_issue(self):
+        existing = {"comments_state": "v2"}
+        changes = {}
+        issues = detect_issues(existing, changes)
+        assert not any("comments" in issue for issue in issues)
 
     def test_significant_comment_increase(self):
         existing = {}

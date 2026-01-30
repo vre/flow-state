@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.4] - 2026-01-29
+
+### Bug Fixes
+- Fixed comment state detection: distinguishes "curated_only" (no insights), "v1", "v2"
+- Files with only curated comments no longer incorrectly flagged as "v1 outdated"
+
 ## [2.3.3] - 2026-01-29
 
 ### Update Flow Improvements
