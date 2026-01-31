@@ -12,28 +12,37 @@ You are a deep expert in your subject area. Your goal is what is best for the us
 
 ## THE DEVELOPMENT PROCESS
 
-Move to Plan Phase if the user request requires more than 3 calls or 500 tokens to implement.
+Move to Plan Phase if the user request requires more than 5 tool calls or file changes to implement.
 
 ### 1. Plan Phase Rules
 
 - DO NOT USE OR CHANGE TO AGENT PLAN MODE!
 - ALWAYS WRITE THE PLAN: 'docs/[plugin/core]/plans/' for plugin-/core specific
+- Single source of truth: plans live only in docs/plans — never create a separate plan file elsewhere like '.claude/plans/' or '.copilot/session-state/'
 - Define measurable acceptance criteria and validation approach
 - Mission Command: include intent, goal, constraints, situational context. Research these before writing.
 - Use exact requirements, no temporal references ("current best practices", "latest version")
 - Implementation is delegated to an agent who has only the plan as context — plan must be self-contained
+- When you think that the plan is ready ask if there is something else or proceed to review
+- When "review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- Print instruction to the human companion: Ask the job applicant to "Review the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Finally, ask the human companion if they approve the plan to proceed to Implementation Phase
 
 ### 2. Implementation Phase Rules
 
 SETUP:
 - Start by reviewing if the architecture fits the future direction - even "maybe" requires returning to Plan Phase to present the problem and solution options
-- Create git worktree under '.worktrees/[short_description]' to isolate development from the main branch. Move plan here.
+- Create git worktree under '.worktrees/[short_description]' to isolate development from the main branch. Move plan file there.
 - Worktree setup: copy all `.env*` files from main (any directory level), run `uv sync` in dirs with pyproject.toml
 
 PROCESS:
-- Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan.
-- If problem is found during implementation, return to Plan Phase. Don't just fix it and move on.
-- For every todo do `git add` for new files, `git commit -a -m "{minimal description, no co-auth}"`
+- Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
+- Problem found: investigate. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
+- For every completed todo `git add` new files, `git commit -a -m "{minimal description, no co-auth}"`
+- When you think that the implementation is ready ask if there is something else or proceed to review
+- When "review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- Print instruction to the human companion: Ask the job applicant to "Review the implementation <worktree path> against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Finally, ask the human companion if they approve the functionality and implementation to proceed to Reflection Phase
 
 CODING:
 - NO CODE before tests + YAGNI + KISS + DRY + Avoid Wordiness
@@ -47,17 +56,17 @@ CODING:
 ### 3. Reflect Phase Rules
 
 - Mark status in Tasks and Acceptance Criteria: `[x]` done `[-]` not done - why? `[>]` deferred - why? `[_]` skipped - why? `[+]` discovered `[?]` unclear
-- Add "## Reflection": what went well, what changed from plan, lessons learned
+- Add "## Reflection" to the plan file: what went well, what changed from plan, lessons learned
 
 ### 4. Merge Phase Rules
 
-- `With clear mind take role of a skeptic and validate what was created`
-- Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md'
-- For every release: update version numbers in '.claude-plugin/marketplace.json', '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
+- Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
+- For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 - Ask final acceptance from the human companion
-- To wrap up: `git pull --rebase` with the main and then `git squash` to main with oneline commit message, no co-authors. Remove worktree.
+- To merge progress do `git pull --rebase` with the main. Test and validate after each rebase step. If conflicts: validate that existing functionality from main was not broken.
+- Finalize with `git merge --squash` to main with oneline commit message, no co-authors. Remove worktree.
 
-## Implementing AGENTS.md / CLAUDE.md
+## Writing AGENTS.md / CLAUDE.md
 
 Budget: <2000 tokens (~100 lines)
 
@@ -81,7 +90,7 @@ Task instructions:
 - Bullets over tables - tables require parsing
 - No code style rules - use linters instead
 
-## Implementing Skills (SKILL.md)
+## Writing Skills (SKILL.md)
 
 - Budget: <500 tokens (~50 lines)
 - Description: "<Use when trigger>. <What it produces>."
@@ -92,7 +101,7 @@ Task instructions:
 - Stop conditions explicit: "If X: `STOP`"
 - Subagent prompts: `INPUT:`/`OUTPUT:` first - highest value, read first
 
-## Implementing MCPs
+## Writing MCPs
 
 - One tool per domain, route via action parameter - 70% token savings
 - Documentation in `help` action, minimal docstring
@@ -100,7 +109,7 @@ Task instructions:
 - Error → suggest fix: `"Try: {action: 'list'}"`
 - Log unknown queries, expand parser when patterns emerge
 
-## Implementing CLI Scripts
+## Writing CLI Scripts
 
 - Unix/POSIX conventions: `-v` verbose, `-q` quiet, `-o` output, `--format json`
 - Errors MUST suggest fix: `"File not found. Did you mean 'config.json'?"`
