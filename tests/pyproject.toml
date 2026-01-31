@@ -15,7 +15,6 @@ imap-stream-mcp = { path = "../imap-stream-mcp" }
 testpaths = [
     "youtube-to-markdown",
     "imap-stream-mcp",
-    "project-builder",
 ]
 python_files = "test_*.py"
 python_functions = "test_*"

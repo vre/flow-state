@@ -10,6 +10,7 @@ def get_summary_work_files(base_name: str) -> list[str]:
     return [
         f"{base_name}_title.txt",
         f"{base_name}_metadata.md",
+        f"{base_name}_description.md",
         f"{base_name}_summary.md",
         f"{base_name}_summary_tight.md",
         f"{base_name}_quick_summary.md",
@@ -47,9 +48,19 @@ def get_comments_work_files(base_name: str) -> list[str]:
     ]
 
 
+def get_warmup_work_files(base_name: str) -> list[str]:
+    """Write permission warmup file."""
+    return [f"{base_name}_warmup.tmp"]
+
+
 def get_all_work_files(base_name: str) -> list[str]:
     """All possible work files (deduplicated)."""
-    all_files = get_summary_work_files(base_name) + get_transcript_work_files(base_name) + get_comments_work_files(base_name)
+    all_files = (
+        get_warmup_work_files(base_name)
+        + get_summary_work_files(base_name)
+        + get_transcript_work_files(base_name)
+        + get_comments_work_files(base_name)
+    )
     # Deduplicate while preserving order
     seen = set()
     unique = []

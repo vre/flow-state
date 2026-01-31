@@ -470,9 +470,10 @@ class TestFinalizeSummaryComments:
         mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "Insights"
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
-        summary_path, comments_path = finalizer.finalize_summary_comments(base_name, output_dir, template_dir, debug=True)
+        summary_path, comments_path, transcript_path = finalizer.finalize_summary_comments(base_name, output_dir, template_dir, debug=True)
         assert "youtube - Test Title (abc123).md" in str(summary_path)
         assert "comments" in str(comments_path)
+        assert transcript_path is None  # no raw transcript in test data
 
 
 class TestFinalizeFull:

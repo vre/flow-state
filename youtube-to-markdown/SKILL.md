@@ -22,6 +22,8 @@ python3 ./scripts/20_check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
 
+Write `"# Processing {video_id}\n"` to `<output_directory>/${BASE_NAME}_warmup.tmp`. This ensures Write tool is approved before subagents need it.
+
 If `exists: false`: Continue to Step 1.
 
 If `exists: true`: Read and follow `./subskills/update_flow.md`.
