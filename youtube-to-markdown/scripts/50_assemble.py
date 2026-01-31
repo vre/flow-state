@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Creates final markdown files from template and component files, cleans up intermediate work files.
+"""Creates final markdown files from template and component files, cleans up intermediate work files.
 
 Usage: 50_assemble.py [options] <BASE_NAME> <OUTPUT_DIR>
 
@@ -28,15 +27,15 @@ def main() -> None:
     args = []
 
     for arg in sys.argv[1:]:
-        if arg == '--debug':
+        if arg == "--debug":
             debug = True
-        elif arg == '--summary-only':
+        elif arg == "--summary-only":
             mode = "summary-only"
-        elif arg == '--transcript-only':
+        elif arg == "--transcript-only":
             mode = "transcript-only"
-        elif arg == '--comments-only':
+        elif arg == "--comments-only":
             mode = "comments-only"
-        elif arg == '--summary-comments':
+        elif arg == "--summary-comments":
             mode = "summary-comments"
         else:
             args.append(arg)

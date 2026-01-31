@@ -9,7 +9,7 @@ When developing this project, skills and MCP servers point directly to local dir
 youtube-to-markdown -> ../../youtube-to-markdown  (symlink)
 ```
 
-**MCP Servers** (`.mcp.json`):
+**MCP Servers** ('.mcp.json'):
 ```json
 {
   "mcpServers": {
@@ -26,7 +26,7 @@ This setup ensures:
 - No reinstall needed after changes
 - Same pattern for both skills and MCP servers
 
-Note: Each sub-project (e.g., `imap-stream-mcp`) also has its own `.mcp.json` with `${CLAUDE_PLUGIN_ROOT}` for standalone installation.
+Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation.
 
 ## Local Plugin Installation Behavior
 
@@ -54,7 +54,7 @@ When installing marketplace from local directory (`/plugin marketplace add /xxx/
 ### Local testing
 
 ```bash
-/plugin marketplace add $(PWD)
+/plugin marketplace add "$PWD"
 /plugin install youtube-to-markdown@flow-state
 ```
 
@@ -71,3 +71,14 @@ claude plugin validate .
 3. Edit scripts/SKILL.md in `/xxx/flow-state/youtube-to-markdown/`
 4. Changes are live (may need Claude reload)
 5. Test, iterate, repeat
+
+## LLM Agent Development Guidelines
+
+For comprehensive guidance on building Skills, MCPs, CLI tools, and instruction files:
+
+- [docs/Designing Initial Project Setup.md](docs/Designing%20Initial%20Project%20Setup.md) - Setting up projects for LLM-assisted development
+- [docs/Designing AGENTS.md.md](docs/Designing%20AGENTS.md.md) - Instruction engineering (Context Engineering, Psychology)
+- [docs/Designing Skills.md](docs/Designing%20Skills.md) - Writing robust workflows (Skill vs Script)
+- [docs/Designing MCP Servers.md](docs/Designing%20MCP%20Servers.md) - Tool interfaces (Token Economics)
+- [docs/Designing CLI Tools.md](docs/Designing%20CLI%20Tools.md) - CLI tools for humans and LLMs
+- [docs/Designing Hooks.md](docs/Designing%20Hooks.md) - Lifecycle hooks (Security, Observability)

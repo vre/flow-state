@@ -2,28 +2,28 @@
 
 Provides AccountSession for connection keepalive and folder/message caching.
 """
-import socket
+
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Optional
 
 from imapclient import IMAPClient
 from imapclient.exceptions import IMAPClientError
 
 CONNECTION_IDLE_TIMEOUT = 300  # 5 minutes
 
-_sessions: dict[str, 'AccountSession'] = {}
+_sessions: dict[str, "AccountSession"] = {}
 
 
 def get_default_account() -> str | None:
     """Get default account name from imap_client."""
     from imap_client import get_default_account as _get_default
+
     return _get_default()
 
 
-def get_session(account: str | None = None) -> 'AccountSession':
+def get_session(account: str | None = None) -> "AccountSession":
     """Get or create session for account.
 
     Args:
@@ -95,6 +95,7 @@ def _create_connection(account: str) -> IMAPClient:
 @dataclass
 class FolderCache:
     """Cached folder listing."""
+
     folders: list[dict]
     fetched_at: float
 
@@ -102,6 +103,7 @@ class FolderCache:
 @dataclass
 class MessageListCache:
     """Cached message list with validation metadata."""
+
     messages: list[dict]
     uidvalidity: int
     uidnext: int
@@ -111,10 +113,11 @@ class MessageListCache:
 @dataclass
 class AccountSession:
     """IMAP session with connection keepalive and caching."""
+
     account: str
-    connection: Optional[IMAPClient] = None
+    connection: IMAPClient | None = None
     last_activity: float = 0.0
-    folder_cache: Optional[FolderCache] = None
+    folder_cache: FolderCache | None = None
     message_cache: dict[str, MessageListCache] = field(default_factory=dict)
     lock: threading.RLock = field(default_factory=threading.RLock)
 
@@ -160,7 +163,7 @@ class AccountSession:
             conn = self.get_connection()
             yield conn
             self.last_activity = time.time()
-        except (IMAPClientError, ConnectionError, socket.error):
+        except (OSError, IMAPClientError, ConnectionError):
             self._close_connection()
             raise
 
@@ -177,11 +180,7 @@ class AccountSession:
         folders = conn.list_folders()
 
         self.folder_cache = FolderCache(
-            folders=[
-                {"name": _to_str(name), "flags": [_to_str(f) for f in flags]}
-                for flags, _, name in folders
-            ],
-            fetched_at=time.time()
+            folders=[{"name": _to_str(name), "flags": [_to_str(f) for f in flags]} for flags, _, name in folders], fetched_at=time.time()
         )
         return self.folder_cache.folders
 
@@ -202,48 +201,41 @@ class AccountSession:
             select_res = conn.select_folder(folder, readonly=True)
         except Exception as e:
             from imap_client import IMAPError
+
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
-        
+
         # Parse metadata from select response
         # IMAPClient usually returns dict with keys like b'UIDVALIDITY', b'UIDNEXT', b'EXISTS'
-        uidvalidity = select_res.get(b'UIDVALIDITY')
-        uidnext = select_res.get(b'UIDNEXT')
-        exists = select_res.get(b'EXISTS')
+        uidvalidity = select_res.get(b"UIDVALIDITY")
+        uidnext = select_res.get(b"UIDNEXT")
+        exists = select_res.get(b"EXISTS")
 
         with self.lock:
             cached = self.message_cache.get(folder)
-            if (cached and
-                cached.uidvalidity == uidvalidity and
-                cached.uidnext == uidnext and
-                cached.exists == exists):
+            if cached and cached.uidvalidity == uidvalidity and cached.uidnext == uidnext and cached.exists == exists:
                 return cached.messages[:limit]
 
         # Cache miss - fetch fresh
         # Folder is already selected
-        message_ids = conn.search(['ALL'])
+        message_ids = conn.search(["ALL"])
 
         if not message_ids:
             with self.lock:
-                self.message_cache[folder] = MessageListCache(
-                    messages=[],
-                    uidvalidity=uidvalidity,
-                    uidnext=uidnext,
-                    exists=exists
-                )
+                self.message_cache[folder] = MessageListCache(messages=[], uidvalidity=uidvalidity, uidnext=uidnext, exists=exists)
             return []
 
         # Get newest messages
         selected_ids = message_ids[-limit:] if len(message_ids) > limit else message_ids
         selected_ids = list(reversed(selected_ids))
 
-        data = conn.fetch(selected_ids, ['ENVELOPE', 'FLAGS', 'RFC822.SIZE'])
+        data = conn.fetch(selected_ids, ["ENVELOPE", "FLAGS", "RFC822.SIZE"])
 
         messages = []
         for msg_id in selected_ids:
             if msg_id not in data:
                 continue
             msg_data = data[msg_id]
-            envelope = msg_data[b'ENVELOPE']
+            envelope = msg_data[b"ENVELOPE"]
 
             from_addr = ""
             if envelope.from_:
@@ -259,22 +251,19 @@ class AccountSession:
                 except Exception:
                     date_str = str(envelope.date)
 
-            messages.append({
-                "id": msg_id,
-                "subject": _to_str(envelope.subject) if envelope.subject else "(no subject)",
-                "from": from_addr,
-                "date": date_str,
-                "size": msg_data.get(b'RFC822.SIZE', 0),
-                "flags": [_to_str(f).lstrip('\\') for f in msg_data.get(b'FLAGS', [])]
-            })
+            messages.append(
+                {
+                    "id": msg_id,
+                    "subject": _to_str(envelope.subject) if envelope.subject else "(no subject)",
+                    "from": from_addr,
+                    "date": date_str,
+                    "size": msg_data.get(b"RFC822.SIZE", 0),
+                    "flags": [_to_str(f).lstrip("\\") for f in msg_data.get(b"FLAGS", [])],
+                }
+            )
 
         with self.lock:
-            self.message_cache[folder] = MessageListCache(
-                messages=messages,
-                uidvalidity=uidvalidity,
-                uidnext=uidnext,
-                exists=exists
-            )
+            self.message_cache[folder] = MessageListCache(messages=messages, uidvalidity=uidvalidity, uidnext=uidnext, exists=exists)
         return messages
 
 
@@ -283,5 +272,5 @@ def _to_str(value) -> str:
     if value is None:
         return ""
     if isinstance(value, bytes):
-        return value.decode('utf-8', errors='replace')
+        return value.decode("utf-8", errors="replace")
     return str(value)

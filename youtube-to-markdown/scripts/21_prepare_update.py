@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Analyzes existing extraction and prepares update recommendations.
+"""Analyzes existing extraction and prepares update recommendations.
 
 Usage: 21_prepare_update.py <YOUTUBE_URL> <OUTPUT_DIR>
 Output: JSON with status, metadata changes, issues, and recommendation.
@@ -21,9 +20,7 @@ from lib.prepare_update import prepare_update
 def main() -> None:
     """CLI entry point."""
     if len(sys.argv) != 3:
-        print(
-            "Usage: 21_prepare_update.py <YOUTUBE_URL> <OUTPUT_DIR>", file=sys.stderr
-        )
+        print("Usage: 21_prepare_update.py <YOUTUBE_URL> <OUTPUT_DIR>", file=sys.stderr)
         sys.exit(1)
 
     video_url = sys.argv[1]

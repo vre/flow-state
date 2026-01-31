@@ -2,9 +2,12 @@
 
 import pytest
 from lib.shared_types import (
-    extract_video_id, format_upload_date, format_subscribers,
-    format_duration, clean_title_for_filename,
-    VideoIdExtractionError
+    VideoIdExtractionError,
+    clean_title_for_filename,
+    extract_video_id,
+    format_duration,
+    format_subscribers,
+    format_upload_date,
 )
 
 

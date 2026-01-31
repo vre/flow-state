@@ -1,22 +1,21 @@
-"""
-Update preparation library.
-"""
+"""Update preparation library."""
 
 from pathlib import Path
 
-from lib.check_existing import check_existing, extract_metadata_from_file
+from lib.check_existing import check_existing
 from lib.intermediate_files import get_key_intermediate_files
 from lib.shared_types import (
-    extract_video_id,
     FileOperationError,
-    RealFileSystem,
     RealCommandRunner,
+    RealFileSystem,
+    extract_video_id,
 )
 from lib.youtube_extractor import YouTubeDataExtractor
 
 
 class VideoUnavailableError(Exception):
     """Video is no longer available on YouTube."""
+
     pass
 
 
@@ -51,8 +50,7 @@ def format_count_compact(value: int | None) -> str:
 
 
 def compare_counts(old: int | None, new: int | None) -> dict:
-    """
-    Compare two count values.
+    """Compare two count values.
 
     Returns dict with:
     - changed: bool - whether the value changed
@@ -76,8 +74,7 @@ def compare_strings(old: str | None, new: str | None) -> dict:
 
 
 def detect_issues(existing: dict, changes: dict) -> list[str]:
-    """
-    Detect issues based on existing file state and changes.
+    """Detect issues based on existing file state and changes.
 
     Returns list of issue descriptions.
     """
@@ -112,8 +109,7 @@ def detect_issues(existing: dict, changes: dict) -> list[str]:
 
 
 def generate_recommendation(existing: dict, changes: dict, issues: list[str]) -> dict:
-    """
-    Generate update recommendation based on analysis.
+    """Generate update recommendation based on analysis.
 
     Returns dict with action and details.
     """
@@ -183,10 +179,7 @@ def generate_recommendation(existing: dict, changes: dict, issues: list[str]) ->
         }
 
     # Check if any changes at all
-    any_changes = any(
-        changes.get(field, {}).get("changed", False)
-        for field in ["views", "likes", "comment_count", "title"]
-    )
+    any_changes = any(changes.get(field, {}).get("changed", False) for field in ["views", "likes", "comment_count", "title"])
 
     if any_changes and not issues:
         return {
@@ -204,9 +197,7 @@ def generate_recommendation(existing: dict, changes: dict, issues: list[str]) ->
 
 def fetch_current_metadata(video_url: str, output_dir: Path) -> dict:
     """Fetch current video metadata from YouTube."""
-    extractor = YouTubeDataExtractor(
-        fs=RealFileSystem(), cmd=RealCommandRunner()
-    )
+    extractor = YouTubeDataExtractor(fs=RealFileSystem(), cmd=RealCommandRunner())
 
     try:
         extractor.check_yt_dlp()
@@ -221,14 +212,12 @@ def fetch_current_metadata(video_url: str, output_dir: Path) -> dict:
     except FileOperationError as e:
         error_str = str(e).lower()
         if "unavailable" in error_str or "private" in error_str:
-            raise VideoUnavailableError(f"Video unavailable: {e}")
+            raise VideoUnavailableError(f"Video unavailable: {e}") from e
         raise
 
 
 def prepare_update(video_url: str, output_dir: Path) -> dict:
-    """
-    Main entry point: analyze existing files and prepare update recommendation.
-    """
+    """Main entry point: analyze existing files and prepare update recommendation."""
     video_id = extract_video_id(video_url)
     existing = check_existing(video_url, output_dir)
 
@@ -259,18 +248,9 @@ def prepare_update(video_url: str, output_dir: Path) -> dict:
 
     # Build changes dict
     changes = {
-        "views": compare_counts(
-            parse_count(stored_meta.get("views")),
-            current_meta.get("views")
-        ),
-        "likes": compare_counts(
-            parse_count(stored_meta.get("likes")),
-            current_meta.get("likes")
-        ),
-        "comment_count": compare_counts(
-            parse_count(stored_meta.get("comments")),
-            current_meta.get("comments")
-        ),
+        "views": compare_counts(parse_count(stored_meta.get("views")), current_meta.get("views")),
+        "likes": compare_counts(parse_count(stored_meta.get("likes")), current_meta.get("likes")),
+        "comment_count": compare_counts(parse_count(stored_meta.get("comments")), current_meta.get("comments")),
         "title": compare_strings(stored_meta.get("title"), current_meta.get("title")),
     }
 

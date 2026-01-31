@@ -1,11 +1,10 @@
 """Pytest configuration and shared fixtures for streammail tests."""
 
 import sys
-from pathlib import Path
-from typing import Any, Optional
-from unittest.mock import MagicMock
 from dataclasses import dataclass, field
-from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 # Add imap-stream-mcp directory to Python path for imports
@@ -15,19 +14,21 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-stream-mcp"))
 @dataclass
 class MockEnvelope:
     """Mock IMAP envelope."""
+
     subject: bytes = b"Test Subject"
     from_: list = field(default_factory=list)
     to: list = field(default_factory=list)
     cc: list = field(default_factory=list)
     date: Any = None
     message_id: bytes = b"<test@example.com>"
-    in_reply_to: Optional[bytes] = None
+    in_reply_to: bytes | None = None
 
 
 @dataclass
 class MockAddress:
     """Mock email address."""
-    name: Optional[bytes] = None
+
+    name: bytes | None = None
     mailbox: bytes = b"test"
     host: bytes = b"example.com"
 
@@ -40,7 +41,7 @@ class MockIMAPClient:
             "INBOX": [],
             "Drafts": [],
         }
-        self.selected_folder: Optional[str] = None
+        self.selected_folder: str | None = None
         self.logged_in: bool = False
         self.appended_messages: list[dict] = []
         self.deleted_messages: list[int] = []
@@ -68,9 +69,9 @@ class MockIMAPClient:
         self.selected_folder = folder
         messages = self.folders.get(folder, [])
         return {
-            b'UIDVALIDITY': 1,
-            b'UIDNEXT': len(messages) + 1,
-            b'EXISTS': len(messages),
+            b"UIDVALIDITY": 1,
+            b"UIDNEXT": len(messages) + 1,
+            b"EXISTS": len(messages),
         }
 
     def search(self, criteria: list) -> list[int]:
@@ -99,12 +100,14 @@ class MockIMAPClient:
     def append(self, folder: str, message: bytes, flags: list[bytes] = None) -> int:
         """Append message to folder."""
         msg_id = len(self.folders.get(folder, [])) + 1
-        self.appended_messages.append({
-            "folder": folder,
-            "message": message,
-            "flags": flags or [],
-            "id": msg_id,
-        })
+        self.appended_messages.append(
+            {
+                "folder": folder,
+                "message": message,
+                "flags": flags or [],
+                "id": msg_id,
+            }
+        )
         return msg_id
 
     def delete_messages(self, message_ids: list[int]):
@@ -116,9 +119,16 @@ class MockIMAPClient:
         pass
 
     # Helper methods for tests
-    def add_message(self, folder: str, msg_id: int, envelope: MockEnvelope,
-                    body_text: str = "", body_html: str = "", flags: list = None,
-                    raw_email: bytes = None):
+    def add_message(
+        self,
+        folder: str,
+        msg_id: int,
+        envelope: MockEnvelope,
+        body_text: str = "",
+        body_html: str = "",
+        flags: list = None,
+        raw_email: bytes = None,
+    ):
         """Add a message to a folder for testing."""
         if folder not in self.folders:
             self.folders[folder] = []
@@ -126,15 +136,17 @@ class MockIMAPClient:
         if raw_email is None:
             raw_email = f"Subject: {envelope.subject.decode()}\r\n\r\n{body_text}".encode()
 
-        self.folders[folder].append({
-            "id": msg_id,
-            "data": {
-                b"ENVELOPE": envelope,
-                b"FLAGS": flags or [],
-                b"RFC822.SIZE": len(raw_email),
-                b"RFC822": raw_email,
+        self.folders[folder].append(
+            {
+                "id": msg_id,
+                "data": {
+                    b"ENVELOPE": envelope,
+                    b"FLAGS": flags or [],
+                    b"RFC822.SIZE": len(raw_email),
+                    b"RFC822": raw_email,
+                },
             }
-        })
+        )
 
 
 @pytest.fixture
@@ -146,6 +158,7 @@ def mock_imap():
 @pytest.fixture
 def mock_credentials(monkeypatch):
     """Mock keyring credentials."""
+
     def mock_get_password(service, key):
         creds = {
             "accounts": '["default"]',

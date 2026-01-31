@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""
-Analyze token usage from Claude Code session logs.
+"""Analyze token usage from Claude Code session logs.
 Usage: python3 analyze_run.py [trace_log] [otel_log]
 """
-import sys
 import re
-from datetime import datetime
+import sys
 from collections import defaultdict
+
 
 def parse_trace_log(path: str) -> list[dict]:
     """Parse agent_trace.log into events."""

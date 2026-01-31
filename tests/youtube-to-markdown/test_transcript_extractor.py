@@ -1,9 +1,13 @@
 """Tests for extract_transcript module."""
 
-import pytest
 from pathlib import Path
+
+import pytest
+from lib.shared_types import (
+    CommandNotFoundError,
+    TranscriptNotAvailableError,
+)
 from lib.transcript_extractor import TranscriptExtractor
-from lib.shared_types import CommandNotFoundError, TranscriptNotAvailableError, FileOperationError
 
 
 class TestTranscriptExtractor:
@@ -25,11 +29,7 @@ class TestTranscriptExtractor:
 
     def test_get_video_language(self, mock_cmd):
         """Test getting video language."""
-        mock_cmd.set_response(
-            "yt-dlp --print %(language)s https://youtube.com/watch?v=test123",
-            returncode=0,
-            stdout="en"
-        )
+        mock_cmd.set_response("yt-dlp --print %(language)s https://youtube.com/watch?v=test123", returncode=0, stdout="en")
         extractor = TranscriptExtractor(cmd=mock_cmd)
 
         result = extractor.get_video_language("https://youtube.com/watch?v=test123")
@@ -37,10 +37,7 @@ class TestTranscriptExtractor:
 
     def test_get_video_language_unknown(self, mock_cmd):
         """Test getting video language when unavailable."""
-        mock_cmd.set_response(
-            "yt-dlp --print %(language)s https://youtube.com/watch?v=test123",
-            returncode=1
-        )
+        mock_cmd.set_response("yt-dlp --print %(language)s https://youtube.com/watch?v=test123", returncode=1)
         extractor = TranscriptExtractor(cmd=mock_cmd)
 
         result = extractor.get_video_language("https://youtube.com/watch?v=test123")
@@ -55,11 +52,7 @@ class TestTranscriptExtractor:
         vtt_file = Path("/output/youtube_test123_transcript_temp.en.vtt")
         mock_fs.write_text(vtt_file, "VTT content")
 
-        result = extractor.download_manual_subtitles(
-            "https://youtube.com/watch?v=test123",
-            "en",
-            output_name
-        )
+        result = extractor.download_manual_subtitles("https://youtube.com/watch?v=test123", "en", output_name)
 
         assert result == vtt_file
 
@@ -70,11 +63,7 @@ class TestTranscriptExtractor:
         output_name = Path("/output/youtube_test123_transcript_temp")
         # No VTT file created
 
-        result = extractor.download_manual_subtitles(
-            "https://youtube.com/watch?v=test123",
-            "en",
-            output_name
-        )
+        result = extractor.download_manual_subtitles("https://youtube.com/watch?v=test123", "en", output_name)
 
         assert result is None
 
@@ -87,11 +76,7 @@ class TestTranscriptExtractor:
         vtt_file = Path("/output/youtube_test123_transcript_temp.en.vtt")
         mock_fs.write_text(vtt_file, "VTT content")
 
-        result = extractor.download_auto_subtitles(
-            "https://youtube.com/watch?v=test123",
-            "en",
-            output_name
-        )
+        result = extractor.download_auto_subtitles("https://youtube.com/watch?v=test123", "en", output_name)
 
         assert result == vtt_file
 
@@ -104,11 +89,7 @@ class TestTranscriptExtractor:
         manual_vtt = Path("/output/youtube_test123_transcript_temp.en.vtt")
         mock_fs.write_text(manual_vtt, "Manual VTT")
 
-        result = extractor.download_subtitles(
-            "https://youtube.com/watch?v=test123",
-            "en",
-            output_name
-        )
+        result = extractor.download_subtitles("https://youtube.com/watch?v=test123", "en", output_name)
 
         assert result == manual_vtt
         # Should only call manual, not auto
@@ -141,11 +122,7 @@ class TestTranscriptExtractor:
 
         mock_fs.glob = smart_glob
 
-        result = extractor.download_subtitles(
-            "https://youtube.com/watch?v=test123",
-            "en",
-            output_name
-        )
+        result = extractor.download_subtitles("https://youtube.com/watch?v=test123", "en", output_name)
 
         assert result is not None
         assert "youtube_test123_transcript_temp.en.vtt" in str(result)
@@ -158,9 +135,4 @@ class TestTranscriptExtractor:
         # No VTT files created
 
         with pytest.raises(TranscriptNotAvailableError, match="No subtitles available"):
-            extractor.download_subtitles(
-                "https://youtube.com/watch?v=test123",
-                "en",
-                output_name
-            )
-
+            extractor.download_subtitles("https://youtube.com/watch?v=test123", "en", output_name)

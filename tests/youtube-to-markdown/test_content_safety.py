@@ -1,12 +1,11 @@
 """Tests for content_safety.py."""
 
 import pytest
-
 from lib.content_safety import (
+    INJECTION_DETECTED_NOTICE,
     contains_injection_patterns,
     sanitize_for_delimiters,
     wrap_untrusted_content,
-    INJECTION_DETECTED_NOTICE,
 )
 
 

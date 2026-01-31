@@ -3,7 +3,6 @@
 from pathlib import Path
 
 import pytest
-
 from lib.assembler import Finalizer
 from lib.shared_types import FileOperationError
 
@@ -35,6 +34,7 @@ class MockFileSystem:
 
     def glob(self, pattern: str, directory: Path) -> list[Path]:
         import fnmatch
+
         results = []
         for file_path in self.files.keys():
             if file_path.parent == directory:
@@ -307,6 +307,7 @@ class TestGetWorkFiles:
     def test_get_summary_work_files(self):
         """Test getting summary work files list."""
         from lib.intermediate_files import get_summary_work_files
+
         files = get_summary_work_files("youtube_test123")
 
         assert "youtube_test123_title.txt" in files
@@ -316,6 +317,7 @@ class TestGetWorkFiles:
     def test_get_transcript_work_files(self):
         """Test getting transcript work files list."""
         from lib.intermediate_files import get_transcript_work_files
+
         files = get_transcript_work_files("youtube_test123")
 
         assert "youtube_test123_transcript.md" in files
@@ -324,6 +326,7 @@ class TestGetWorkFiles:
     def test_get_comments_work_files(self):
         """Test getting comments work files list."""
         from lib.intermediate_files import get_comments_work_files
+
         files = get_comments_work_files("youtube_test123")
 
         assert "youtube_test123_comments.md" in files
@@ -333,10 +336,11 @@ class TestGetWorkFiles:
         """Test getting all work files combines all lists."""
         from lib.intermediate_files import (
             get_all_work_files,
+            get_comments_work_files,
             get_summary_work_files,
             get_transcript_work_files,
-            get_comments_work_files,
         )
+
         full_files = get_all_work_files("youtube_test123")
         summary_files = get_summary_work_files("youtube_test123")
         transcript_files = get_transcript_work_files("youtube_test123")

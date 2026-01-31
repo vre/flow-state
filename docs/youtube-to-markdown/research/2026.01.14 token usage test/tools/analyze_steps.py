@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""
-Analyze token usage per step and subagent.
+"""Analyze token usage per step and subagent.
 Usage: python3 analyze_steps.py [trace_log] [otel_log]
 """
-import sys
 import re
+import sys
 
 # Step definitions for youtube-to-markdown skill variants
 # Format: (step_name, model, parallel_with_next)

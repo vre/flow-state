@@ -415,3 +415,119 @@ The skill is project installed with symlink. Test with "claude -p".
 - [x] Backups created before any replacement (with unique timestamps)
 - [x] Unit tests pass (189 tests)
 - [x] Integration tests pass (Cases 3, 4, 5, 9 manually verified)
+
+---
+
+## Additional Fixes (2026-01-29)
+
+### Intent
+
+User sees stored vs current metadata and can re-extract individual components without full refresh.
+
+### Goal
+
+1. Display metadata comparison table in Step U2
+2. Offer "Re-extract comments" and "Re-extract transcript" as separate options in Step U3
+
+### Acceptance Criteria
+
+- [ ] Step U2 shows table: Views/Likes/Comments with Stored vs Current columns
+- [ ] Step U3 offers "Re-extract comments" when comments exist
+- [ ] Step U3 offers "Re-extract transcript" when transcript exists
+- [ ] Re-extract comments flow: backup → comment_extract.md → comment_summarize.md → 50_assemble.py
+- [ ] Re-extract transcript flow: backup → transcript_extract.md → transcript_polish.md → 50_assemble.py
+- [ ] Manual test: verify both re-extract options work
+
+### Constraints
+
+- Only modify `subskills/update_flow.md`
+- Do not modify prepare_update.py (already returns needed data)
+- Do not modify Python scripts
+
+### Context
+
+**prepare_update.py output structure (relevant fields):**
+```json
+{
+  "stored_metadata": {"views": "1.2M", "likes": "50K", "comments": "500"},
+  "current_metadata": {"views": "1.5M", "likes": "60K", "comments": "1.2K"},
+  "changes": {
+    "views": {"changed": true, "significant": false},
+    "comment_count": {"changed": true, "significant": true}
+  },
+  "existing_files": {
+    "summary": "/path/to/summary.md",
+    "comments": "/path/to/comments.md"
+  },
+  "action": "update_comments",
+  "reason": "Significant new comments",
+  "files_to_backup": ["/path/to/comments.md"]
+}
+```
+
+**Scripts:**
+- `./scripts/40_backup.py backup <file>` - creates timestamped backup
+- `./scripts/50_assemble.py --comments-only ${BASE_NAME} <output_dir>` - finalizes comments
+
+**Subskills:**
+- `./subskills/comment_extract.md` - fetches comments from YouTube
+- `./subskills/comment_summarize.md` - generates comment insights
+
+### Changes to update_flow.md
+
+**Step U2 - add after component table:**
+```markdown
+If stored_metadata and current_metadata differ, show:
+
+| Metric | Stored | Current |
+|--------|--------|---------|
+| Views | {stored_metadata.views} | {current_metadata.views} |
+| Likes | {stored_metadata.likes} | {current_metadata.likes} |
+| Comments | {stored_metadata.comments} | {current_metadata.comments} |
+
+Omit rows where values are identical.
+```
+
+**Step U3 - replace options:**
+```markdown
+- "Update metadata only" (if action=metadata_only)
+- "Re-extract comments" (if existing_files.comments exists) ← most common use case
+- "Re-extract transcript" (if existing_files.transcript exists)
+- "Add comments" (if existing_files.comments missing, existing_files.summary exists)
+- "Full refresh" (always)
+- "Keep existing" (always)
+
+Note: When all files are valid, "Re-extract comments" is typically what user wants
+(videos accumulate comments over time). Show it first among re-extract options.
+```
+
+**Step U4 - add execution paths:**
+```markdown
+**If "Re-extract comments":**
+python3 ./scripts/40_backup.py backup "<existing_files.comments>"
+Run: comment_extract.md → comment_summarize.md
+python3 ./scripts/50_assemble.py --comments-only "${BASE_NAME}" "<output_directory>"
+DONE
+
+**If "Re-extract transcript":**
+python3 ./scripts/40_backup.py backup "<existing_files.transcript>"
+Run: transcript_extract.md → transcript_polish.md
+python3 ./scripts/50_assemble.py --transcript-only "${BASE_NAME}" "<output_directory>"
+DONE
+```
+
+### Validation
+
+```bash
+# Manual test with claude -p
+# 1. Extract video with few comments
+# 2. Wait for more comments (or use video known to have grown)
+# 3. Run skill again, verify:
+#    - Metadata table shows comment count difference
+#    - "Re-extract comments" option appears
+#    - Selecting it backs up old, extracts new, assembles
+```
+
+### Out of Scope
+
+- **Re-extract summary**: Requires transcript extraction → cleaning → summarizing → tightening. Effectively a full reload, use "Full refresh" instead.

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Apply paragraph breaks to deduplicated transcript.
+"""Apply paragraph breaks to deduplicated transcript.
 Usage: 31_format_transcript.py <INPUT_MD> <BREAKS_FILE> <OUTPUT_MD>
 BREAKS_FILE: file containing comma-separated line numbers (e.g., "15,42,78,103")
 """

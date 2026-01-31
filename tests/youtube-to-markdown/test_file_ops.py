@@ -1,8 +1,9 @@
 """Tests for file_ops module."""
 
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 from lib.file_ops import FileOps
 
 

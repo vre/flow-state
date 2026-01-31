@@ -1,6 +1,4 @@
-"""
-YouTube comment extraction library.
-"""
+"""YouTube comment extraction library."""
 
 import json
 import re
@@ -9,11 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from lib.shared_types import (
-    Comment,
     CommandRunner,
+    Comment,
     CommentVideoData,
     FileSystem,
-    RealFileSystem,
     VideoDataFetchError,
     VideoIdExtractionError,
     YTDLPNotFoundError,
@@ -92,15 +89,11 @@ def format_comment_markdown(
         lines.append(f"{comment.text}\n")
     else:
         indent = "  " * (depth - 4)
-        lines.append(
-            f"{indent}- **{comment.author} ({comment.like_count} likes)**: {comment.text}\n"
-        )
+        lines.append(f"{indent}- **{comment.author} ({comment.like_count} likes)**: {comment.text}\n")
 
     replies = replies_by_parent.get(comment.id, [])
     for reply in replies:
-        lines.append(
-            format_comment_markdown(reply, depth + 1, replies_by_parent)
-        )
+        lines.append(format_comment_markdown(reply, depth + 1, replies_by_parent))
 
     return "\n".join(lines)
 
@@ -163,16 +156,15 @@ class CommentExtractor:
                     "--dump-single-json",
                     "--write-comments",
                     "--skip-download",
-                    "--extractor-args", "youtube:comment_sort=top",
+                    "--extractor-args",
+                    "youtube:comment_sort=top",
                     video_url,
                 ],
                 capture_stdout=True,
             )
 
             if returncode != 0:
-                raise VideoDataFetchError(
-                    f"Failed to extract video data: {stderr}"
-                )
+                raise VideoDataFetchError(f"Failed to extract video data: {stderr}")
 
             self.filesystem.write_text(temp_json, stdout)
             json_str = self.filesystem.read_text(temp_json)
@@ -188,9 +180,7 @@ class CommentExtractor:
             if self.filesystem.exists(temp_json):
                 self.filesystem.remove(temp_json)
 
-    def extract_and_save(
-        self, video_url: str, output_dir: Path
-    ) -> tuple[Path, Path]:
+    def extract_and_save(self, video_url: str, output_dir: Path) -> tuple[Path, Path]:
         self.check_yt_dlp()
         video_id = extract_video_id(video_url)
         base_name = f"youtube_{video_id}"

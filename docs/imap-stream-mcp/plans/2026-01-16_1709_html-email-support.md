@@ -42,6 +42,7 @@ No library found for markdown → pre-markdown. Options:
 ## Decisions
 
 ### Supported markdown subset
+
 | Markdown | HTML |
 |----------|------|
 | `**bold**` | `<strong>` |
@@ -133,6 +134,7 @@ else:
 - Requires `pymdown-extensions` for extended syntax
 
 ### Extensions tested and selected
+
 | Extension | Purpose | Status |
 |-----------|---------|--------|
 | `pymdownx.tilde` | ~~strikethrough~~ | ✓ works |
@@ -149,6 +151,7 @@ Default emoji output uses CDN images (`<img src="cloudflare...">`) which trigger
 Markdown requires blank line before block elements (lists, blockquotes, headings, code blocks). Added `preprocess_markdown()` to auto-insert blank lines.
 
 ### Plain text conversion (markdown_to_plain)
+
 | Markdown | Plain text | Notes |
 |----------|------------|-------|
 | `**bold**` | `*bold*` | Gmail style, universal pre-markdown convention |

@@ -11,6 +11,7 @@ htmlcov/
 dist/
 build/
 .eggs/
+.ruff_cache
 
 # Virtual environments
 venv/

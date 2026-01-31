@@ -1,13 +1,11 @@
 """Tests for prepare_update module."""
 
-import pytest
-from pathlib import Path
 from lib.prepare_update import (
-    parse_count,
     compare_counts,
     compare_strings,
     detect_issues,
     generate_recommendation,
+    parse_count,
 )
 
 

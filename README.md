@@ -13,7 +13,7 @@
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
 
-## **IMAP Stream MCP Server** 
+## **IMAP Stream MCP Server**
 
 > **Your Inbox, Minimal Context.**
 > Lightweight IMAP email client. No destructive operations.

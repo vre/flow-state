@@ -7,25 +7,23 @@ Pure functions for:
 """
 
 import re
-from typing import Optional
 
 import markdown
 from pymdownx import emoji
 
-
 # Markdown extensions for email formatting
 MARKDOWN_EXTENSIONS = [
-    'pymdownx.tilde',      # ~~strikethrough~~
-    'pymdownx.tasklist',   # - [ ] checkboxes
-    'pymdownx.mark',       # ==highlight==
-    'pymdownx.betterem',   # smarter bold/italic
-    'pymdownx.emoji',      # :emoji: shortcodes
+    "pymdownx.tilde",  # ~~strikethrough~~
+    "pymdownx.tasklist",  # - [ ] checkboxes
+    "pymdownx.mark",  # ==highlight==
+    "pymdownx.betterem",  # smarter bold/italic
+    "pymdownx.emoji",  # :emoji: shortcodes
 ]
 
 # Extension configurations
 MARKDOWN_EXTENSION_CONFIGS = {
-    'pymdownx.emoji': {
-        'emoji_generator': emoji.to_alt  # Unicode output, not CDN images
+    "pymdownx.emoji": {
+        "emoji_generator": emoji.to_alt  # Unicode output, not CDN images
     }
 }
 
@@ -36,9 +34,11 @@ URL_PATTERN = re.compile(r'(?<!href=")(https?://[^\s<>"]+)')
 
 def autolink_urls(html: str) -> str:
     """Convert bare URLs to links in HTML, skip already linked URLs."""
+
     def replace_url(match):
         url = match.group(1)
         return f'<a href="{url}">{url}</a>'
+
     return URL_PATTERN.sub(replace_url, html)
 
 
@@ -58,46 +58,41 @@ def preprocess_markdown(text: str) -> str:
     if not text:
         return text
 
-    lines = text.split('\n')
+    lines = text.split("\n")
     result = []
     prev_was_blank = True  # Start as if there was a blank line
     prev_was_list_item = False
 
     for line in lines:
         stripped = line.strip()
-        is_blank = stripped == ''
+        is_blank = stripped == ""
 
         # Check if line is a list item
         is_list_item = (
-            stripped.startswith('- ') or
-            stripped.startswith('* ') or
-            stripped.startswith('+ ') or
-            bool(re.match(r'^\d+\. ', stripped))
+            stripped.startswith("- ") or stripped.startswith("* ") or stripped.startswith("+ ") or bool(re.match(r"^\d+\. ", stripped))
         )
 
         # Check if line starts other block elements (not list items)
         is_other_block = (
-            stripped.startswith('> ') or  # blockquote
-            stripped.startswith('```') or  # code block
-            stripped.startswith('#')  # heading
+            stripped.startswith("> ")  # blockquote
+            or stripped.startswith("```")  # code block
+            or stripped.startswith("#")  # heading
         )
 
         # Add blank line before block element if previous line wasn't blank
         # For list items: only at list START (not between items)
         needs_blank = False
-        if is_other_block and not prev_was_blank:
-            needs_blank = True
-        elif is_list_item and not prev_was_blank and not prev_was_list_item:
+        if is_other_block and not prev_was_blank or is_list_item and not prev_was_blank and not prev_was_list_item:
             needs_blank = True
 
         if needs_blank:
-            result.append('')
+            result.append("")
 
         result.append(line)
         prev_was_blank = is_blank
         prev_was_list_item = is_list_item
 
-    return '\n'.join(result)
+    return "\n".join(result)
 
 
 def markdown_to_plain(text: str) -> str:
@@ -124,22 +119,22 @@ def markdown_to_plain(text: str) -> str:
         return text
 
     # **bold** or __bold__ -> *bold*
-    text = re.sub(r'\*\*(.+?)\*\*', r'*\1*', text)
-    text = re.sub(r'__(.+?)__', r'*\1*', text)
+    text = re.sub(r"\*\*(.+?)\*\*", r"*\1*", text)
+    text = re.sub(r"__(.+?)__", r"*\1*", text)
 
     # [text](url) -> text <url>
-    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'\1 <\2>', text)
+    text = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r"\1 <\2>", text)
 
     # ~~strike~~ -> plain (accessibility: screen readers would say "tilde tilde")
-    text = re.sub(r'~~(.+?)~~', r'\1', text)
+    text = re.sub(r"~~(.+?)~~", r"\1", text)
 
     # ==highlight== -> plain (accessibility: screen readers would say "equals equals")
-    text = re.sub(r'==(.+?)==', r'\1', text)
+    text = re.sub(r"==(.+?)==", r"\1", text)
 
     return text
 
 
-def convert_body(body: str, format_type: str = "markdown") -> tuple[Optional[str], str]:
+def convert_body(body: str, format_type: str = "markdown") -> tuple[str | None, str]:
     """Convert email body to HTML and plain text.
 
     Eliminates duplication between create_draft and modify_draft.
@@ -155,11 +150,7 @@ def convert_body(body: str, format_type: str = "markdown") -> tuple[Optional[str
     """
     if format_type == "markdown":
         preprocessed = preprocess_markdown(body)
-        html_body = markdown.markdown(
-            preprocessed,
-            extensions=MARKDOWN_EXTENSIONS,
-            extension_configs=MARKDOWN_EXTENSION_CONFIGS
-        )
+        html_body = markdown.markdown(preprocessed, extensions=MARKDOWN_EXTENSIONS, extension_configs=MARKDOWN_EXTENSION_CONFIGS)
         html_body = autolink_urls(html_body)
         plain_body = markdown_to_plain(body)
         return html_body, plain_body

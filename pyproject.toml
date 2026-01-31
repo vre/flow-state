@@ -1,0 +1,40 @@
+[tool.ruff]
+target-version = "py310"
+line-length = 140
+exclude = [".worktrees", ".venv", "__pycache__", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "D",    # pydocstyle
+]
+ignore = [
+    "D100", # missing docstring in public module
+    "D101", # missing docstring in public class
+    "D102", # missing docstring in public method
+    "D104", # missing docstring in public package
+    "D105", # missing docstring in magic method
+    "D107", # missing docstring in __init__
+    "D200", # one-line docstring should fit on one line
+    "D205", # blank line between summary and description
+    "D301", # use r""" for backslashes
+    "D415", # first line ending punctuation
+    "B008", # function call in default argument (intentional DI pattern)
+    "E501", # line too long (140 is generous, edge cases hurt readability)
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["D"]  # no docstrings required in tests
+"**/scripts/*.py" = ["D103"]  # scripts don't need function docstrings
+
+[tool.pyright]
+pythonVersion = "3.10"
+typeCheckingMode = "basic"
+exclude = [".worktrees", "**/.venv", "**/node_modules", "docs"]

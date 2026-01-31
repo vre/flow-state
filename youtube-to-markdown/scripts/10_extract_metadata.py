@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Extracts YouTube video data: metadata, description, and chapters
+"""Extracts YouTube video data: metadata, description, and chapters
 Usage: 10_extract_metadata.py <YOUTUBE_URL> <OUTPUT_DIR>
 Output: Creates youtube_{VIDEO_ID}_metadata.md, youtube_{VIDEO_ID}_description.md, youtube_{VIDEO_ID}_chapters.json
 """

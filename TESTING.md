@@ -57,7 +57,7 @@ uv run pytest -k "pattern"    # Run tests matching pattern
 **Stateless Fixtures**
 - Each test gets clean state via pytest fixtures
 - Tests can run in any order or in parallel
-- Mock implementations in `conftest.py`
+- Mock implementations in 'conftest.py'
 
 **Comprehensive Coverage**
 - Pure function tests (no I/O)

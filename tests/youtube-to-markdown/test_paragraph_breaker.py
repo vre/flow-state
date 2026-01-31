@@ -1,8 +1,12 @@
 """Tests for apply_paragraph_breaks module."""
 
-import pytest
 from pathlib import Path
-from lib.paragraph_breaker import ParagraphBreaker, ParsedLine, extract_video_id_from_path
+
+import pytest
+from lib.paragraph_breaker import (
+    ParagraphBreaker,
+    extract_video_id_from_path,
+)
 from lib.shared_types import FileOperationError
 
 
@@ -59,7 +63,7 @@ class TestParagraphBreaker:
 
         assert paragraph_count == 3
         content = mock_fs.read_text(output_path)
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
         assert len(paragraphs) == 3
 
         # First paragraph should have lines 1-2
@@ -71,11 +75,7 @@ class TestParagraphBreaker:
         breaker = ParagraphBreaker(fs=mock_fs)
 
         with pytest.raises(FileOperationError, match="not found"):
-            breaker.apply_breaks(
-                Path("/nonexistent.md"),
-                Path("/output.md"),
-                {2, 4}
-            )
+            breaker.apply_breaks(Path("/nonexistent.md"), Path("/output.md"), {2, 4})
 
     def test_apply_breaks_no_paragraphs_created(self, mock_fs):
         """Test error when no paragraphs are created."""
@@ -116,10 +116,10 @@ class TestParagraphBreaker:
         output_path = Path("/output.md")
         mock_fs.write_text(input_path, input_content)
 
-        paragraph_count = breaker.apply_breaks(input_path, output_path, {3})
+        breaker.apply_breaks(input_path, output_path, {3})
 
         content = mock_fs.read_text(output_path)
-        paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
 
         # Should have timestamp from first line of paragraph
         assert "[00:00:01.000]" in paragraphs[0]

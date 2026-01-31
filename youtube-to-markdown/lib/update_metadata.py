@@ -1,14 +1,11 @@
-"""
-Metadata update library.
-"""
+"""Metadata update library."""
 
 import re
 from datetime import datetime
 
 
 def replace_metadata_section(summary: str, fresh_metadata: str) -> str:
-    """
-    Replace metadata section in summary with fresh metadata.
+    """Replace metadata section in summary with fresh metadata.
     Looks for "## Video" section and replaces content until next "##" heading.
     """
     pattern = r"(## Video)\s*\n(.*?)(\n## |\Z)"

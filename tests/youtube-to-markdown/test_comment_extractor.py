@@ -1,10 +1,8 @@
 """Tests for extract_comments.py."""
 
 from pathlib import Path
-from typing import Any
 
 import pytest
-
 from lib.comment_extractor import (
     CommentExtractor,
     SubprocessRunner,
@@ -17,8 +15,6 @@ from lib.comment_extractor import (
 )
 from lib.shared_types import (
     Comment,
-    CommandRunner,
-    FileSystem,
     CommentVideoData,
     VideoDataFetchError,
     VideoIdExtractionError,
@@ -231,9 +227,7 @@ class TestFormatCommentMarkdown:
         _, replies_by_parent = build_comment_hierarchy(sample_comments)
         comment = sample_comments[0]  # Alice's comment
 
-        result = format_comment_markdown(
-            comment, depth=0, replies_by_parent=replies_by_parent, include_numbering=True, number=1
-        )
+        result = format_comment_markdown(comment, depth=0, replies_by_parent=replies_by_parent, include_numbering=True, number=1)
 
         assert "### 1. Alice (42 likes)" in result
         assert "Great video!" in result
@@ -352,7 +346,15 @@ class TestCommentExtractor:
         """Test fetching video data successfully."""
         json_output = '{"title": "Test Video", "id": "abc123", "comments": []}'
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
+            [
+                "yt-dlp",
+                "--dump-single-json",
+                "--write-comments",
+                "--skip-download",
+                "--extractor-args",
+                "youtube:comment_sort=top",
+                "test_url",
+            ],
             0,
             json_output,
             "",
@@ -372,7 +374,15 @@ class TestCommentExtractor:
     def test_fetch_video_data_command_failure(self, mock_runner, mock_filesystem):
         """Test handling yt-dlp command failure."""
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
+            [
+                "yt-dlp",
+                "--dump-single-json",
+                "--write-comments",
+                "--skip-download",
+                "--extractor-args",
+                "youtube:comment_sort=top",
+                "test_url",
+            ],
             1,
             "",
             "Error: video not found",
@@ -390,7 +400,15 @@ class TestCommentExtractor:
     def test_fetch_video_data_invalid_json(self, mock_runner, mock_filesystem):
         """Test handling invalid JSON from yt-dlp."""
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "test_url"],
+            [
+                "yt-dlp",
+                "--dump-single-json",
+                "--write-comments",
+                "--skip-download",
+                "--extractor-args",
+                "youtube:comment_sort=top",
+                "test_url",
+            ],
             0,
             "invalid json{",
             "",
@@ -410,7 +428,15 @@ class TestCommentExtractor:
         json_output = '{"title": "Test Video", "id": "abc123", "comments": []}'
         mock_runner.set_return_value(["yt-dlp", "--version"], 0, "2023.01.01", "")
         mock_runner.set_return_value(
-            ["yt-dlp", "--dump-single-json", "--write-comments", "--skip-download", "--extractor-args", "youtube:comment_sort=top", "https://youtu.be/abc123"],
+            [
+                "yt-dlp",
+                "--dump-single-json",
+                "--write-comments",
+                "--skip-download",
+                "--extractor-args",
+                "youtube:comment_sort=top",
+                "https://youtu.be/abc123",
+            ],
             0,
             json_output,
             "",

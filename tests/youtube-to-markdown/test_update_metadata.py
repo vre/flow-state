@@ -1,6 +1,5 @@
 """Tests for update_metadata module."""
 
-import pytest
 from lib.update_metadata import replace_metadata_section, update_extraction_date
 
 

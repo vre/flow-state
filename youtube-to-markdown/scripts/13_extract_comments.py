@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Extracts YouTube video comments.
+"""Extracts YouTube video comments.
 
 Usage: 13_extract_comments.py <YOUTUBE_URL> <OUTPUT_DIR>
 Output: Creates youtube_{VIDEO_ID}_name.txt, youtube_{VIDEO_ID}_comments.md

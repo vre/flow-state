@@ -4,15 +4,13 @@ TDD: These tests define the interface for the new markdown_utils module.
 Tests are written first, then the module is created to satisfy them.
 """
 
-import pytest
-
 # Import from new module location (will fail until module exists)
 from markdown_utils import (
-    preprocess_markdown,
-    markdown_to_plain,
-    convert_body,
-    MARKDOWN_EXTENSIONS,
     MARKDOWN_EXTENSION_CONFIGS,
+    MARKDOWN_EXTENSIONS,
+    convert_body,
+    markdown_to_plain,
+    preprocess_markdown,
 )
 
 
@@ -171,11 +169,11 @@ class TestMarkdownConstants:
 
     def test_required_extensions_present(self):
         """Required extensions should be in the list."""
-        assert 'pymdownx.tilde' in MARKDOWN_EXTENSIONS
-        assert 'pymdownx.tasklist' in MARKDOWN_EXTENSIONS
-        assert 'pymdownx.mark' in MARKDOWN_EXTENSIONS
-        assert 'pymdownx.betterem' in MARKDOWN_EXTENSIONS
-        assert 'pymdownx.emoji' in MARKDOWN_EXTENSIONS
+        assert "pymdownx.tilde" in MARKDOWN_EXTENSIONS
+        assert "pymdownx.tasklist" in MARKDOWN_EXTENSIONS
+        assert "pymdownx.mark" in MARKDOWN_EXTENSIONS
+        assert "pymdownx.betterem" in MARKDOWN_EXTENSIONS
+        assert "pymdownx.emoji" in MARKDOWN_EXTENSIONS
 
     def test_extension_configs_exists(self):
         """MARKDOWN_EXTENSION_CONFIGS should be a dict."""
@@ -183,4 +181,4 @@ class TestMarkdownConstants:
 
     def test_emoji_config_uses_unicode(self):
         """Emoji config should use unicode output, not CDN."""
-        assert 'pymdownx.emoji' in MARKDOWN_EXTENSION_CONFIGS
+        assert "pymdownx.emoji" in MARKDOWN_EXTENSION_CONFIGS

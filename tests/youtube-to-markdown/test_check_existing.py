@@ -1,6 +1,5 @@
 """Tests for check_existing.py comment detection."""
 
-import pytest
 import sys
 from pathlib import Path
 

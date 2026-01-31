@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Detects video language, lists available subtitles, tries manual subtitles first, falls back to auto-generated.
+"""Detects video language, lists available subtitles, tries manual subtitles first, falls back to auto-generated.
 Usage: 11_extract_transcript.py <YOUTUBE_URL> <OUTPUT_DIR> [SUBTITLE_LANG]
 Output: SUCCESS: youtube_{VIDEO_ID}_transcript.vtt or ERROR: No subtitles available
 """

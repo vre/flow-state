@@ -1,7 +1,6 @@
 """Tests for markdown processing functions."""
 
-import pytest
-from markdown_utils import preprocess_markdown, markdown_to_plain
+from markdown_utils import markdown_to_plain, preprocess_markdown
 
 
 class TestPreprocessMarkdown:

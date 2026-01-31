@@ -1,5 +1,4 @@
-"""
-Shared types, protocols, and exceptions for YouTube to Markdown conversion.
+"""Shared types, protocols, and exceptions for YouTube to Markdown conversion.
 
 This module defines the interfaces for external dependencies (file system, subprocess)
 to enable dependency injection and improve testability.
@@ -7,48 +6,55 @@ to enable dependency injection and improve testability.
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, Optional, Any
-import json
+from typing import Any, Protocol
 
 
 # Custom Exceptions
 class YouTubeToMarkdownError(Exception):
     """Base exception for YouTube to Markdown operations."""
+
     pass
 
 
 class VideoIdExtractionError(YouTubeToMarkdownError):
     """Failed to extract video ID from URL."""
+
     pass
 
 
 class CommandNotFoundError(YouTubeToMarkdownError):
     """Required command not found."""
+
     pass
 
 
 class YTDLPNotFoundError(YouTubeToMarkdownError):
     """yt-dlp command not found."""
+
     pass
 
 
 class TranscriptNotAvailableError(YouTubeToMarkdownError):
     """No transcript available for the video."""
+
     pass
 
 
 class FileOperationError(YouTubeToMarkdownError):
     """File operation failed."""
+
     pass
 
 
 class VideoDataFetchError(YouTubeToMarkdownError):
     """Failed to fetch video data from YouTube."""
+
     pass
 
 
 class TemplateNotFoundError(YouTubeToMarkdownError):
     """Template file not found."""
+
     pass
 
 
@@ -56,29 +62,31 @@ class TemplateNotFoundError(YouTubeToMarkdownError):
 @dataclass
 class VideoMetadata:
     """Video metadata extracted from YouTube."""
+
     video_id: str
     title: str
     webpage_url: str
     uploader: str
     channel_url: str
-    channel_follower_count: Optional[int]
+    channel_follower_count: int | None
     channel_is_verified: bool
     upload_date: str
     view_count: int
     like_count: int
-    comment_count: Optional[int]
+    comment_count: int | None
     duration: int
     description: str
     chapters: list[dict[str, Any]]
     language: str
     categories: list[str]
     tags: list[str]
-    license: Optional[str]
+    license: str | None
 
 
 @dataclass
 class TranscriptLine:
     """Single line of transcript with timestamp."""
+
     timestamp: str
     text: str
 
@@ -86,6 +94,7 @@ class TranscriptLine:
 @dataclass(frozen=True)
 class Comment:
     """Represents a YouTube comment."""
+
     id: str
     author: str
     text: str
@@ -96,6 +105,7 @@ class Comment:
 @dataclass(frozen=True)
 class CommentVideoData:
     """Represents YouTube video data for comment extraction."""
+
     title: str
     video_id: str
     comments: list[Comment]
@@ -139,9 +149,9 @@ class CommandRunner(Protocol):
         capture_output: bool = False,
         text: bool = False,
         check: bool = False,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
         stdout: Any = None,
-        stderr: Any = None
+        stderr: Any = None,
     ) -> "CommandResult":
         """Run command and return result."""
         ...
@@ -150,6 +160,7 @@ class CommandRunner(Protocol):
 @dataclass
 class CommandResult:
     """Result of command execution."""
+
     returncode: int
     stdout: str
     stderr: str
@@ -193,34 +204,23 @@ class RealCommandRunner:
         capture_output: bool = False,
         text: bool = False,
         check: bool = False,
-        timeout: Optional[int] = None,
+        timeout: int | None = None,
         stdout: Any = None,
-        stderr: Any = None
+        stderr: Any = None,
     ) -> CommandResult:
         """Run command and return result."""
         import subprocess
 
         result = subprocess.run(
-            command,
-            capture_output=capture_output,
-            text=text,
-            check=check,
-            timeout=timeout,
-            stdout=stdout,
-            stderr=stderr
+            command, capture_output=capture_output, text=text, check=check, timeout=timeout, stdout=stdout, stderr=stderr
         )
 
-        return CommandResult(
-            returncode=result.returncode,
-            stdout=result.stdout if text else "",
-            stderr=result.stderr if text else ""
-        )
+        return CommandResult(returncode=result.returncode, stdout=result.stdout if text else "", stderr=result.stderr if text else "")
 
 
 # Utility Functions
 def extract_video_id(url: str) -> str:
-    """
-    Extract video ID from YouTube URL.
+    """Extract video ID from YouTube URL.
 
     Args:
         url: YouTube URL (youtu.be or youtube.com format)
@@ -234,13 +234,13 @@ def extract_video_id(url: str) -> str:
     import re
 
     # Handle youtu.be format
-    if 'youtu.be/' in url:
-        video_id = url.split('youtu.be/')[-1].split('?')[0]
+    if "youtu.be/" in url:
+        video_id = url.split("youtu.be/")[-1].split("?")[0]
         if video_id:
             return video_id
 
     # Handle youtube.com format with v= parameter
-    match = re.search(r'[?&]v=([^&]+)', url)
+    match = re.search(r"[?&]v=([^&]+)", url)
     if match:
         return match.group(1)
 
@@ -248,8 +248,7 @@ def extract_video_id(url: str) -> str:
 
 
 def format_upload_date(upload_date: str) -> str:
-    """
-    Format upload date from YYYYMMDD to YYYY-MM-DD.
+    """Format upload date from YYYYMMDD to YYYY-MM-DD.
 
     Args:
         upload_date: Date string in YYYYMMDD format
@@ -257,14 +256,13 @@ def format_upload_date(upload_date: str) -> str:
     Returns:
         Formatted date string or 'Unknown' if invalid
     """
-    if upload_date != 'Unknown' and len(str(upload_date)) == 8:
+    if upload_date != "Unknown" and len(str(upload_date)) == 8:
         return f"{upload_date[:4]}-{upload_date[4:6]}-{upload_date[6:]}"
     return upload_date
 
 
-def format_subscribers(subscribers: Optional[int]) -> str:
-    """
-    Format subscriber count.
+def format_subscribers(subscribers: int | None) -> str:
+    """Format subscriber count.
 
     Args:
         subscribers: Subscriber count or None
@@ -278,8 +276,7 @@ def format_subscribers(subscribers: Optional[int]) -> str:
 
 
 def format_duration(duration: int) -> str:
-    """
-    Format duration from seconds to HH:MM:SS or MM:SS.
+    """Format duration from seconds to HH:MM:SS or MM:SS.
 
     Args:
         duration: Duration in seconds
@@ -298,9 +295,8 @@ def format_duration(duration: int) -> str:
     return "Unknown"
 
 
-def format_count(count: Optional[int]) -> str:
-    """
-    Format large numbers with K/M suffix.
+def format_count(count: int | None) -> str:
+    """Format large numbers with K/M suffix.
 
     Args:
         count: Number to format
@@ -318,8 +314,7 @@ def format_count(count: Optional[int]) -> str:
 
 
 def clean_title_for_filename(title: str, max_length: int = 60) -> str:
-    """
-    Clean title for use in filename.
+    """Clean title for use in filename.
 
     Args:
         title: Original title
@@ -331,12 +326,12 @@ def clean_title_for_filename(title: str, max_length: int = 60) -> str:
     import re
 
     # Remove or replace problematic characters
-    cleaned = re.sub(r'[<>:"/\\|?*]', '', title)
-    cleaned = re.sub(r'\s+', ' ', cleaned)
+    cleaned = re.sub(r'[<>:"/\\|?*]', "", title)
+    cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = cleaned.strip()
 
     # Truncate if too long
     if len(cleaned) > max_length:
-        cleaned = cleaned[:max_length].rsplit(' ', 1)[0]
+        cleaned = cleaned[:max_length].rsplit(" ", 1)[0]
 
     return cleaned

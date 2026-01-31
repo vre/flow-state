@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Checks if a YouTube video has already been processed.
+"""Checks if a YouTube video has already been processed.
 Usage: 20_check_existing.py <YOUTUBE_URL> <OUTPUT_DIR>
 Output: JSON with existence status, file paths, format versions, and stored metadata.
 """

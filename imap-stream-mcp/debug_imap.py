@@ -2,8 +2,9 @@
 """Debug IMAP connection issues."""
 
 import json
-import ssl
 import socket
+import ssl
+
 import keyring
 
 SERVICE_NAME = "imap-stream"
@@ -28,7 +29,6 @@ def get_credentials():
 
 def debug_connection():
     """Test IMAP connection step by step."""
-
     # 1. Get credentials
     print("=" * 50)
     print("1. Checking stored credentials...")
@@ -111,7 +111,7 @@ def debug_connection():
 
         try:
             imap.login(username, password)
-            print(f"   ✓ LOGIN successful!")
+            print("   ✓ LOGIN successful!")
 
             # List some folders
             typ, folders = imap.list()
@@ -134,9 +134,9 @@ def debug_connection():
             print()
 
             # Try to see if AUTHENTICATE methods are available
-            if b'AUTH=PLAIN' in data[0]:
+            if b"AUTH=PLAIN" in data[0]:
                 print("   Server supports AUTH=PLAIN")
-            if b'AUTH=LOGIN' in data[0]:
+            if b"AUTH=LOGIN" in data[0]:
                 print("   Server supports AUTH=LOGIN")
 
             imap.logout()

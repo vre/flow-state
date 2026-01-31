@@ -1,12 +1,10 @@
-"""
-Library functions for checking existing YouTube video extractions.
-"""
+"""Library functions for checking existing YouTube video extractions."""
 
 import re
 from pathlib import Path
 
-from lib.shared_types import extract_video_id
 from lib.intermediate_files import get_key_intermediate_files
+from lib.shared_types import extract_video_id
 
 
 def find_existing_files(video_id: str, output_dir: Path) -> dict:
@@ -34,10 +32,7 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
     # Check for intermediate files from incomplete extraction
     base_name = f"youtube_{video_id}"
     key_files = get_key_intermediate_files(base_name)
-    found_intermediate = [
-        str(output_dir / f) for f in key_files
-        if (output_dir / f).exists()
-    ]
+    found_intermediate = [str(output_dir / f) for f in key_files if (output_dir / f).exists()]
 
     return {
         "summary_file": str(summary_file) if summary_file else None,
@@ -48,8 +43,7 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
 
 
 def detect_v1_summary(content: str) -> bool:
-    """
-    Detect if summary uses v1.0 format (universal W5H for all videos).
+    """Detect if summary uses v1.0 format (universal W5H for all videos).
 
     V1.0 markers:
     - Contains **What**: AND **Why**: AND **How**: pattern
@@ -69,8 +63,7 @@ def detect_v1_summary(content: str) -> bool:
 
 
 def detect_comments_state(content: str) -> str:
-    """
-    Detect comment file state.
+    """Detect comment file state.
 
     Returns:
         'curated_only': Has Curated Comments but no Comment Insights section
@@ -102,8 +95,7 @@ def detect_comments_state(content: str) -> str:
 
 
 def detect_v1_comments(content: str) -> bool:
-    """
-    Detect if comment insights use v1.0 format (no type-specific sections).
+    """Detect if comment insights use v1.0 format (no type-specific sections).
 
     DEPRECATED: Use detect_comments_state() instead.
     Kept for backward compatibility.
@@ -121,8 +113,7 @@ def has_section_content(content: str, section: str) -> bool:
 
 
 def validate_summary_integrity(content: str) -> tuple[bool, list[str]]:
-    """
-    Validate that summary file has all required elements with content.
+    """Validate that summary file has all required elements with content.
     Returns (is_valid, list_of_issues).
     """
     issues = []
@@ -159,8 +150,7 @@ def validate_comments_integrity(content: str) -> tuple[bool, list[str]]:
 
 
 def extract_metadata_from_file(content: str) -> dict:
-    """
-    Extract metadata from existing summary file.
+    """Extract metadata from existing summary file.
 
     Supports both formats:
     - New: "- **Engagement:** 2.2M views · 71.2K likes · 2.2K comments"
@@ -212,8 +202,7 @@ def extract_metadata_from_file(content: str) -> dict:
 
 
 def check_existing(video_url: str, output_dir: Path) -> dict:
-    """
-    Check if video has been processed and analyze existing files.
+    """Check if video has been processed and analyze existing files.
 
     Returns:
         Dictionary with:

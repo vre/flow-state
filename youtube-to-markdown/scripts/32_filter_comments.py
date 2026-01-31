@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Filter low-value comments from extracted YouTube comments.
+"""Filter low-value comments from extracted YouTube comments.
 Usage: 32_filter_comments.py <comments.md> [output.md] [max_comments]
 
 Removes junk (short AND unpopular), keeps top N by likes (default 200).
@@ -11,7 +10,12 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from lib.comment_filter import parse_comments, filter_comments, format_comments, MAX_COMMENTS
+from lib.comment_filter import (
+    MAX_COMMENTS,
+    filter_comments,
+    format_comments,
+    parse_comments,
+)
 
 
 def main():
@@ -32,5 +36,5 @@ def main():
     print(f"Filtered: {len(comments)} → {len(filtered)} comments (max {max_comments})")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

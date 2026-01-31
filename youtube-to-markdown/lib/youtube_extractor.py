@@ -1,38 +1,31 @@
-"""
-YouTube data extraction library.
-"""
+"""YouTube data extraction library."""
 
 import json
 from datetime import datetime
 from pathlib import Path
 
+from lib.content_safety import wrap_untrusted_content
 from lib.shared_types import (
-    FileSystem,
+    CommandNotFoundError,
     CommandRunner,
-    RealFileSystem,
+    FileOperationError,
+    FileSystem,
     RealCommandRunner,
+    RealFileSystem,
     VideoMetadata,
     extract_video_id,
-    format_upload_date,
-    format_subscribers,
-    format_duration,
     format_count,
-    CommandNotFoundError,
-    FileOperationError,
+    format_duration,
+    format_subscribers,
+    format_upload_date,
 )
-from lib.content_safety import wrap_untrusted_content
 
 
 class YouTubeDataExtractor:
     """Extracts and processes YouTube video data."""
 
-    def __init__(
-        self,
-        fs: FileSystem = RealFileSystem(),
-        cmd: CommandRunner = RealCommandRunner()
-    ):
-        """
-        Initialize extractor with dependencies.
+    def __init__(self, fs: FileSystem = RealFileSystem(), cmd: CommandRunner = RealCommandRunner()):
+        """Initialize extractor with dependencies.
 
         Args:
             fs: File system implementation
@@ -42,26 +35,24 @@ class YouTubeDataExtractor:
         self.cmd = cmd
 
     def check_yt_dlp(self) -> None:
-        """
-        Check if yt-dlp is installed.
+        """Check if yt-dlp is installed.
 
         Raises:
             CommandNotFoundError: If yt-dlp is not installed
         """
         try:
-            result = self.cmd.run(['yt-dlp', '--version'], capture_output=True, check=True)
-        except Exception:
+            self.cmd.run(["yt-dlp", "--version"], capture_output=True, check=True)
+        except Exception as e:
             raise CommandNotFoundError(
                 "yt-dlp is not installed\n"
                 "Install options:\n"
                 "  - macOS: brew install yt-dlp\n"
                 "  - Ubuntu/Debian: sudo apt update && sudo apt install -y yt-dlp\n"
                 "  - All systems: pip3 install yt-dlp"
-            )
+            ) from e
 
     def fetch_video_data(self, video_url: str, output_dir: Path) -> dict:
-        """
-        Fetch video metadata from YouTube.
+        """Fetch video metadata from YouTube.
 
         Args:
             video_url: YouTube URL
@@ -77,13 +68,8 @@ class YouTubeDataExtractor:
 
         try:
             # Run yt-dlp and write JSON to temp file
-            with open(temp_json, 'w') as f:
-                result = self.cmd.run(
-                    ['yt-dlp', '--dump-single-json', '--skip-download', video_url],
-                    stdout=f,
-                    stderr=None,
-                    text=True
-                )
+            with open(temp_json, "w") as f:
+                result = self.cmd.run(["yt-dlp", "--dump-single-json", "--skip-download", video_url], stdout=f, stderr=None, text=True)
 
             if result.returncode != 0:
                 raise FileOperationError("Failed to extract video metadata")
@@ -95,17 +81,16 @@ class YouTubeDataExtractor:
             return data
 
         except json.JSONDecodeError as e:
-            raise FileOperationError(f"Failed to parse JSON: {e}")
+            raise FileOperationError(f"Failed to parse JSON: {e}") from e
         except Exception as e:
-            raise FileOperationError(f"Failed to extract video metadata: {e}")
+            raise FileOperationError(f"Failed to extract video metadata: {e}") from e
         finally:
             # Clean up temp file
             if self.fs.exists(temp_json):
                 self.fs.remove(temp_json)
 
     def parse_video_metadata(self, data: dict, video_id: str) -> VideoMetadata:
-        """
-        Parse raw video data into VideoMetadata object.
+        """Parse raw video data into VideoMetadata object.
 
         Args:
             data: Raw data from yt-dlp
@@ -116,33 +101,27 @@ class YouTubeDataExtractor:
         """
         return VideoMetadata(
             video_id=video_id,
-            title=data.get('title', 'Untitled'),
-            webpage_url=data.get('webpage_url', 'N/A'),
-            uploader=data.get('uploader', 'Unknown'),
-            channel_url=data.get('channel_url', data.get('uploader_url', '')),
-            channel_follower_count=data.get('channel_follower_count'),
-            channel_is_verified=data.get('channel_is_verified', False),
-            upload_date=data.get('upload_date', 'Unknown'),
-            view_count=data.get('view_count', 0),
-            like_count=data.get('like_count', 0),
-            comment_count=data.get('comment_count'),
-            duration=data.get('duration', 0),
-            description=data.get('description', 'No description'),
-            chapters=data.get('chapters', []),
-            language=data.get('language', 'unknown'),
-            categories=data.get('categories', []),
-            tags=data.get('tags', []),
-            license=data.get('license')
+            title=data.get("title", "Untitled"),
+            webpage_url=data.get("webpage_url", "N/A"),
+            uploader=data.get("uploader", "Unknown"),
+            channel_url=data.get("channel_url", data.get("uploader_url", "")),
+            channel_follower_count=data.get("channel_follower_count"),
+            channel_is_verified=data.get("channel_is_verified", False),
+            upload_date=data.get("upload_date", "Unknown"),
+            view_count=data.get("view_count", 0),
+            like_count=data.get("like_count", 0),
+            comment_count=data.get("comment_count"),
+            duration=data.get("duration", 0),
+            description=data.get("description", "No description"),
+            chapters=data.get("chapters", []),
+            language=data.get("language", "unknown"),
+            categories=data.get("categories", []),
+            tags=data.get("tags", []),
+            license=data.get("license"),
         )
 
-    def create_metadata_file(
-        self,
-        metadata: VideoMetadata,
-        base_name: str,
-        output_dir: Path
-    ) -> Path:
-        """
-        Create metadata markdown file.
+    def create_metadata_file(self, metadata: VideoMetadata, base_name: str, output_dir: Path) -> Path:
+        """Create metadata markdown file.
 
         Args:
             metadata: Video metadata
@@ -160,7 +139,7 @@ class YouTubeDataExtractor:
 
         # Format values
         upload_date = format_upload_date(metadata.upload_date)
-        extraction_date = datetime.now().strftime('%Y-%m-%d')
+        extraction_date = datetime.now().strftime("%Y-%m-%d")
         sub_text = format_subscribers(metadata.channel_follower_count)
         duration_text = format_duration(metadata.duration)
         views_text = format_count(metadata.view_count)
@@ -169,21 +148,19 @@ class YouTubeDataExtractor:
         verified_text = " ✓" if metadata.channel_is_verified else ""
 
         # Build content
-        lines = [
-            f"- **Title:** [{metadata.title}]({metadata.webpage_url}) · {duration_text}"
-        ]
+        lines = [f"- **Title:** [{metadata.title}]({metadata.webpage_url}) · {duration_text}"]
 
         if metadata.channel_url:
-            lines.append(
-                f"- **Channel:** [{metadata.uploader}]({metadata.channel_url}){verified_text} ({sub_text})"
-            )
+            lines.append(f"- **Channel:** [{metadata.uploader}]({metadata.channel_url}){verified_text} ({sub_text})")
         else:
             lines.append(f"- **Channel:** {metadata.uploader}{verified_text} ({sub_text})")
 
-        lines.extend([
-            f"- **Engagement:** {views_text} views · {likes_text} likes · {comments_text} comments",
-            f"- **Published:** {upload_date} | Extracted: {extraction_date}"
-        ])
+        lines.extend(
+            [
+                f"- **Engagement:** {views_text} views · {likes_text} likes · {comments_text} comments",
+                f"- **Published:** {upload_date} | Extracted: {extraction_date}",
+            ]
+        )
 
         # Add category and license if available
         category_license = []
@@ -199,20 +176,14 @@ class YouTubeDataExtractor:
             tags_display = metadata.tags[:8]
             lines.append(f"- **Tags:** {', '.join(tags_display)}")
 
-        content = '\n'.join(lines)
+        content = "\n".join(lines)
         self.fs.write_text(filename, content)
 
         print(f"SUCCESS: {filename}")
         return filename
 
-    def create_description_file(
-        self,
-        metadata: VideoMetadata,
-        base_name: str,
-        output_dir: Path
-    ) -> Path:
-        """
-        Create description markdown file.
+    def create_description_file(self, metadata: VideoMetadata, base_name: str, output_dir: Path) -> Path:
+        """Create description markdown file.
 
         Wraps content in safety delimiters to defend against prompt
         injection from creator-controlled content.
@@ -232,14 +203,8 @@ class YouTubeDataExtractor:
         print(f"SUCCESS: {filename}")
         return filename
 
-    def create_chapters_file(
-        self,
-        metadata: VideoMetadata,
-        base_name: str,
-        output_dir: Path
-    ) -> Path:
-        """
-        Create chapters JSON file.
+    def create_chapters_file(self, metadata: VideoMetadata, base_name: str, output_dir: Path) -> Path:
+        """Create chapters JSON file.
 
         Args:
             metadata: Video metadata
@@ -261,8 +226,7 @@ class YouTubeDataExtractor:
         return chapters_file
 
     def extract_all(self, video_url: str, output_dir: Path) -> tuple[Path, Path, Path]:
-        """
-        Extract all video data (metadata, description, chapters).
+        """Extract all video data (metadata, description, chapters).
 
         Args:
             video_url: YouTube URL

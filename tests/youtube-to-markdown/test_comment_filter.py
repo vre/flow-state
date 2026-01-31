@@ -1,11 +1,10 @@
 """Tests for prefilter_comments.py."""
 
-import pytest
 from lib.comment_filter import (
-    parse_comments,
+    MAX_COMMENTS,
     filter_comments,
     format_comments,
-    MAX_COMMENTS,
+    parse_comments,
 )
 
 
@@ -18,9 +17,9 @@ class TestParseComments:
         result = parse_comments(content)
 
         assert len(result) == 1
-        assert result[0]['author'] == 'user1'
-        assert result[0]['likes'] == 42
-        assert result[0]['text'] == 'This is a comment'
+        assert result[0]["author"] == "user1"
+        assert result[0]["likes"] == 42
+        assert result[0]["text"] == "This is a comment"
 
     def test_parse_multiple_comments(self):
         """Test parsing multiple comments."""
@@ -32,9 +31,9 @@ class TestParseComments:
         result = parse_comments(content)
 
         assert len(result) == 3
-        assert result[0]['author'] == 'user1'
-        assert result[1]['author'] == 'user2'
-        assert result[2]['author'] == 'user3'
+        assert result[0]["author"] == "user1"
+        assert result[1]["author"] == "user2"
+        assert result[2]["author"] == "user3"
 
     def test_parse_comment_with_singular_like(self):
         """Test parsing comment with '1 like' (singular)."""
@@ -42,7 +41,7 @@ class TestParseComments:
         result = parse_comments(content)
 
         assert len(result) == 1
-        assert result[0]['likes'] == 1
+        assert result[0]["likes"] == 1
 
     def test_parse_multiline_comment(self):
         """Test parsing comment with multiple lines."""
@@ -50,9 +49,9 @@ class TestParseComments:
         result = parse_comments(content)
 
         assert len(result) == 1
-        assert "Line one" in result[0]['text']
-        assert "Line two" in result[0]['text']
-        assert "Line three" in result[0]['text']
+        assert "Line one" in result[0]["text"]
+        assert "Line two" in result[0]["text"]
+        assert "Line three" in result[0]["text"]
 
     def test_parse_empty_content(self):
         """Test parsing empty content."""
@@ -65,7 +64,7 @@ class TestParseComments:
         result = parse_comments(content)
 
         assert len(result) == 1
-        assert result[0]['likes'] == 0
+        assert result[0]["likes"] == 0
 
 
 class TestFilterComments:
@@ -74,7 +73,7 @@ class TestFilterComments:
     def test_filter_keeps_long_comments(self):
         """Test that comments with >=20 chars are kept regardless of likes."""
         comments = [
-            {'author': 'user1', 'likes': 0, 'text': 'This is a long enough comment'},
+            {"author": "user1", "likes": 0, "text": "This is a long enough comment"},
         ]
         result = filter_comments(comments)
 
@@ -83,7 +82,7 @@ class TestFilterComments:
     def test_filter_keeps_popular_comments(self):
         """Test that comments with >=2 likes are kept regardless of length."""
         comments = [
-            {'author': 'user1', 'likes': 5, 'text': 'Short'},
+            {"author": "user1", "likes": 5, "text": "Short"},
         ]
         result = filter_comments(comments)
 
@@ -92,8 +91,8 @@ class TestFilterComments:
     def test_filter_removes_short_and_unpopular(self):
         """Test that short AND unpopular comments are removed."""
         comments = [
-            {'author': 'user1', 'likes': 0, 'text': 'Short'},
-            {'author': 'user2', 'likes': 1, 'text': 'Also short'},
+            {"author": "user1", "likes": 0, "text": "Short"},
+            {"author": "user2", "likes": 1, "text": "Also short"},
         ]
         result = filter_comments(comments)
 
@@ -101,20 +100,14 @@ class TestFilterComments:
 
     def test_filter_respects_max_comments(self):
         """Test that max_comments limit is respected."""
-        comments = [
-            {'author': f'user{i}', 'likes': 100 - i, 'text': 'This is a valid comment'}
-            for i in range(10)
-        ]
+        comments = [{"author": f"user{i}", "likes": 100 - i, "text": "This is a valid comment"} for i in range(10)]
         result = filter_comments(comments, max_comments=5)
 
         assert len(result) == 5
 
     def test_filter_default_max_is_200(self):
         """Test that default max is MAX_COMMENTS (200)."""
-        comments = [
-            {'author': f'user{i}', 'likes': 10, 'text': 'This is a valid comment'}
-            for i in range(300)
-        ]
+        comments = [{"author": f"user{i}", "likes": 10, "text": "This is a valid comment"} for i in range(300)]
         result = filter_comments(comments)
 
         assert len(result) == MAX_COMMENTS
@@ -122,20 +115,20 @@ class TestFilterComments:
     def test_filter_preserves_order(self):
         """Test that comment order is preserved (already sorted by yt-dlp)."""
         comments = [
-            {'author': 'user1', 'likes': 100, 'text': 'First comment here'},
-            {'author': 'user2', 'likes': 50, 'text': 'Second comment here'},
-            {'author': 'user3', 'likes': 25, 'text': 'Third comment here'},
+            {"author": "user1", "likes": 100, "text": "First comment here"},
+            {"author": "user2", "likes": 50, "text": "Second comment here"},
+            {"author": "user3", "likes": 25, "text": "Third comment here"},
         ]
         result = filter_comments(comments)
 
-        assert result[0]['author'] == 'user1'
-        assert result[1]['author'] == 'user2'
-        assert result[2]['author'] == 'user3'
+        assert result[0]["author"] == "user1"
+        assert result[1]["author"] == "user2"
+        assert result[2]["author"] == "user3"
 
     def test_filter_edge_case_exactly_20_chars(self):
         """Test comment with exactly 20 characters."""
         comments = [
-            {'author': 'user1', 'likes': 0, 'text': '12345678901234567890'},  # exactly 20
+            {"author": "user1", "likes": 0, "text": "12345678901234567890"},  # exactly 20
         ]
         result = filter_comments(comments)
 
@@ -144,7 +137,7 @@ class TestFilterComments:
     def test_filter_edge_case_exactly_2_likes(self):
         """Test comment with exactly 2 likes."""
         comments = [
-            {'author': 'user1', 'likes': 2, 'text': 'Short'},
+            {"author": "user1", "likes": 2, "text": "Short"},
         ]
         result = filter_comments(comments)
 
@@ -156,7 +149,7 @@ class TestFormatComments:
 
     def test_format_single_comment(self):
         """Test formatting a single comment with safety wrappers."""
-        comments = [{'author': 'user1', 'likes': 42, 'text': 'Test comment'}]
+        comments = [{"author": "user1", "likes": 42, "text": "Test comment"}]
         result = format_comments(comments)
 
         # Content present
@@ -170,8 +163,8 @@ class TestFormatComments:
     def test_format_multiple_comments(self):
         """Test formatting multiple comments with safety wrappers."""
         comments = [
-            {'author': 'user1', 'likes': 100, 'text': 'First'},
-            {'author': 'user2', 'likes': 50, 'text': 'Second'},
+            {"author": "user1", "likes": 100, "text": "First"},
+            {"author": "user2", "likes": 50, "text": "Second"},
         ]
         result = format_comments(comments)
 
@@ -182,18 +175,18 @@ class TestFormatComments:
     def test_format_empty_list(self):
         """Test formatting empty list returns empty (no wrapper)."""
         result = format_comments([])
-        assert result == ''
+        assert result == ""
 
     def test_format_preserves_multiline_text(self):
         """Test that multiline text is preserved."""
-        comments = [{'author': 'user1', 'likes': 10, 'text': 'Line1\nLine2\nLine3'}]
+        comments = [{"author": "user1", "likes": 10, "text": "Line1\nLine2\nLine3"}]
         result = format_comments(comments)
 
         assert "Line1\nLine2\nLine3" in result
 
     def test_format_without_wrapping(self):
         """Test formatting with wrap_safe=False returns raw markdown."""
-        comments = [{'author': 'user1', 'likes': 42, 'text': 'Test'}]
+        comments = [{"author": "user1", "likes": 42, "text": "Test"}]
         result = format_comments(comments, wrap_safe=False)
 
         assert "### 1. @user1 (42 likes)" in result

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Updates metadata section in existing summary file.
+"""Updates metadata section in existing summary file.
 
 Usage: 41_update_metadata.py <SUMMARY_PATH> <METADATA_PATH>
 

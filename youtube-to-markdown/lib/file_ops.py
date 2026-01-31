@@ -1,19 +1,16 @@
-"""
-File operations library: backup and cleanup.
-"""
+"""File operations library: backup and cleanup."""
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from lib.shared_types import FileOperationError, FileSystem, RealFileSystem
 from lib.intermediate_files import get_all_work_files
+from lib.shared_types import FileOperationError, FileSystem, RealFileSystem
 
 
 class FileOps:
     """File operations: backup and cleanup."""
 
-    def __init__(self, fs: Optional[FileSystem] = None):
+    def __init__(self, fs: FileSystem | None = None):
         self.fs = fs or RealFileSystem()
 
     def backup(self, file_path: Path) -> Path:

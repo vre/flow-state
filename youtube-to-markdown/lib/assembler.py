@@ -1,15 +1,18 @@
-"""
-Final assembly library for YouTube to Markdown conversion.
-"""
+"""Final assembly library for YouTube to Markdown conversion."""
 
 from pathlib import Path
 
-from lib.shared_types import FileSystem, RealFileSystem, clean_title_for_filename, FileOperationError
 from lib.intermediate_files import (
+    get_all_work_files,
+    get_comments_work_files,
     get_summary_work_files,
     get_transcript_work_files,
-    get_comments_work_files,
-    get_all_work_files,
+)
+from lib.shared_types import (
+    FileOperationError,
+    FileSystem,
+    RealFileSystem,
+    clean_title_for_filename,
 )
 
 
@@ -36,14 +39,14 @@ class Finalizer:
         """Strip leading markdown header if present."""
         stripped = content.strip()
         if stripped.startswith(header):
-            stripped = stripped[len(header):].lstrip()
+            stripped = stripped[len(header) :].lstrip()
         return stripped
 
     def get_filenames(self, base_name: str, output_dir: Path) -> tuple[str, str]:
         """Get cleaned title and video ID for filename generation."""
         title_path = output_dir / f"{base_name}_title.txt"
         title = self.read_component_or_empty(title_path).strip()
-        video_id = base_name.replace('youtube_', '')
+        video_id = base_name.replace("youtube_", "")
 
         if title:
             cleaned_title = clean_title_for_filename(title)
@@ -52,12 +55,7 @@ class Finalizer:
 
         return cleaned_title, video_id
 
-    def assemble_summary_content(
-        self,
-        template: str,
-        base_name: str,
-        output_dir: Path
-    ) -> str:
+    def assemble_summary_content(self, template: str, base_name: str, output_dir: Path) -> str:
         """Assemble summary content from template and components."""
         quick_summary = self.read_component_or_empty(output_dir / f"{base_name}_quick_summary.md")
         metadata = self.read_component_or_empty(output_dir / f"{base_name}_metadata.md")
@@ -72,12 +70,7 @@ class Finalizer:
 
         return final_content
 
-    def assemble_transcript_content(
-        self,
-        template: str,
-        base_name: str,
-        output_dir: Path
-    ) -> str:
+    def assemble_transcript_content(self, template: str, base_name: str, output_dir: Path) -> str:
         """Assemble transcript content from template and components.
 
         Note: Description is pre-wrapped in safety delimiters at extraction time.
@@ -90,13 +83,7 @@ class Finalizer:
 
         return transcript_content
 
-    def assemble_comments_content(
-        self,
-        template: str,
-        base_name: str,
-        output_dir: Path,
-        standalone: bool = False
-    ) -> str:
+    def assemble_comments_content(self, template: str, base_name: str, output_dir: Path, standalone: bool = False) -> str:
         """Assemble comments content from template and components.
 
         Note: Comments are pre-wrapped in safety delimiters at extraction time.
@@ -112,11 +99,7 @@ class Finalizer:
         content = content.replace("{comments}", comments.strip())
         return content
 
-    def insert_comment_insights_into_summary(
-        self,
-        summary_path: Path,
-        comment_insights: str
-    ) -> None:
+    def insert_comment_insights_into_summary(self, summary_path: Path, comment_insights: str) -> None:
         """Insert Comment Insights section into existing summary file at end."""
         if not self.fs.exists(summary_path) or not comment_insights.strip():
             return
@@ -144,13 +127,7 @@ class Finalizer:
 
         print("Cleaned up intermediate work files")
 
-    def finalize_summary_only(
-        self,
-        base_name: str,
-        output_dir: Path,
-        template_dir: Path,
-        debug: bool = False
-    ) -> Path:
+    def finalize_summary_only(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> Path:
         """Create only summary file."""
         template = self.read_template(template_dir, "summary.md")
 
@@ -171,13 +148,7 @@ class Finalizer:
 
         return output_path
 
-    def finalize_transcript_only(
-        self,
-        base_name: str,
-        output_dir: Path,
-        template_dir: Path,
-        debug: bool = False
-    ) -> Path:
+    def finalize_transcript_only(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> Path:
         """Create only transcript file."""
         template = self.read_template(template_dir, "transcript.md")
 
@@ -198,13 +169,7 @@ class Finalizer:
 
         return output_path
 
-    def finalize_comments_only(
-        self,
-        base_name: str,
-        output_dir: Path,
-        template_dir: Path,
-        debug: bool = False
-    ) -> Path:
+    def finalize_comments_only(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> Path:
         """Create only comments file (standalone with insights)."""
         template = self.read_template(template_dir, "comments_standalone.md")
 
@@ -212,7 +177,7 @@ class Finalizer:
 
         name_path = output_dir / f"{base_name}_name.txt"
         title = self.read_component_or_empty(name_path).strip()
-        video_id = base_name.replace('youtube_', '')
+        video_id = base_name.replace("youtube_", "")
 
         if title:
             cleaned_title = clean_title_for_filename(title)
@@ -229,13 +194,7 @@ class Finalizer:
 
         return output_path
 
-    def finalize_summary_comments(
-        self,
-        base_name: str,
-        output_dir: Path,
-        template_dir: Path,
-        debug: bool = False
-    ) -> tuple[Path, Path]:
+    def finalize_summary_comments(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> tuple[Path, Path]:
         """Create summary and comments files, insert insights into summary."""
         summary_template = self.read_template(template_dir, "summary.md")
         summary_content = self.assemble_summary_content(summary_template, base_name, output_dir)
@@ -268,13 +227,7 @@ class Finalizer:
 
         return summary_path, comments_path
 
-    def finalize_full(
-        self,
-        base_name: str,
-        output_dir: Path,
-        template_dir: Path,
-        debug: bool = False
-    ) -> tuple[Path, Path, Path]:
+    def finalize_full(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> tuple[Path, Path, Path]:
         """Create summary, transcript, and comments files."""
         cleaned_title, video_id = self.get_filenames(base_name, output_dir)
 

@@ -1,33 +1,32 @@
 """Tests for imap_client module."""
 
-import email
-import pytest
-from unittest.mock import MagicMock, patch, PropertyMock
-from contextlib import contextmanager
-
 import sys
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+import session
+from conftest import MockAddress, MockEnvelope, MockIMAPClient
 from imap_client import (
-    to_str,
+    IMAPError,
+    create_draft,
     decode_header_value,
-    parse_folder_path,
     format_address,
     format_address_list,
     get_credentials,
-    list_accounts,
     get_default_account,
+    list_accounts,
     list_folders,
     list_messages,
+    modify_draft,
+    parse_folder_path,
     read_message,
     search_messages,
-    create_draft,
-    modify_draft,
-    IMAPError,
+    to_str,
 )
-import session
-from conftest import MockIMAPClient, MockEnvelope, MockAddress
 
 
 class TestToStr:
@@ -47,7 +46,7 @@ class TestToStr:
 
     def test_bytes_with_invalid_utf8(self):
         """Test bytes with invalid UTF-8 uses replace."""
-        result = to_str(b'\xff\xfe')
+        result = to_str(b"\xff\xfe")
         assert isinstance(result, str)
 
     def test_int_to_str(self):
@@ -61,7 +60,7 @@ class TestGetCredentials:
     Verifies keychain priority over env vars (keychain is primary).
     """
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_keychain_takes_priority(self, mock_keyring, monkeypatch):
         """Keychain credentials should be used when available."""
         # Set env vars (should be ignored when keychain has credentials)
@@ -88,7 +87,7 @@ class TestGetCredentials:
         assert username == "keychainuser"
         assert password == "keychainpass"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_default_port_when_not_set(self, mock_keyring, monkeypatch):
         """Default port should be 993 when not specified."""
         # Clear env vars
@@ -110,7 +109,7 @@ class TestGetCredentials:
 
         assert port == "993"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_falls_back_to_env_vars(self, mock_keyring, monkeypatch):
         """Should fall back to env vars when keychain not configured."""
         # Set env vars
@@ -129,7 +128,7 @@ class TestGetCredentials:
         assert username == "envuser"
         assert password == "envpass"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_raises_when_not_configured(self, mock_keyring, monkeypatch):
         """Should raise IMAPError when no credentials available."""
         # Clear env vars
@@ -143,7 +142,7 @@ class TestGetCredentials:
         with pytest.raises(IMAPError, match="not configured"):
             get_credentials()
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_multi_account_uses_prefixed_keys(self, mock_keyring, monkeypatch):
         """Should use account-prefixed keys for multi-account config."""
         monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
@@ -164,7 +163,7 @@ class TestGetCredentials:
         assert username == "me@company.com"
         assert password == "workpass"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_multi_account_default_when_no_account_specified(self, mock_keyring, monkeypatch):
         """Should use default account when account not specified."""
         monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
@@ -184,7 +183,7 @@ class TestGetCredentials:
         assert username == "me@gmail.com"
         assert password == "gmailpass"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_multi_account_nonexistent_raises(self, mock_keyring, monkeypatch):
         """Should raise error for nonexistent account."""
         monkeypatch.delenv("IMAP_STREAM_SERVER", raising=False)
@@ -197,10 +196,11 @@ class TestGetCredentials:
         with pytest.raises(IMAPError, match="Account 'nonexistent' not found"):
             get_credentials("nonexistent")
 
+
 class TestListAccounts:
     """Tests for list_accounts function."""
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_empty_list_when_no_accounts(self, mock_keyring):
         """Should return empty list when no accounts configured."""
         mock_keyring.return_value = None
@@ -209,7 +209,7 @@ class TestListAccounts:
 
         assert accounts == []
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_accounts_from_keychain(self, mock_keyring):
         """Should return list of account names from keychain."""
         mock_keyring.side_effect = lambda service, key: {
@@ -220,7 +220,7 @@ class TestListAccounts:
 
         assert accounts == ["work", "personal"]
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_single_account(self, mock_keyring):
         """Should handle single account."""
         mock_keyring.side_effect = lambda service, key: {
@@ -231,10 +231,11 @@ class TestListAccounts:
 
         assert accounts == ["default"]
 
+
 class TestGetDefaultAccount:
     """Tests for get_default_account function."""
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_none_when_no_accounts(self, mock_keyring):
         """Should return None when no accounts configured."""
         mock_keyring.return_value = None
@@ -243,7 +244,7 @@ class TestGetDefaultAccount:
 
         assert default is None
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_default_account_from_keychain(self, mock_keyring):
         """Should return default account name from keychain."""
         mock_keyring.side_effect = lambda service, key: {
@@ -255,7 +256,7 @@ class TestGetDefaultAccount:
 
         assert default == "work"
 
-    @patch('imap_client.keyring.get_password')
+    @patch("imap_client.keyring.get_password")
     def test_returns_first_account_when_no_default_set(self, mock_keyring):
         """Should return first account when no default explicitly set."""
         mock_keyring.side_effect = lambda service, key: {
@@ -322,7 +323,7 @@ class TestFormatAddress:
         addr = MockAddress(
             name=b"=?UTF-8?B?SGVsbG8gV29ybGQ=?=",  # "Hello World"
             mailbox=b"hello",
-            host=b"example.com"
+            host=b"example.com",
         )
         result = format_address(addr)
         assert result == "Hello World <hello@example.com>"
@@ -394,12 +395,12 @@ class TestParseFolderPath:
 class TestListFolders:
     """Tests for list_folders function."""
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_list_folders_basic(self, mock_create):
         """Test basic folder listing."""
         mock_client = MockIMAPClient()
         mock_create.return_value = mock_client
-        
+
         # Reset session cache
         session._sessions.clear()
 
@@ -413,7 +414,7 @@ class TestListFolders:
 class TestListMessages:
     """Tests for list_messages function."""
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_list_empty_folder(self, mock_create):
         """Test listing empty folder."""
         mock_client = MockIMAPClient()
@@ -424,7 +425,7 @@ class TestListMessages:
 
         assert result == []
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_list_messages_with_content(self, mock_create, sample_envelope):
         """Test listing folder with messages."""
         mock_client = MockIMAPClient()
@@ -438,7 +439,7 @@ class TestListMessages:
         assert result[0]["id"] == 1
         assert result[0]["subject"] == "Test Email Subject"
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_list_messages_folder_not_found(self, mock_create):
         """Test listing non-existent folder."""
         mock_client = MockIMAPClient()
@@ -450,15 +451,15 @@ class TestListMessages:
         # Original test didn't configure it.
         mock_create.return_value = mock_client
         session._sessions.clear()
-        
+
         # Configure mock to raise error for select_folder("NonExistent")
         # Assuming MockIMAPClient implementation handles it, or we mock the method.
         # But MockIMAPClient probably mimics 'INBOX' and 'Drafts' only.
-        
+
         # If I look at the failure, it was connecting to REAL server.
         # Now I am patching _create_connection, so it won't connect to real server.
         # But MockIMAPClient needs to simulate failure.
-        
+
         with pytest.raises(IMAPError, match="Cannot open folder"):
             list_messages("NonExistent", limit=20)
 
@@ -466,7 +467,7 @@ class TestListMessages:
 class TestReadMessage:
     """Tests for read_message function."""
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_read_message_not_found(self, mock_create):
         """Test reading non-existent message."""
         mock_client = MockIMAPClient()
@@ -476,15 +477,11 @@ class TestReadMessage:
         with pytest.raises(IMAPError, match="not found"):
             read_message("INBOX", 999)
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_read_message_basic(self, mock_create, sample_envelope, sample_raw_email):
         """Test reading a basic message."""
         mock_client = MockIMAPClient()
-        mock_client.add_message(
-            "INBOX", 1, sample_envelope,
-            body_text="This is the email body.",
-            raw_email=sample_raw_email
-        )
+        mock_client.add_message("INBOX", 1, sample_envelope, body_text="This is the email body.", raw_email=sample_raw_email)
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -498,7 +495,7 @@ class TestReadMessage:
 class TestSearchMessages:
     """Tests for search_messages function."""
 
-    @patch('session._create_connection')
+    @patch("session._create_connection")
     def test_search_no_results(self, mock_create):
         """Test search with no results."""
         mock_client = MockIMAPClient()
@@ -513,8 +510,8 @@ class TestSearchMessages:
 class TestCreateDraft:
     """Tests for create_draft function."""
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_create_draft_basic(self, mock_creds, mock_create):
         """Test creating a basic draft."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -522,12 +519,7 @@ class TestCreateDraft:
         mock_create.return_value = mock_client
         session._sessions.clear()
 
-        result = create_draft(
-            folder="INBOX",
-            to="recipient@example.com",
-            subject="Test Subject",
-            body="Test body content"
-        )
+        result = create_draft(folder="INBOX", to="recipient@example.com", subject="Test Subject", body="Test body content")
 
         assert result["status"] == "created"
         assert result["to"] == "recipient@example.com"
@@ -541,8 +533,8 @@ class TestCreateDraft:
         assert b"Test Subject" in appended["message"]
         assert b"Test body content" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_create_draft_with_html(self, mock_creds, mock_create):
         """Test creating a draft with HTML content."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -555,7 +547,7 @@ class TestCreateDraft:
             to="recipient@example.com",
             subject="HTML Test",
             body="Plain text body",
-            html="<html><body><p>HTML body</p></body></html>"
+            html="<html><body><p>HTML body</p></body></html>",
         )
 
         assert result["status"] == "created"
@@ -567,8 +559,8 @@ class TestCreateDraft:
         assert b"text/html" in appended["message"]
         assert b"<html>" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_create_draft_with_reply(self, mock_creds, mock_create):
         """Test creating a draft reply with In-Reply-To."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -577,11 +569,7 @@ class TestCreateDraft:
         session._sessions.clear()
 
         result = create_draft(
-            folder="INBOX",
-            to="recipient@example.com",
-            subject="Re: Original",
-            body="Reply content",
-            in_reply_to="<original@example.com>"
+            folder="INBOX", to="recipient@example.com", subject="Re: Original", body="Reply content", in_reply_to="<original@example.com>"
         )
 
         assert result["status"] == "created"
@@ -591,8 +579,8 @@ class TestCreateDraft:
         assert b"In-Reply-To: <original@example.com>" in appended["message"]
         assert b"References: <original@example.com>" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_create_draft_with_cc(self, mock_creds, mock_create):
         """Test creating a draft with CC."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -601,11 +589,7 @@ class TestCreateDraft:
         session._sessions.clear()
 
         result = create_draft(
-            folder="INBOX",
-            to="recipient@example.com",
-            subject="Test with CC",
-            body="Body",
-            cc="cc1@example.com, cc2@example.com"
+            folder="INBOX", to="recipient@example.com", subject="Test with CC", body="Body", cc="cc1@example.com, cc2@example.com"
         )
 
         assert result["status"] == "created"
@@ -617,8 +601,8 @@ class TestCreateDraft:
 class TestModifyDraft:
     """Tests for modify_draft function."""
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_modify_draft_not_found(self, mock_creds, mock_create):
         """Test modifying non-existent draft."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -629,8 +613,8 @@ class TestModifyDraft:
         with pytest.raises(IMAPError, match="not found"):
             modify_draft("Drafts", 999, body="New body")
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_modify_draft_basic(self, mock_creds, mock_create):
         """Test modifying a draft with new body."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -668,8 +652,8 @@ Original body content.
         appended = mock_client.appended_messages[0]
         assert b"Updated body content" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_modify_draft_preserve_reply_threading(self, mock_creds, mock_create):
         """Test modifying draft preserves In-Reply-To and References."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -704,8 +688,8 @@ Reply body.
         assert b"In-Reply-To: <thread@example.com>" in appended["message"]
         assert b"References: <thread@example.com>" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_modify_draft_change_subject(self, mock_creds, mock_create):
         """Test modifying draft with new subject."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -735,8 +719,8 @@ Body.
         appended = mock_client.appended_messages[0]
         assert b"Subject: New Subject" in appended["message"]
 
-    @patch('session._create_connection')
-    @patch('imap_client.get_credentials')
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
     def test_modify_draft_with_html(self, mock_creds, mock_create):
         """Test modifying draft with HTML content."""
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
@@ -759,11 +743,7 @@ Plain text.
         mock_create.return_value = mock_client
         session._sessions.clear()
 
-        result = modify_draft(
-            "Drafts", 1,
-            body="Plain text",
-            html="<p><strong>Bold</strong> text</p>"
-        )
+        result = modify_draft("Drafts", 1, body="Plain text", html="<p><strong>Bold</strong> text</p>")
 
         assert result["status"] == "modified"
 

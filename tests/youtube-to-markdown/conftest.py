@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 from typing import Any
+
 import pytest
 
 # Add youtube-to-markdown directory to Python path for lib imports
@@ -39,6 +40,7 @@ class MockFileSystem:
     def glob(self, pattern: str, directory: Path) -> list[Path]:
         # Simple glob implementation for tests
         import fnmatch
+
         results = []
         for file_path in self.files.keys():
             if file_path.parent == directory:
@@ -62,7 +64,7 @@ class MockCommandRunner:
         check: bool = False,
         timeout: int | None = None,
         stdout: Any = None,
-        stderr: Any = None
+        stderr: Any = None,
     ) -> CommandResult:
         """Record command and return mocked response."""
         self.commands.append(command)
@@ -101,21 +103,21 @@ def mock_cmd():
 def sample_video_data():
     """Sample video metadata from yt-dlp."""
     return {
-        'title': 'Test Video Title',
-        'webpage_url': 'https://youtube.com/watch?v=test123',
-        'uploader': 'Test Channel',
-        'channel_url': 'https://youtube.com/c/testchannel',
-        'channel_follower_count': 1000000,
-        'upload_date': '20240101',
-        'view_count': 500000,
-        'like_count': 10000,
-        'duration': 3661,  # 1:01:01
-        'description': 'Test video description',
-        'chapters': [
-            {'start_time': 0, 'end_time': 60, 'title': 'Introduction'},
-            {'start_time': 60, 'end_time': 120, 'title': 'Main Content'}
+        "title": "Test Video Title",
+        "webpage_url": "https://youtube.com/watch?v=test123",
+        "uploader": "Test Channel",
+        "channel_url": "https://youtube.com/c/testchannel",
+        "channel_follower_count": 1000000,
+        "upload_date": "20240101",
+        "view_count": 500000,
+        "like_count": 10000,
+        "duration": 3661,  # 1:01:01
+        "description": "Test video description",
+        "chapters": [
+            {"start_time": 0, "end_time": 60, "title": "Introduction"},
+            {"start_time": 60, "end_time": 120, "title": "Main Content"},
         ],
-        'language': 'en'
+        "language": "en",
     }
 
 

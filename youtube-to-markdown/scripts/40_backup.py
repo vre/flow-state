@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-File operations for YouTube to Markdown: backup and cleanup.
+"""File operations for YouTube to Markdown: backup and cleanup.
 
 Usage:
     40_backup.py backup <file>

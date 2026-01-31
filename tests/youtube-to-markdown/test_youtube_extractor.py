@@ -1,10 +1,11 @@
 """Tests for extract_data module."""
 
-import pytest
 import json
 from pathlib import Path
+
+import pytest
+from lib.shared_types import CommandNotFoundError
 from lib.youtube_extractor import YouTubeDataExtractor
-from lib.shared_types import CommandNotFoundError, FileOperationError
 
 
 class TestYouTubeDataExtractor:
@@ -40,11 +41,7 @@ class TestYouTubeDataExtractor:
         extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
         metadata = extractor.parse_video_metadata(sample_video_data, "test123")
 
-        output_path = extractor.create_metadata_file(
-            metadata,
-            "youtube_test123",
-            Path("/output")
-        )
+        output_path = extractor.create_metadata_file(metadata, "youtube_test123", Path("/output"))
 
         assert output_path == Path("/output/youtube_test123_metadata.md")
         content = mock_fs.read_text(output_path)
@@ -62,11 +59,7 @@ class TestYouTubeDataExtractor:
         extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
         metadata = extractor.parse_video_metadata(sample_video_data, "test123")
 
-        output_path = extractor.create_description_file(
-            metadata,
-            "youtube_test123",
-            Path("/output")
-        )
+        output_path = extractor.create_description_file(metadata, "youtube_test123", Path("/output"))
 
         assert output_path == Path("/output/youtube_test123_description.md")
         content = mock_fs.read_text(output_path)
@@ -82,31 +75,22 @@ class TestYouTubeDataExtractor:
         extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
         metadata = extractor.parse_video_metadata(sample_video_data, "test123")
 
-        output_path = extractor.create_chapters_file(
-            metadata,
-            "youtube_test123",
-            Path("/output")
-        )
+        output_path = extractor.create_chapters_file(metadata, "youtube_test123", Path("/output"))
 
         assert output_path == Path("/output/youtube_test123_chapters.json")
         content = mock_fs.read_text(output_path)
         chapters = json.loads(content)
         assert len(chapters) == 2
-        assert chapters[0]['title'] == 'Introduction'
+        assert chapters[0]["title"] == "Introduction"
 
     def test_create_chapters_file_empty(self, mock_fs, mock_cmd):
         """Test creating chapters file when no chapters exist."""
         extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
-        data = {'chapters': []}
+        data = {"chapters": []}
         metadata = extractor.parse_video_metadata(data, "test123")
 
-        output_path = extractor.create_chapters_file(
-            metadata,
-            "youtube_test123",
-            Path("/output")
-        )
+        output_path = extractor.create_chapters_file(metadata, "youtube_test123", Path("/output"))
 
         content = mock_fs.read_text(output_path)
         chapters = json.loads(content)
         assert chapters == []
-

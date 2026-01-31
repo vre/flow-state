@@ -1,11 +1,9 @@
-"""
-Content safety utilities for YouTube to Markdown conversion.
+"""Content safety utilities for YouTube to Markdown conversion.
 
 Provides prompt injection defense by wrapping untrusted content
 (descriptions, comments, transcripts) in XML tags with warnings
 that signal to LLMs that the content should not be interpreted as instructions.
 """
-
 
 INJECTION_DETECTED_NOTICE = "[Suspicious patterns escaped]"
 
@@ -66,8 +64,7 @@ def wrap_untrusted_content(content: str, content_type: str) -> str:
     """
     valid_types = ["description", "comments", "transcript"]
     if content_type not in valid_types:
-        raise ValueError(f"Unknown content_type: {content_type}. "
-                        f"Must be one of: {valid_types}")
+        raise ValueError(f"Unknown content_type: {content_type}. Must be one of: {valid_types}")
 
     if not content or not content.strip():
         return content

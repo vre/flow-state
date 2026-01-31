@@ -2,6 +2,7 @@
 
 ## Ideas for further improvements
 
+- [ ] Pull list of videos on a youtube channel and propose to fetch the new ones and update comments for older
 - [ ] Providing yt-dlp logged in cookie signed to download restricted/member/etc transcripts
 - [ ] Try modding skill to run on opencode, github copilot, openai codex, ...
 

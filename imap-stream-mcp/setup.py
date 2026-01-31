@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-IMAP Stream Setup - Configure IMAP credentials in system keychain.
+"""IMAP Stream Setup - Configure IMAP credentials in system keychain.
 
 This script manages IMAP account configurations, supporting multiple accounts.
 Credentials are stored securely in the system keychain.
@@ -17,8 +16,9 @@ Usage:
 import argparse
 import getpass
 import json
-import keyring
 import sys
+
+import keyring
 
 SERVICE_NAME = "imap-stream"
 
@@ -130,7 +130,7 @@ def add_account(name: str):
     print()
     print(f"  Server:   {server}:{port}")
     print(f"  Username: {username}")
-    print(f"  Password: (stored in keychain)")
+    print("  Password: (stored in keychain)")
     print()
 
 
@@ -262,7 +262,7 @@ Examples:
   python setup.py --remove personal  # Remove 'personal' account
   python setup.py --default work     # Set 'work' as default
   python setup.py --clear            # Remove all configuration
-"""
+""",
     )
     parser.add_argument("--list", action="store_true", help="List configured accounts")
     parser.add_argument("--add", metavar="NAME", help="Add or update named account")

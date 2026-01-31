@@ -1,9 +1,10 @@
 """Tests for deduplicate_vtt module."""
 
-import pytest
 from pathlib import Path
-from lib.vtt_deduplicator import VTTDeduplicator
+
+import pytest
 from lib.shared_types import FileOperationError
+from lib.vtt_deduplicator import VTTDeduplicator
 
 
 class TestVTTDeduplicator:
@@ -63,7 +64,7 @@ class TestVTTDeduplicator:
 
         assert line_count == 3  # Duplicates should be removed
         content = mock_fs.read_text(output_path)
-        lines = content.split('\n')
+        lines = content.split("\n")
         assert len(lines) == 3
         assert "[00:00:01.000] First line of text" in content
         assert "[00:00:05.000] Second line of text" in content

@@ -12,7 +12,7 @@
 
 ---
 
-### Task 1: Data Structures
+## Task 1: Data Structures
 
 **Files:**
 - Create: `imap-stream-mcp/session.py`
@@ -115,7 +115,7 @@ git commit -m "Add session data structures"
 
 ---
 
-### Task 2: Connection Management
+## Task 2: Connection Management
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -274,7 +274,7 @@ git commit -a -m "Add connection management with keepalive"
 
 ---
 
-### Task 3: Connection Context Manager
+## Task 3: Connection Context Manager
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -373,7 +373,7 @@ git commit -a -m "Add connection context manager"
 
 ---
 
-### Task 4: Folder Caching
+## Task 4: Folder Caching
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -472,7 +472,7 @@ git commit -a -m "Add folder caching"
 
 ---
 
-### Task 5: Message List Caching
+## Task 5: Message List Caching
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -662,7 +662,7 @@ git commit -a -m "Add message list caching with validation"
 
 ---
 
-### Task 6: Session Management Module-Level
+## Task 6: Session Management Module-Level
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -776,7 +776,7 @@ git commit -a -m "Add session management functions"
 
 ---
 
-### Task 7: Cache Update on Flag Operations
+## Task 7: Cache Update on Flag Operations
 
 **Files:**
 - Modify: `imap-stream-mcp/session.py`
@@ -871,7 +871,7 @@ git commit -a -m "Add cache update for flag operations"
 
 ---
 
-### Task 8: Integrate with imap_client.py - list_folders
+## Task 8: Integrate with imap_client.py - list_folders
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -910,7 +910,7 @@ git commit -a -m "Integrate list_folders with session caching"
 
 ---
 
-### Task 9: Integrate with imap_client.py - list_messages
+## Task 9: Integrate with imap_client.py - list_messages
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -951,7 +951,7 @@ git commit -a -m "Integrate list_messages with session caching"
 
 ---
 
-### Task 10: Integrate modify_flags with cache update
+## Task 10: Integrate modify_flags with cache update
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -996,7 +996,7 @@ git commit -a -m "Integrate modify_flags with cache update"
 
 ---
 
-### Task 11: Integrate create_draft with cache invalidation
+## Task 11: Integrate create_draft with cache invalidation
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -1026,7 +1026,7 @@ git commit -a -m "Integrate create_draft with cache invalidation"
 
 ---
 
-### Task 12: Integrate modify_draft with cache invalidation
+## Task 12: Integrate modify_draft with cache invalidation
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -1058,7 +1058,7 @@ git commit -a -m "Integrate modify_draft with cache invalidation"
 
 ---
 
-### Task 13: Remove old imap_connection context manager usage
+## Task 13: Remove old imap_connection context manager usage
 
 **Files:**
 - Modify: `imap-stream-mcp/imap_client.py`
@@ -1099,7 +1099,7 @@ git commit -a -m "Update remaining functions to use session connection"
 
 ---
 
-### Task 14: Update Documentation
+## Task 14: Update Documentation
 
 **Files:**
 - Modify: `imap-stream-mcp/CHANGELOG.md`
@@ -1147,7 +1147,7 @@ git commit -m "Update docs for v0.4.0 caching"
 
 ---
 
-### Task 15: Manual Testing
+## Task 15: Manual Testing
 
 **Step 1: Test folder caching**
 
@@ -1183,7 +1183,7 @@ Expect: Flag appears without full refetch.
 
 ---
 
-### Task 16: Final Review and Merge
+## Task 16: Final Review and Merge
 
 **Step 1: Run all tests**
 

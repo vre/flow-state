@@ -1,5 +1,4 @@
-"""
-Intermediate work file patterns for YouTube to Markdown.
+"""Intermediate work file patterns for YouTube to Markdown.
 
 Single source of truth for work files created during extraction.
 Used by finalize.py for cleanup and prepare_update.py for detection.
@@ -50,11 +49,7 @@ def get_comments_work_files(base_name: str) -> list[str]:
 
 def get_all_work_files(base_name: str) -> list[str]:
     """All possible work files (deduplicated)."""
-    all_files = (
-        get_summary_work_files(base_name) +
-        get_transcript_work_files(base_name) +
-        get_comments_work_files(base_name)
-    )
+    all_files = get_summary_work_files(base_name) + get_transcript_work_files(base_name) + get_comments_work_files(base_name)
     # Deduplicate while preserving order
     seen = set()
     unique = []
@@ -66,8 +61,7 @@ def get_all_work_files(base_name: str) -> list[str]:
 
 
 def get_key_intermediate_files(base_name: str) -> list[str]:
-    """
-    Key intermediate files that indicate extraction started but didn't finish.
+    """Key intermediate files that indicate extraction started but didn't finish.
 
     If these exist without corresponding final files, extraction was interrupted.
     """

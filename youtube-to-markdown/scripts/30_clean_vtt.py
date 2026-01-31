@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-Deduplicate VTT (removes duplicate lines from auto-generated captions).
+"""Deduplicate VTT (removes duplicate lines from auto-generated captions).
 Usage: 30_clean_vtt.py <INPUT_VTT> <OUTPUT_MD> [NO_TIMESTAMPS_MD]
 Output format: [00:00:01.000] Text here
 """
