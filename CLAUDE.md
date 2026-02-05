@@ -17,31 +17,34 @@ Move to Plan Phase if the user request requires more than 5 tool calls or file c
 ### 1. Plan Phase Rules
 
 - DO NOT USE OR CHANGE TO AGENT PLAN MODE!
-- ALWAYS WRITE THE PLAN: 'docs/[plugin/core]/plans/' for plugin-/core specific
+- ALWAYS WRITE THE PLAN: 'docs/<plugin/core>/plans/<yyyy-mm-dd-short-description>.md'
 - Single source of truth: plans live only in docs/plans — never create a separate plan file elsewhere like '.claude/plans/' or '.copilot/session-state/'
-- Define measurable acceptance criteria and validation approach
-- Mission Command: include intent, goal, constraints, situational context. Research these before writing.
+- Define measurable and observable acceptance criteria with expected outputs, validation approach and thresholds when possible
+- Mission Command: include intent, goal, constraints, situational context and matching testing strategy (levels, tools, pass criteria). Research these before writing.
 - Use exact requirements, no temporal references ("current best practices", "latest version")
+- Interface change in plan → propose design exploration, iterate in cooperation 3-5 designs. Delegate to subagent: create mockups with realistic content.
 - Implementation is delegated to an agent who has only the plan as context — plan must be self-contained
-- When you think that the plan is ready ask if there is something else or proceed to review
-- When "review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- When you think that the plan is ready ask if there is something else or proceed to self-review
+- When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
 - Print instruction to the human companion: Ask the job applicant to "Review the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
 - Finally, ask the human companion if they approve the plan to proceed to Implementation Phase
+- Print instruction to the human companion: Tell the implementing agent "Plan reviewed and fixed, read it and then start Implementation Phase"
 
 ### 2. Implementation Phase Rules
 
 SETUP:
 - Start by reviewing if the architecture fits the future direction - even "maybe" requires returning to Plan Phase to present the problem and solution options
-- Create git worktree under '.worktrees/[short_description]' to isolate development from the main branch. Move plan file there.
+- ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development. Move plan file there.
 - Worktree setup: copy all `.env*` files from main (any directory level), run `uv sync` in dirs with pyproject.toml
 
 PROCESS:
 - Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
 - Problem found: investigate. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
-- For every completed todo `git add` new files, `git commit -a -m "{minimal description, no co-auth}"`
-- When you think that the implementation is ready ask if there is something else or proceed to review
-- When "review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Print instruction to the human companion: Ask the job applicant to "Review the implementation <worktree path> against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Document surprises and design decisions in the plan - the plan is a living document during implementation
+- For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
+- When you think that the implementation is ready ask if there is something else or proceed to self-review
+- When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- Print instruction to the human companion: Ask the job applicant to "Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
 - Finally, ask the human companion if they approve the functionality and implementation to proceed to Reflection Phase
 
 CODING:
@@ -55,16 +58,16 @@ CODING:
 
 ### 3. Reflect Phase Rules
 
-- Mark status in Tasks and Acceptance Criteria: `[x]` done `[-]` not done - why? `[>]` deferred - why? `[_]` skipped - why? `[+]` discovered `[?]` unclear
+- Mark status in Tasks and Acceptance Criteria: `[x]` done `[+]` discovered and done `[/]` in progress `[-]` cancelled - why? `[>]` deferred - why?
 - Add "## Reflection" to the plan file: what went well, what changed from plan, lessons learned
 
 ### 4. Merge Phase Rules
 
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
-- Ask final acceptance from the human companion
 - To merge progress do `git pull --rebase` with the main. Test and validate after each rebase step. If conflicts: validate that existing functionality from main was not broken.
-- Finalize with `git merge --squash` to main with oneline commit message, no co-authors. Remove worktree.
+- Finalize with `git merge --squash` to main with oneline commit message, no co-authors.
+- Ask final acceptance testing and approval from the human companion and then remove worktree and branch.
 
 ## Writing AGENTS.md / CLAUDE.md
 
