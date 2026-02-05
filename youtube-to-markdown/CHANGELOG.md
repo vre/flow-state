@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.0] - 2026-02-05
+
+### New Feature: Channel Browser
+- Browse YouTube channel videos by providing a channel URL
+- Paginated listing (20 videos per page) with title, views, duration
+- Matches against locally extracted videos in output directory and subdirectories (depth 1)
+- Check comment growth on existing videos (>10% triggers refresh suggestion)
+- Batch extraction: select multiple new videos with same output mode
+- Channel subdirectory suggestion for new channels
+- URL normalization: any channel tab redirects to /videos
+- Rate limiting: --sleep-requests 0.5 for listing, 1s delay for individual metadata
+
+### New Files
+- `lib/channel_listing.py` - Channel listing and video matching library
+- `scripts/22_list_channel.py` - Channel video listing CLI
+- `scripts/23_check_comment_growth.py` - Comment growth detection CLI
+- `subskills/channel_browse.md` - LLM instructions for channel browsing flow
+
+### Testing
+- 30 new tests for channel_listing (parse, match, growth threshold, output dir)
+
 ## [2.3.4] - 2026-01-29
 
 ### Bug Fixes

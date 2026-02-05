@@ -13,10 +13,10 @@
     {
       "name": "youtube-to-markdown",
       "source": "./youtube-to-markdown",
-      "description": "Transform YouTube video to storagable knowledge. Choose from summary only, transcript only, comments only, or full extraction. Get tight summary, cleaned transcript, and curated comment insights cross-analyzed against video content. Modular architecture runs independent steps in parallel.",
-      "version": "2.3.4",
+      "description": "Transform YouTube video to storagable knowledge. Choose from summary only, transcript only, comments only, or full extraction. Get tight summary, cleaned transcript, and curated comment insights cross-analyzed against video content. Browse channels to batch-extract or refresh comments. Modular architecture runs independent steps in parallel.",
+      "version": "2.4.0",
       "category": "media-extraction",
-      "keywords": ["youtube", "transcript", "captions", "markdown", "summary", "chapters", "comments"],
+      "keywords": ["youtube", "transcript", "captions", "markdown", "summary", "chapters", "comments", "channel"],
       "skills": ["./"]
     },
     {

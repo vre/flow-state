@@ -1,6 +1,6 @@
 ---
 name: youtube-to-markdown
-description: Use when user asks YouTube video extraction, get, fetch, transcripts, subtitles, or captions. Writes video details and transcription into structured markdown file.
+description: Use when user asks YouTube video extraction, get, fetch, transcripts, subtitles, or captions, or channel browsing. Writes video details and transcription into structured markdown file.
 allowed-tools:
   - Bash
   - Read
@@ -13,6 +13,13 @@ allowed-tools:
 # YouTube to Markdown
 
 Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions. Do not create your own scripts.
+
+## Step -1: Detect input type
+
+If URL is a channel URL (contains `/@`, `/channel/`, `/c/`, or `/user/`, but NOT `watch?v=`):
+  Read and follow `./subskills/channel_browse.md`.
+
+Otherwise: Continue to Step 0.
 
 ## Step 0: Check if extracted before
 

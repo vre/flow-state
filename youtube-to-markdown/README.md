@@ -12,6 +12,7 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Transcript** - Cleaned and formatted with chapters, paragraphs, and topic headings
 - **Timestamp links** - Jump back to specific moments in the original video
 - **Comment analysis** - Curated comments cross-analyzed against video content
+- **Channel browser** - Browse channel videos, batch-extract new ones, detect comment growth on existing
 - **Update mode** - Refresh existing extractions when video metadata changes
 
 ## Security
@@ -36,6 +37,11 @@ Defends against prompt injection in YouTube content. User-generated content (des
 
 ```
 extract https://www.youtube.com/watch?v=VIDEO_ID
+```
+
+Or browse a channel:
+```
+extract https://www.youtube.com/@channelname
 ```
 
 Also works: `get`, `fetch`, `transcript`, `subtitles`, `captions`
@@ -72,6 +78,8 @@ scripts/             # CLI entry points (numbered by pipeline order)
   13_extract_comments.py
   20_check_existing.py
   21_prepare_update.py
+  22_list_channel.py
+  23_check_comment_growth.py
   30_clean_vtt.py
   31_format_transcript.py
   32_filter_comments.py
