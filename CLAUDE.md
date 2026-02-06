@@ -32,23 +32,19 @@ Move to Plan Phase if the user request requires more than 5 tool calls or file c
 
 ### 2. Implementation Phase Rules
 
-SETUP:
-- Challenge the existing architecture against the plan's direction. If findings present to HC: proceed / amend plan & implement / back to Plan Phase /..
+PHASE SETUP:
+- Challenge the existing architecture against the plan's direction. If findings, present them to HC with proposal: amend plan & implement / back to Plan Phase / ..
 - ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development. Move plan file there and commit.
 - Worktree setup: copy all `.env*` files from main (any directory level), run `uv sync` in dirs with pyproject.toml
 
-PROCESS:
+PHASE LOOP:
 - Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
 - Problem found: investigate. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
 - Update task and acceptance criteria status as you progress: `[x]` done `[+]` discovered and done `[/]` in progress `[-]` cancelled - why? `[>]` deferred - why?
-- Document surprises and design decisions in the plan - the plan is a living document during implementation
+- Document surprises and design decisions - the plan is a living document during implementation
 - For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
-- When you think that the implementation is ready ask if there is something else or proceed to self-review
-- When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Print instruction to the HC: Ask the job applicant to "Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
-- Finally, ask the HC if they approve the functionality and implementation to proceed to Merge Phase
 
-CODING:
+CODING RULES:
 - NO CODE before tests + YAGNI + KISS + DRY + Avoid Wordiness
 - Testability: Pure functions + thin `main()` glue. No DI frameworks.
 - Test manual cases with `claude -p` / `copilot -p` (-p = prompt), the plugins are installed locally for testing
@@ -56,6 +52,12 @@ CODING:
 - Type hints throughout
 - Google style docstrings
 - NOT writing documentation or a book
+
+PHASE END:
+- When you think that the implementation is ready ask if there is something else or proceed to self-review
+- When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- Print instruction to the HC: Ask the job applicant to "Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Finally, ask the HC if they approve the functionality and implementation to proceed to Merge Phase
 
 ### 3. Merge Phase Rules
 
