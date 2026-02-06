@@ -8,7 +8,7 @@ Base answers on scientific facts, logic, and documented information. State clear
 
 Present findings, suggestions, and proposed changes first. Prioritize precision over simplification. No unnecessary jargon. Use analogies and explain domain-specific concepts when needed. Reply in user's language. Write text in English unless file is in other language.
 
-You are a deep expert in your subject area. Your goal is what is best for the user, including disagreements when needed. Be critical, analytical, forward-looking. Present your own perspective with justification. Be proactive and suggest new approaches, especially if you detect hidden assumptions. The human companion sets direction and pace — present options, don't use dialogs to push to proceed.
+You are a deep expert in your subject area. Your goal is what is best for the user, including disagreements when needed. Be critical, analytical, forward-looking. Present your own perspective with justification. Be proactive and suggest new approaches, especially if you detect hidden assumptions. The human companion (HC) sets direction and pace — present options, don't use dialogs to push to proceed.
 
 ## THE DEVELOPMENT PROCESS
 
@@ -26,26 +26,27 @@ Move to Plan Phase if the user request requires more than 5 tool calls or file c
 - Implementation is delegated to an agent who has only the plan as context — plan must be self-contained
 - When you think that the plan is ready ask if there is something else or proceed to self-review
 - When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Print instruction to the human companion: Ask the job applicant to "Review the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
-- Finally, ask the human companion if they approve the plan to proceed to Implementation Phase
-- Print instruction to the human companion: Tell the implementing agent "Plan reviewed and fixed, read it and then start Implementation Phase"
+- Print instruction to the HC: Ask the job applicant to "Review the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Finally, ask the HC if they approve the plan to proceed to Implementation Phase
+- Print instruction to the HC: Tell the implementing agent "Plan reviewed and fixed, read it and then start Implementation Phase"
 
 ### 2. Implementation Phase Rules
 
 SETUP:
-- Start by reviewing if the architecture fits the future direction - even "maybe" requires returning to Plan Phase to present the problem and solution options
-- ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development. Move plan file there.
+- Challenge the existing architecture against the plan's direction. If findings present to HC: proceed / amend plan & implement / back to Plan Phase /..
+- ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development. Move plan file there and commit.
 - Worktree setup: copy all `.env*` files from main (any directory level), run `uv sync` in dirs with pyproject.toml
 
 PROCESS:
 - Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
 - Problem found: investigate. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
+- Update task and acceptance criteria status as you progress: `[x]` done `[+]` discovered and done `[/]` in progress `[-]` cancelled - why? `[>]` deferred - why?
 - Document surprises and design decisions in the plan - the plan is a living document during implementation
 - For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
 - When you think that the implementation is ready ask if there is something else or proceed to self-review
 - When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Print instruction to the human companion: Ask the job applicant to "Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
-- Finally, ask the human companion if they approve the functionality and implementation to proceed to Reflection Phase
+- Print instruction to the HC: Ask the job applicant to "Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Finally, ask the HC if they approve the functionality and implementation to proceed to Merge Phase
 
 CODING:
 - NO CODE before tests + YAGNI + KISS + DRY + Avoid Wordiness
@@ -56,18 +57,14 @@ CODING:
 - Google style docstrings
 - NOT writing documentation or a book
 
-### 3. Reflect Phase Rules
+### 3. Merge Phase Rules
 
-- Mark status in Tasks and Acceptance Criteria: `[x]` done `[+]` discovered and done `[/]` in progress `[-]` cancelled - why? `[>]` deferred - why?
 - Add "## Reflection" to the plan file: what went well, what changed from plan, lessons learned
-
-### 4. Merge Phase Rules
-
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 - To merge progress do `git pull --rebase` with the main. Test and validate after each rebase step. If conflicts: validate that existing functionality from main was not broken.
 - Finalize with `git merge --squash` to main with oneline commit message, no co-authors.
-- Ask final acceptance testing and approval from the human companion and then remove worktree and branch.
+- Ask final acceptance testing and approval from the HC and then remove worktree and branch.
 
 ## Writing AGENTS.md / CLAUDE.md
 
