@@ -1,0 +1,112 @@
+# Scenario: Create a PR review skill from scratch
+# Tests the full skill_only.md flow end-to-end
+#
+# Run: cat prompt.txt | claude -p --allowedTools 'Bash,Read,Write,Task'
+# From: skill-builder/ directory
+
+name: create-pr-review-skill
+type: end-to-end
+hypothesis: "Agent follows skill_only.md flow to produce a valid, token-efficient SKILL.md"
+
+inputs:
+  name: reviewing-pull-requests
+  trigger: "reviewing GitHub pull requests, checking PR quality, or validating changes before merge"
+  outputs: [review_comments.md]
+  flow_type: sequential
+
+rubric:
+  # Structural (deterministic - checked by validate_structure.py)
+  - check: validate_structure_passes
+    assert: true
+  - check: token_budget
+    max: 300
+  - check: has_frontmatter
+    fields: [name, description, keywords]
+  - check: gerund_naming
+    assert: true
+  - check: no_prose_patterns
+    assert: true
+
+  # Semantic (check output manually or with subagent)
+  - check: description_is_trigger_only
+    assert: true
+    note: "No workflow verbs (fetch, analyze, generate)"
+  - check: every_step_has_creates_line
+    assert: true
+  - check: has_stop_or_done
+    assert: true
+  - check: allowed_tools_least_privilege
+    assert: true
+    note: "Should NOT include Write if skill only reads"
+
+runs: 3
+pass_threshold: 1.0
+
+# Run 1 (2026-02-09) — semantic check: haiku
+results:
+  - run: 1
+    model: haiku
+    pass: true
+    token_count: 281
+    validate_structure: "{pass: true, issues: []}"
+    notes:
+      - "Agent skipped generate_skill.py, wrote SKILL.md directly"
+      - "Allowed-tools: Bash/Read/Grep/Glob/Task (no Write — correct)"
+      - "4 steps: Fetch → Analyze → Write Review → Post (optional)"
+      - "STOP on PR not found, DONE after review"
+      - "No gate step"
+
+  # Run 2 (2026-02-09) — semantic check: sonnet
+  - run: 2
+    model: sonnet
+    pass: true
+    token_count: 284
+    validate_structure: "{pass: true, issues: []}"
+    notes:
+      - "Agent skipped generate_skill.py, wrote SKILL.md directly"
+      - "Allowed-tools: Bash/Read/Grep/Task (no Write, no Glob)"
+      - "5 steps: Gate → Fetch → Analyze → Write Review → Submit"
+      - "2 STOP conditions (no PR, 0 files), 1 DONE"
+      - "Step 4 Submit uses AskUserQuestion with 4 options"
+      - "Semantic check found 1 real issue (missing Creates: on Step 2), agent fixed it"
+
+  # Run 3 (2026-02-09) — opus
+  - run: 3
+    model: opus
+    pass: true
+    token_count: 279
+    validate_structure: "{pass: true, issues: []}"
+    notes:
+      - "Agent skipped generate_skill.py, wrote SKILL.md directly"
+      - "Allowed-tools: Bash/Read/Grep/Glob/Write"
+      - "3 steps: Fetch → Analyze → Write Review (most compact)"
+      - "2 STOP conditions (PR not found, 0 files), 1 DONE"
+      - "No submit step — stayed scoped to 'outputs: review_comments.md'"
+      - "Semantic check: 0 false positives"
+      - "Added OWASP check, verdict field, helpful error suggestion (gh pr list)"
+      - "Used ${PR_NUMBER} variable consistently"
+
+observations:
+  - category: semantic-check-model
+    finding: "Haiku produced 6/6 false positives. Sonnet found 1 real issue + fewer false positives."
+    action: "RESOLVED — changed to sonnet in skill_only.md"
+
+  - category: model-comparison
+    finding: "Output quality varies significantly by model"
+    details:
+      - "Haiku: 4 steps, 1 STOP, no gate, 6/6 semantic FPs"
+      - "Sonnet: 5 steps, 2 STOPs, gate, submit UX, few semantic FPs"
+      - "Opus: 3 steps, 2 STOPs, most compact, 0 semantic FPs, scope-disciplined"
+      - "Opus stayed scoped to declared outputs; Sonnet added UX beyond spec"
+    action: "Calling model affects output quality. Semantic check model should be sonnet minimum."
+
+  - category: generate-script-usage
+    finding: "Both runs bypassed generate_skill.py, wrote SKILL.md directly via Write tool"
+    details:
+      - "echo JSON | python3 generate_skill.py pattern is awkward"
+      - "Generated skeleton is too minimal — agent enhanced it entirely"
+    action: "Consider if generate_skill.py adds value or should be optional"
+
+  - category: variable-convention
+    finding: "Neither run set ${SKILL_DIR} variable as skill_only.md instructs"
+    action: "Minor — accept flexible usage"
