@@ -9,6 +9,7 @@ def get_summary_work_files(base_name: str) -> list[str]:
     """Work files created during summary extraction."""
     return [
         f"{base_name}_title.txt",
+        f"{base_name}_upload_date.txt",
         f"{base_name}_metadata.md",
         f"{base_name}_description.md",
         f"{base_name}_summary.md",
@@ -25,6 +26,7 @@ def get_transcript_work_files(base_name: str) -> list[str]:
     """Work files created during transcript extraction."""
     return [
         f"{base_name}_title.txt",
+        f"{base_name}_upload_date.txt",
         f"{base_name}_description.md",
         f"{base_name}_chapters.json",
         f"{base_name}_transcript.vtt",
@@ -40,7 +42,7 @@ def get_transcript_work_files(base_name: str) -> list[str]:
 def get_comments_work_files(base_name: str) -> list[str]:
     """Work files created during comments extraction."""
     return [
-        f"{base_name}_name.txt",
+        f"{base_name}_title.txt",
         f"{base_name}_comments.md",
         f"{base_name}_comments_prefiltered.md",
         f"{base_name}_comment_insights.md",

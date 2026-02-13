@@ -445,18 +445,49 @@ class TestCommentExtractor:
         extractor = CommentExtractor(mock_runner, mock_filesystem)
         output_dir = Path("/tmp/test")
 
-        name_file, comments_file = extractor.extract_and_save("https://youtu.be/abc123", output_dir)
+        title_file, comments_file = extractor.extract_and_save("https://youtu.be/abc123", output_dir)
 
         # Check files were created
-        assert name_file == output_dir / "youtube_abc123_name.txt"
+        assert title_file == output_dir / "youtube_abc123_title.txt"
         assert comments_file == output_dir / "youtube_abc123_comments.md"
-        assert mock_filesystem.files[name_file] == "Test Video"
+        assert mock_filesystem.files[title_file] == "Test Video"
         assert "No comments available" in mock_filesystem.files[comments_file]
 
         # Check console output
         captured = capsys.readouterr()
         assert "SUCCESS:" in captured.out
         assert "COMMENTS:" in captured.out
+
+    def test_extract_and_save_does_not_overwrite_existing_title(self, mock_runner, mock_filesystem, capsys):
+        """Test that _title.txt is not overwritten if it already exists."""
+        json_output = '{"title": "Test Video", "id": "abc123", "comments": []}'
+        mock_runner.set_return_value(["yt-dlp", "--version"], 0, "2023.01.01", "")
+        mock_runner.set_return_value(
+            [
+                "yt-dlp",
+                "--dump-single-json",
+                "--write-comments",
+                "--skip-download",
+                "--extractor-args",
+                "youtube:comment_sort=top",
+                "https://youtu.be/abc123",
+            ],
+            0,
+            json_output,
+            "",
+        )
+
+        extractor = CommentExtractor(mock_runner, mock_filesystem)
+        output_dir = Path("/tmp/test")
+
+        # Pre-existing title from metadata extraction
+        existing_title_path = output_dir / "youtube_abc123_title.txt"
+        mock_filesystem.files[existing_title_path] = "Original Title"
+
+        title_file, _ = extractor.extract_and_save("https://youtu.be/abc123", output_dir)
+
+        assert title_file == existing_title_path
+        assert mock_filesystem.files[existing_title_path] == "Original Title"
 
     def test_extract_and_save_invalid_url(self, mock_runner, mock_filesystem):
         """Test extraction with invalid URL."""

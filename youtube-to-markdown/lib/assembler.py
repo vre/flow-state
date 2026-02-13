@@ -42,18 +42,34 @@ class Finalizer:
             stripped = stripped[len(header) :].lstrip()
         return stripped
 
-    def get_filenames(self, base_name: str, output_dir: Path) -> tuple[str | None, str]:
-        """Get cleaned title and video ID for filename generation."""
+    def get_filenames(self, base_name: str, output_dir: Path) -> tuple[str | None, str, str | None]:
+        """Get cleaned title, video ID, and upload date for filename generation."""
         title_path = output_dir / f"{base_name}_title.txt"
         title = self.read_component_or_empty(title_path).strip()
         video_id = base_name.replace("youtube_", "")
 
-        if title:
-            cleaned_title = clean_title_for_filename(title)
-        else:
-            cleaned_title = None
+        cleaned_title = clean_title_for_filename(title) if title else None
 
-        return cleaned_title, video_id
+        upload_date_path = output_dir / f"{base_name}_upload_date.txt"
+        upload_date = self.read_component_or_empty(upload_date_path).strip() or None
+        if upload_date == "Unknown":
+            upload_date = None
+
+        return cleaned_title, video_id, upload_date
+
+    @staticmethod
+    def build_filename(upload_date: str | None, cleaned_title: str, video_id: str, suffix: str = "") -> str:
+        """Build final filename from components.
+
+        Args:
+            upload_date: Upload date (YYYY-MM-DD) or None
+            cleaned_title: Cleaned title string
+            video_id: YouTube video ID
+            suffix: Optional suffix like " - transcript" or " - comments"
+        """
+        if upload_date:
+            return f"{upload_date} - youtube - {cleaned_title}{suffix} ({video_id}).md"
+        return f"youtube - {cleaned_title}{suffix} ({video_id}).md"
 
     def assemble_summary_content(self, template: str, base_name: str, output_dir: Path) -> str:
         """Assemble summary content from template and components."""
@@ -87,7 +103,13 @@ class Finalizer:
         return transcript_content
 
     def _save_raw_transcript(
-        self, base_name: str, output_dir: Path, template_dir: Path, cleaned_title: str | None, video_id: str
+        self,
+        base_name: str,
+        output_dir: Path,
+        template_dir: Path,
+        cleaned_title: str | None,
+        video_id: str,
+        upload_date: str | None,
     ) -> Path | None:
         """Save raw transcript as final transcript file if content available."""
         raw = self.read_component_or_empty(output_dir / f"{base_name}_transcript_no_timestamps.txt")
@@ -98,7 +120,7 @@ class Finalizer:
         content = self.assemble_transcript_content(template, base_name, output_dir)
 
         if cleaned_title:
-            filename = f"youtube - {cleaned_title} - transcript ({video_id}).md"
+            filename = self.build_filename(upload_date, cleaned_title, video_id, " - transcript")
         else:
             filename = f"{base_name}_transcript.md"
 
@@ -156,10 +178,10 @@ class Finalizer:
         template = self.read_template(template_dir, "summary.md")
 
         content = self.assemble_summary_content(template, base_name, output_dir)
-        cleaned_title, video_id = self.get_filenames(base_name, output_dir)
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
         if cleaned_title:
-            filename = f"youtube - {cleaned_title} ({video_id}).md"
+            filename = self.build_filename(upload_date, cleaned_title, video_id)
         else:
             filename = f"{base_name}.md"
 
@@ -167,7 +189,7 @@ class Finalizer:
         self.fs.write_text(output_path, content)
         print(f"Created summary file: {filename}")
 
-        transcript_path = self._save_raw_transcript(base_name, output_dir, template_dir, cleaned_title, video_id)
+        transcript_path = self._save_raw_transcript(base_name, output_dir, template_dir, cleaned_title, video_id, upload_date)
 
         if not debug:
             self.cleanup_work_files(get_summary_work_files(base_name), output_dir)
@@ -179,10 +201,10 @@ class Finalizer:
         template = self.read_template(template_dir, "transcript.md")
 
         content = self.assemble_transcript_content(template, base_name, output_dir)
-        cleaned_title, video_id = self.get_filenames(base_name, output_dir)
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
         if cleaned_title:
-            filename = f"youtube - {cleaned_title} - transcript ({video_id}).md"
+            filename = self.build_filename(upload_date, cleaned_title, video_id, " - transcript")
         else:
             filename = f"{base_name}_transcript.md"
 
@@ -200,14 +222,10 @@ class Finalizer:
         template = self.read_template(template_dir, "comments_standalone.md")
 
         content = self.assemble_comments_content(template, base_name, output_dir, standalone=True)
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
-        name_path = output_dir / f"{base_name}_name.txt"
-        title = self.read_component_or_empty(name_path).strip()
-        video_id = base_name.replace("youtube_", "")
-
-        if title:
-            cleaned_title = clean_title_for_filename(title)
-            filename = f"youtube - {cleaned_title} - comments ({video_id}).md"
+        if cleaned_title:
+            filename = self.build_filename(upload_date, cleaned_title, video_id, " - comments")
         else:
             filename = f"{base_name}_comments.md"
 
@@ -226,11 +244,11 @@ class Finalizer:
         """Create summary, comments, and raw transcript files. Insert insights into summary."""
         summary_template = self.read_template(template_dir, "summary.md")
         summary_content = self.assemble_summary_content(summary_template, base_name, output_dir)
-        cleaned_title, video_id = self.get_filenames(base_name, output_dir)
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
         if cleaned_title:
-            summary_filename = f"youtube - {cleaned_title} ({video_id}).md"
-            comments_filename = f"youtube - {cleaned_title} - comments ({video_id}).md"
+            summary_filename = self.build_filename(upload_date, cleaned_title, video_id)
+            comments_filename = self.build_filename(upload_date, cleaned_title, video_id, " - comments")
         else:
             summary_filename = f"{base_name}.md"
             comments_filename = f"{base_name}_comments.md"
@@ -249,7 +267,7 @@ class Finalizer:
         self.fs.write_text(comments_path, comments_content)
         print(f"Created comments file: {comments_filename}")
 
-        transcript_path = self._save_raw_transcript(base_name, output_dir, template_dir, cleaned_title, video_id)
+        transcript_path = self._save_raw_transcript(base_name, output_dir, template_dir, cleaned_title, video_id, upload_date)
 
         if not debug:
             work_files = get_summary_work_files(base_name) + get_comments_work_files(base_name)
@@ -259,12 +277,12 @@ class Finalizer:
 
     def finalize_full(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> tuple[Path, Path, Path]:
         """Create summary, transcript, and comments files."""
-        cleaned_title, video_id = self.get_filenames(base_name, output_dir)
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
         if cleaned_title:
-            summary_filename = f"youtube - {cleaned_title} ({video_id}).md"
-            transcript_filename = f"youtube - {cleaned_title} - transcript ({video_id}).md"
-            comments_filename = f"youtube - {cleaned_title} - comments ({video_id}).md"
+            summary_filename = self.build_filename(upload_date, cleaned_title, video_id)
+            transcript_filename = self.build_filename(upload_date, cleaned_title, video_id, " - transcript")
+            comments_filename = self.build_filename(upload_date, cleaned_title, video_id, " - comments")
         else:
             summary_filename = f"{base_name}.md"
             transcript_filename = f"{base_name}_transcript.md"

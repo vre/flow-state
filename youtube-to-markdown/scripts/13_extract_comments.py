@@ -2,7 +2,7 @@
 """Extracts YouTube video comments.
 
 Usage: 13_extract_comments.py <YOUTUBE_URL> <OUTPUT_DIR>
-Output: Creates youtube_{VIDEO_ID}_name.txt, youtube_{VIDEO_ID}_comments.md
+Output: Creates youtube_{VIDEO_ID}_title.txt, youtube_{VIDEO_ID}_comments.md
 """
 
 import sys

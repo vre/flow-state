@@ -65,9 +65,11 @@ Also works: `get`, `fetch`, `transcript`, `subtitles`, `captions`
 
 ## Output Files
 
-- `youtube - {title} ({video_id}).md` - Summary with metadata
-- `youtube - {title} - transcript ({video_id}).md` - Cleaned transcript with timestamps
-- `youtube - {title} - comments ({video_id}).md` - Curated comments
+- `{date} - youtube - {title} ({video_id}).md` - Summary with metadata
+- `{date} - youtube - {title} - transcript ({video_id}).md` - Cleaned transcript with timestamps
+- `{date} - youtube - {title} - comments ({video_id}).md` - Curated comments
+
+Date is the video's upload date (YYYY-MM-DD). Falls back to no prefix if unavailable.
 
 ## Project Structure
 

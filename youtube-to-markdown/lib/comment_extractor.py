@@ -187,21 +187,22 @@ class CommentExtractor:
         self.filesystem.mkdir(output_dir, parents=True, exist_ok=True)
         video_data = self.fetch_video_data(video_url, output_dir)
 
-        name_file = output_dir / f"{base_name}_name.txt"
-        self.filesystem.write_text(name_file, video_data.title)
+        title_file = output_dir / f"{base_name}_title.txt"
+        if not self.filesystem.exists(title_file):
+            self.filesystem.write_text(title_file, video_data.title)
 
         comments_markdown = generate_comments_markdown(video_data.comments)
         comments_file = output_dir / f"{base_name}_comments.md"
         self.filesystem.write_text(comments_file, comments_markdown)
 
         top_level, replies = count_comments_and_replies(video_data.comments)
-        print(f"SUCCESS: {name_file}")
+        print(f"SUCCESS: {title_file}")
         if video_data.comments:
             print(f"COMMENTS: {comments_file} ({top_level} comments, {replies} replies)")
         else:
             print(f"COMMENTS: {comments_file} (no comments)")
 
-        return name_file, comments_file
+        return title_file, comments_file
 
 
 class SubprocessRunner:

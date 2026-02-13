@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.5.0] - 2026-02-13
+
+### Filename Format: Date Prefix
+- Final files now include upload date prefix: `2026-02-05 - youtube - Title (VIDEO_ID).md`
+- Enables chronological sorting in file browsers
+- Missing or "Unknown" upload date falls back to old format (no prefix)
+- Backward compatible: check_existing finds both old and new format files
+
+### DRY Improvements
+- Unified `_name.txt` / `_title.txt` to single `_title.txt` with exists guard
+- Centralized filename construction via `build_filename()` static method (was inline in 6 places)
+- `finalize_comments_only` now uses shared `get_filenames()` instead of own logic
+
+### Technical
+- `youtube_extractor.create_metadata_file()` writes `_upload_date.txt` intermediate file
+- `prepare_update()` writes `_upload_date.txt` from stored metadata for update flow
+- `get_filenames()` returns 3-tuple: `(cleaned_title, video_id, upload_date)`
+
+### Testing
+- 17 new tests (276 total)
+
 ## [2.4.0] - 2026-02-05
 
 ### New Feature: Channel Browser

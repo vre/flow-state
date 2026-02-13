@@ -6,6 +6,7 @@ from lib.check_existing import check_existing
 from lib.intermediate_files import get_key_intermediate_files
 from lib.shared_types import (
     FileOperationError,
+    FileSystem,
     RealCommandRunner,
     RealFileSystem,
     extract_video_id,
@@ -195,6 +196,22 @@ def generate_recommendation(existing: dict, changes: dict, issues: list[str]) ->
     }
 
 
+def write_upload_date_file(video_id: str, output_dir: Path, stored_metadata: dict, fs: FileSystem = RealFileSystem()) -> None:
+    """Write _upload_date.txt from stored metadata for update flow.
+
+    Args:
+        video_id: YouTube video ID
+        output_dir: Output directory
+        stored_metadata: Metadata parsed from existing summary file
+        fs: File system implementation
+    """
+    published = stored_metadata.get("published")
+    if not published:
+        return
+    base_name = f"youtube_{video_id}"
+    fs.write_text(output_dir / f"{base_name}_upload_date.txt", published)
+
+
 def fetch_current_metadata(video_url: str, output_dir: Path) -> dict:
     """Fetch current video metadata from YouTube."""
     extractor = YouTubeDataExtractor(fs=RealFileSystem(), cmd=RealCommandRunner())
@@ -230,6 +247,7 @@ def prepare_update(video_url: str, output_dir: Path) -> dict:
         }
 
     stored_meta = existing.get("stored_metadata", {})
+    write_upload_date_file(video_id, output_dir, stored_meta)
 
     try:
         current_meta = fetch_current_metadata(video_url, output_dir)

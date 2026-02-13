@@ -8,7 +8,7 @@ Extracts and prefilters YouTube comments.
 python3 ./scripts/13_extract_comments.py "<YOUTUBE_URL>" "<output_directory>"
 ```
 
-Creates: youtube_{VIDEO_ID}_name.txt, youtube_{VIDEO_ID}_comments.md
+Creates: youtube_{VIDEO_ID}_title.txt, youtube_{VIDEO_ID}_comments.md
 
 ## Step 2: Prefilter comments
 

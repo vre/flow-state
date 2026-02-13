@@ -133,12 +133,15 @@ class YouTubeDataExtractor:
         """
         filename = output_dir / f"{base_name}_metadata.md"
 
-        # Save title to separate file for finalize.py
+        # Save title and upload date to separate files for assembler
         title_file = output_dir / f"{base_name}_title.txt"
         self.fs.write_text(title_file, metadata.title)
 
-        # Format values
         upload_date = format_upload_date(metadata.upload_date)
+        upload_date_file = output_dir / f"{base_name}_upload_date.txt"
+        self.fs.write_text(upload_date_file, upload_date)
+
+        # Format values
         extraction_date = datetime.now().strftime("%Y-%m-%d")
         sub_text = format_subscribers(metadata.channel_follower_count)
         duration_text = format_duration(metadata.duration)

@@ -54,6 +54,29 @@ class TestYouTubeDataExtractor:
         assert mock_fs.exists(title_path)
         assert mock_fs.read_text(title_path) == "Test Video Title"
 
+    def test_create_metadata_file_writes_upload_date(self, mock_fs, mock_cmd, sample_video_data):
+        """Test that create_metadata_file writes _upload_date.txt."""
+        extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
+        metadata = extractor.parse_video_metadata(sample_video_data, "test123")
+
+        extractor.create_metadata_file(metadata, "youtube_test123", Path("/output"))
+
+        upload_date_path = Path("/output/youtube_test123_upload_date.txt")
+        assert mock_fs.exists(upload_date_path)
+        assert mock_fs.read_text(upload_date_path) == "2024-01-01"
+
+    def test_create_metadata_file_unknown_upload_date(self, mock_fs, mock_cmd):
+        """Test that _upload_date.txt contains 'Unknown' when date unavailable."""
+        extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)
+        data = {"upload_date": "Unknown"}
+        metadata = extractor.parse_video_metadata(data, "test123")
+
+        extractor.create_metadata_file(metadata, "youtube_test123", Path("/output"))
+
+        upload_date_path = Path("/output/youtube_test123_upload_date.txt")
+        assert mock_fs.exists(upload_date_path)
+        assert mock_fs.read_text(upload_date_path) == "Unknown"
+
     def test_create_description_file(self, mock_fs, mock_cmd, sample_video_data):
         """Test creating description file with safety wrappers."""
         extractor = YouTubeDataExtractor(fs=mock_fs, cmd=mock_cmd)

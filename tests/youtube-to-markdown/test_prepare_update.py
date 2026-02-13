@@ -1,11 +1,14 @@
 """Tests for prepare_update module."""
 
+from pathlib import Path
+
 from lib.prepare_update import (
     compare_counts,
     compare_strings,
     detect_issues,
     generate_recommendation,
     parse_count,
+    write_upload_date_file,
 )
 
 
@@ -226,3 +229,43 @@ class TestGenerateRecommendation:
         issues = ["title changed"]
         rec = generate_recommendation(existing, changes, issues)
         assert rec["action"] == "full_refresh"
+
+
+class TestWriteUploadDateFile:
+    """Tests for write_upload_date_file function."""
+
+    def test_writes_date_from_stored_metadata(self, mock_fs):
+        output_dir = Path("/output")
+        stored_metadata = {"published": "2024-01-15"}
+
+        write_upload_date_file("abc123", output_dir, stored_metadata, mock_fs)
+
+        path = output_dir / "youtube_abc123_upload_date.txt"
+        assert mock_fs.exists(path)
+        assert mock_fs.read_text(path) == "2024-01-15"
+
+    def test_skips_when_published_missing(self, mock_fs):
+        output_dir = Path("/output")
+        stored_metadata = {"views": "1.2M"}
+
+        write_upload_date_file("abc123", output_dir, stored_metadata, mock_fs)
+
+        path = output_dir / "youtube_abc123_upload_date.txt"
+        assert not mock_fs.exists(path)
+
+    def test_skips_when_published_none(self, mock_fs):
+        output_dir = Path("/output")
+        stored_metadata = {"published": None}
+
+        write_upload_date_file("abc123", output_dir, stored_metadata, mock_fs)
+
+        path = output_dir / "youtube_abc123_upload_date.txt"
+        assert not mock_fs.exists(path)
+
+    def test_skips_when_metadata_empty(self, mock_fs):
+        output_dir = Path("/output")
+
+        write_upload_date_file("abc123", output_dir, {}, mock_fs)
+
+        path = output_dir / "youtube_abc123_upload_date.txt"
+        assert not mock_fs.exists(path)

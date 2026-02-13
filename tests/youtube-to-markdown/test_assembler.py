@@ -127,35 +127,76 @@ class TestStripLeadingHeader:
 class TestGetFilenames:
     """Tests for get_filenames method."""
 
-    def test_get_filenames_with_title(self, finalizer, mock_fs):
-        """Test getting filenames when title exists."""
+    def test_get_filenames_with_title_and_date(self, finalizer, mock_fs):
+        """Test getting filenames when title and upload date exist."""
         output_dir = Path("/output")
         mock_fs.files[output_dir / "youtube_abc123_title.txt"] = "Test Video Title"
+        mock_fs.files[output_dir / "youtube_abc123_upload_date.txt"] = "2024-01-15"
 
-        cleaned_title, video_id = finalizer.get_filenames("youtube_abc123", output_dir)
+        cleaned_title, video_id, upload_date = finalizer.get_filenames("youtube_abc123", output_dir)
 
         assert cleaned_title == "Test Video Title"
         assert video_id == "abc123"
+        assert upload_date == "2024-01-15"
 
     def test_get_filenames_without_title(self, finalizer, mock_fs):
         """Test getting filenames when title doesn't exist."""
         output_dir = Path("/output")
 
-        cleaned_title, video_id = finalizer.get_filenames("youtube_abc123", output_dir)
+        cleaned_title, video_id, upload_date = finalizer.get_filenames("youtube_abc123", output_dir)
 
         assert cleaned_title is None
         assert video_id == "abc123"
+        assert upload_date is None
+
+    def test_get_filenames_without_upload_date(self, finalizer, mock_fs):
+        """Test getting filenames when upload date doesn't exist."""
+        output_dir = Path("/output")
+        mock_fs.files[output_dir / "youtube_abc123_title.txt"] = "Test Video Title"
+
+        cleaned_title, video_id, upload_date = finalizer.get_filenames("youtube_abc123", output_dir)
+
+        assert cleaned_title == "Test Video Title"
+        assert upload_date is None
+
+    def test_get_filenames_unknown_upload_date(self, finalizer, mock_fs):
+        """Test that 'Unknown' upload date is treated as None."""
+        output_dir = Path("/output")
+        mock_fs.files[output_dir / "youtube_abc123_title.txt"] = "Test Video Title"
+        mock_fs.files[output_dir / "youtube_abc123_upload_date.txt"] = "Unknown"
+
+        _, _, upload_date = finalizer.get_filenames("youtube_abc123", output_dir)
+
+        assert upload_date is None
 
     def test_get_filenames_cleans_title(self, finalizer, mock_fs):
         """Test that title is cleaned for filename."""
         output_dir = Path("/output")
         mock_fs.files[output_dir / "youtube_abc123_title.txt"] = "Test: Video? Title!"
 
-        cleaned_title, video_id = finalizer.get_filenames("youtube_abc123", output_dir)
+        cleaned_title, video_id, _ = finalizer.get_filenames("youtube_abc123", output_dir)
 
-        # Special characters should be removed
         assert ":" not in cleaned_title
         assert "?" not in cleaned_title
+
+
+class TestBuildFilename:
+    """Tests for build_filename static method."""
+
+    def test_with_date_and_title(self):
+        assert Finalizer.build_filename("2024-01-15", "Test Title", "abc123") == "2024-01-15 - youtube - Test Title (abc123).md"
+
+    def test_with_date_title_and_suffix(self):
+        assert (
+            Finalizer.build_filename("2024-01-15", "Test Title", "abc123", " - transcript")
+            == "2024-01-15 - youtube - Test Title - transcript (abc123).md"
+        )
+
+    def test_without_date(self):
+        assert Finalizer.build_filename(None, "Test Title", "abc123") == "youtube - Test Title (abc123).md"
+
+    def test_without_date_with_suffix(self):
+        assert Finalizer.build_filename(None, "Test Title", "abc123", " - comments") == "youtube - Test Title - comments (abc123).md"
 
 
 class TestAssembleSummaryContent:
@@ -389,20 +430,21 @@ class TestCleanupWorkFiles:
 class TestFinalizeSummaryOnly:
     """Tests for finalize_summary_only method."""
 
-    def test_creates_file_with_title(self, finalizer, mock_fs):
-        """Test finalize_summary_only creates summary file with title."""
+    def test_creates_file_with_title_and_date(self, finalizer, mock_fs):
+        """Test finalize_summary_only creates summary file with date prefix."""
         output_dir = Path("/output")
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
 
         mock_fs.files[template_dir / "summary.md"] = "{quick_summary}\n{metadata}\n{summary}"
         mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_quick_summary.md"] = "Quick"
         mock_fs.files[output_dir / f"{base_name}_metadata.md"] = "Meta"
         mock_fs.files[output_dir / f"{base_name}_summary_tight.md"] = "Summary"
 
         result = finalizer.finalize_summary_only(base_name, output_dir, template_dir, debug=True)
-        assert "youtube - Test Title (abc123).md" in str(result)
+        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(result)
 
     def test_creates_file_without_title(self, finalizer, mock_fs):
         """Test finalize_summary_only creates summary file without title."""
@@ -419,44 +461,46 @@ class TestFinalizeSummaryOnly:
 class TestFinalizeTranscriptOnly:
     """Tests for finalize_transcript_only method."""
 
-    def test_creates_transcript_file(self, finalizer, mock_fs):
-        """Test finalize_transcript_only creates transcript file."""
+    def test_creates_transcript_file_with_date(self, finalizer, mock_fs):
+        """Test finalize_transcript_only creates transcript file with date prefix."""
         output_dir = Path("/output")
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
 
         mock_fs.files[template_dir / "transcript.md"] = "{description}\n{transcription}"
         mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_description.md"] = "Desc"
         mock_fs.files[output_dir / f"{base_name}_transcript.md"] = "Trans"
 
         result = finalizer.finalize_transcript_only(base_name, output_dir, template_dir, debug=True)
-        assert "transcript" in str(result)
+        assert "2024-01-15 - youtube - Test Title - transcript (abc123).md" in str(result)
 
 
 class TestFinalizeCommentsOnly:
     """Tests for finalize_comments_only method."""
 
-    def test_creates_comments_file(self, finalizer, mock_fs):
-        """Test finalize_comments_only creates comments file."""
+    def test_creates_comments_file_with_date(self, finalizer, mock_fs):
+        """Test finalize_comments_only creates comments file with date prefix."""
         output_dir = Path("/output")
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
 
         mock_fs.files[template_dir / "comments_standalone.md"] = "{comment_insights}\n{comments}"
-        mock_fs.files[output_dir / f"{base_name}_name.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "Insights"
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         result = finalizer.finalize_comments_only(base_name, output_dir, template_dir, debug=True)
-        assert "comments" in str(result)
+        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(result)
 
 
 class TestFinalizeSummaryComments:
     """Tests for finalize_summary_comments method."""
 
-    def test_creates_both_files(self, finalizer, mock_fs):
-        """Test finalize_summary_comments creates summary and comments files."""
+    def test_creates_both_files_with_date(self, finalizer, mock_fs):
+        """Test finalize_summary_comments creates files with date prefix."""
         output_dir = Path("/output")
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
@@ -464,6 +508,7 @@ class TestFinalizeSummaryComments:
         mock_fs.files[template_dir / "summary.md"] = "{quick_summary}\n{metadata}\n{summary}"
         mock_fs.files[template_dir / "comments.md"] = "{comments}"
         mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_quick_summary.md"] = "Quick"
         mock_fs.files[output_dir / f"{base_name}_metadata.md"] = "Meta"
         mock_fs.files[output_dir / f"{base_name}_summary_tight.md"] = "Summary"
@@ -471,16 +516,16 @@ class TestFinalizeSummaryComments:
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         summary_path, comments_path, transcript_path = finalizer.finalize_summary_comments(base_name, output_dir, template_dir, debug=True)
-        assert "youtube - Test Title (abc123).md" in str(summary_path)
-        assert "comments" in str(comments_path)
-        assert transcript_path is None  # no raw transcript in test data
+        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(summary_path)
+        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(comments_path)
+        assert transcript_path is None
 
 
 class TestFinalizeFull:
     """Tests for finalize_full method."""
 
-    def test_creates_all_three_files(self, finalizer, mock_fs):
-        """Test finalize_full creates summary, transcript, and comments files."""
+    def test_creates_all_three_files_with_date(self, finalizer, mock_fs):
+        """Test finalize_full creates all files with date prefix."""
         output_dir = Path("/output")
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
@@ -489,6 +534,7 @@ class TestFinalizeFull:
         mock_fs.files[template_dir / "transcript.md"] = "{description}\n{transcription}"
         mock_fs.files[template_dir / "comments.md"] = "{comments}"
         mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_quick_summary.md"] = "Quick"
         mock_fs.files[output_dir / f"{base_name}_metadata.md"] = "Meta"
         mock_fs.files[output_dir / f"{base_name}_summary_tight.md"] = "Summary"
@@ -498,9 +544,9 @@ class TestFinalizeFull:
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         summary_path, transcript_path, comments_path = finalizer.finalize_full(base_name, output_dir, template_dir, debug=True)
-        assert "youtube - Test Title (abc123).md" in str(summary_path)
-        assert "transcript" in str(transcript_path)
-        assert "comments" in str(comments_path)
+        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(summary_path)
+        assert "2024-01-15 - youtube - Test Title - transcript (abc123).md" in str(transcript_path)
+        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(comments_path)
 
     def test_cleanup_in_non_debug_mode(self, finalizer, mock_fs):
         """Test that work files are cleaned up when not in debug mode."""
@@ -512,6 +558,7 @@ class TestFinalizeFull:
         mock_fs.files[template_dir / "transcript.md"] = "{description}\n{transcription}"
         mock_fs.files[template_dir / "comments.md"] = "{comments}"
         mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
         mock_fs.files[output_dir / f"{base_name}_quick_summary.md"] = "Quick"
         mock_fs.files[output_dir / f"{base_name}_metadata.md"] = "Meta"
         mock_fs.files[output_dir / f"{base_name}_summary_tight.md"] = "Summary"
@@ -523,3 +570,4 @@ class TestFinalizeFull:
         finalizer.finalize_full(base_name, output_dir, template_dir, debug=False)
         # Work files should be cleaned up
         assert output_dir / f"{base_name}_metadata.md" not in mock_fs.files
+        assert output_dir / f"{base_name}_upload_date.txt" not in mock_fs.files

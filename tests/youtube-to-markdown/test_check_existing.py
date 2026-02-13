@@ -1,10 +1,10 @@
-"""Tests for check_existing.py comment detection."""
+"""Tests for check_existing.py."""
 
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "youtube-to-markdown"))
-from lib.check_existing import detect_comments_state
+from lib.check_existing import detect_comments_state, find_existing_files
 
 
 class TestDetectCommentsState:
@@ -110,3 +110,47 @@ Great video!
 Random content here.
 """
         assert detect_comments_state(content) == "curated_only"
+
+
+class TestFindExistingFiles:
+    """Tests for find_existing_files function."""
+
+    def test_finds_files_with_date_prefix(self, tmp_path):
+        """Find files with new date prefix format."""
+        (tmp_path / "2024-01-15 - youtube - Test Title (abc123).md").write_text("summary")
+        (tmp_path / "2024-01-15 - youtube - Test Title - comments (abc123).md").write_text("comments")
+        (tmp_path / "2024-01-15 - youtube - Test Title - transcript (abc123).md").write_text("transcript")
+
+        result = find_existing_files("abc123", tmp_path)
+
+        assert result["summary_file"] is not None
+        assert result["comment_file"] is not None
+        assert result["transcript_file"] is not None
+
+    def test_finds_files_without_date_prefix(self, tmp_path):
+        """Find files with old format (no date prefix) - backward compat."""
+        (tmp_path / "youtube - Test Title (abc123).md").write_text("summary")
+        (tmp_path / "youtube - Test Title - comments (abc123).md").write_text("comments")
+
+        result = find_existing_files("abc123", tmp_path)
+
+        assert result["summary_file"] is not None
+        assert result["comment_file"] is not None
+
+    def test_finds_no_files(self, tmp_path):
+        """No matching files returns None."""
+        result = find_existing_files("abc123", tmp_path)
+
+        assert result["summary_file"] is None
+        assert result["comment_file"] is None
+        assert result["transcript_file"] is None
+
+    def test_excludes_backup_files(self, tmp_path):
+        """Backup files are excluded from results."""
+        (tmp_path / "2024-01-15 - youtube - Test Title (abc123).md").write_text("summary")
+        (tmp_path / "2024-01-15 - youtube - Test Title_backup_20240201 (abc123).md").write_text("backup")
+
+        result = find_existing_files("abc123", tmp_path)
+
+        assert result["summary_file"] is not None
+        assert "_backup_" not in Path(result["summary_file"]).name
