@@ -1,0 +1,70 @@
+"""Security helpers for ${tool_name}.
+
+Generated conditionally for tools handling file paths or wrapping CLIs.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+def safe_path(user_input: str, base_dir: Path) -> Path:
+    """Resolve path safely within base directory.
+
+    Prevents directory traversal and symlink escape attacks.
+
+    Args:
+        user_input: User-provided path string.
+        base_dir: Allowed base directory.
+
+    Returns:
+        Resolved path guaranteed to be within base_dir.
+
+    Raises:
+        ValueError: If resolved path escapes base_dir.
+    """
+    resolved = (base_dir / user_input).resolve()
+    base_resolved = base_dir.resolve()
+
+    if not str(resolved).startswith(str(base_resolved) + os.sep) and resolved != base_resolved:
+        raise ValueError(f"Path escapes allowed directory: {user_input}")
+
+    return resolved
+
+
+def load_env(env_path: Path | None = None) -> dict[str, str]:
+    """Load KEY=VALUE pairs from .env file.
+
+    Simple parser: skips comments (#), blank lines, 'export' prefix.
+    Does NOT handle: quoted values with spaces, multiline, variable expansion.
+
+    Args:
+        env_path: Path to .env file. Defaults to .env in cwd.
+
+    Returns:
+        Dict of loaded variables.
+    """
+    if env_path is None:
+        env_path = Path.cwd() / ".env"
+
+    if not env_path.is_file():
+        return {}
+
+    loaded = {}
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key:
+            loaded[key] = value
+            os.environ.setdefault(key, value)
+
+    return loaded

@@ -1,0 +1,116 @@
+"""${tool_name} CLI entry point.
+
+Usage:
+    ${tool_name} <action> [options]
+    ${tool_name} help [topic]
+
+Actions:
+${action_help_lines}
+
+Flags:
+    --format json|table   Output format (default: auto-detect TTY)
+    --quiet, -q           Suppress output, exit code only
+    --verbose, -v         Verbose output
+    --yes                 Skip confirmation for destructive actions
+    --help, -h            Show this help
+"""
+
+from __future__ import annotations
+
+import argparse
+import os
+import sys
+from pathlib import Path
+
+from .${module_name} import ACTIONS, dispatch, format_output
+
+
+def load_env(env_path: Path | None = None) -> dict[str, str]:
+    """Load KEY=VALUE pairs from .env file.
+
+    Skips comments (#), blank lines, 'export' prefix.
+    Does NOT handle: multiline values, variable expansion.
+    """
+    if env_path is None:
+        env_path = Path.cwd() / ".env"
+    if not env_path.is_file():
+        return {}
+    loaded = {}
+    for line in env_path.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip().strip("'\"")
+        if key:
+            loaded[key] = value
+            os.environ.setdefault(key, value)
+    return loaded
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build argument parser with POSIX conventions."""
+    parser = argparse.ArgumentParser(
+        prog="${tool_name}",
+        description="${tool_description}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "action",
+        nargs="?",
+        default="help",
+        choices=list(ACTIONS.keys()),
+        help="Action to perform",
+    )
+    parser.add_argument(
+        "args",
+        nargs="*",
+        help="Action arguments",
+    )
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["json", "table", "auto"],
+        default="auto",
+        help="Output format (default: auto-detect TTY)",
+    )
+    parser.add_argument("--quiet", "-q", action="store_true", help="Exit code only")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point. Returns exit code."""
+    load_env()
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    kwargs = {}
+    if args.args:
+        kwargs["positional"] = args.args
+    if args.yes:
+        kwargs["confirmed"] = True
+    if args.verbose:
+        kwargs["verbose"] = True
+
+    result = dispatch(args.action, **kwargs)
+
+    if not args.quiet:
+        output = format_output(result, fmt=args.output_format)
+        if output:
+            if result.ok:
+                print(output)
+            else:
+                print(output, file=sys.stderr)
+
+    return result.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,189 @@
+"""${tool_name} CLI.
+
+Usage:
+    ${tool_name} <action> [options]
+
+Actions:
+${action_help_lines}
+
+Flags:
+    --format json|table   Output format (default: auto-detect TTY)
+    --quiet, -q           Exit code only
+    --verbose, -v         Verbose output
+    --yes                 Skip confirmation prompts
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from dataclasses import dataclass, field
+from typing import Any
+
+# Exit codes (see Designing CLI Tools.md)
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_NOT_FOUND = 3
+EXIT_PERMISSION = 4
+EXIT_NETWORK = 5
+
+
+@dataclass
+class Result:
+    """Action result. Returned by all action functions."""
+
+    data: Any = None
+    error: str | None = None
+    exit_code: int = EXIT_OK
+    metadata: dict = field(default_factory=dict)
+
+    @property
+    def ok(self) -> bool:
+        return self.error is None
+
+
+${action_functions}
+
+
+def show_help(**kwargs) -> Result:
+    """Show available actions and usage."""
+    topic = kwargs.get("topic")
+    if topic and topic in ACTIONS:
+        fn = ACTIONS[topic]
+        doc = fn.__doc__ or "No documentation."
+        return Result(data={"action": topic, "help": doc})
+
+    actions = []
+    for name, fn in ACTIONS.items():
+        doc = (fn.__doc__ or "").split("\n")[0]
+        actions.append({"action": name, "description": doc})
+    return Result(data=actions)
+
+
+ACTIONS: dict[str, callable] = {
+${action_registry}
+    "help": show_help,
+}
+
+
+def dispatch(action: str, **kwargs) -> Result:
+    """Route action to handler. Shared by CLI and MCP."""
+    if action not in ACTIONS:
+        valid = ", ".join(ACTIONS.keys())
+        return Result(
+            error=f"Unknown action '{action}'. Valid: {valid}",
+            exit_code=EXIT_USAGE,
+        )
+    return ACTIONS[action](**kwargs)
+
+
+def format_output(result: Result, fmt: str = "auto") -> str:
+    """Format result for output. Stdlib only.
+
+    Args:
+        result: Action result.
+        fmt: "json", "table", or "auto" (detect TTY).
+    """
+    if fmt == "auto":
+        fmt = "table" if sys.stdout.isatty() else "json"
+
+    if not result.ok:
+        payload = {"success": False, "error": result.error}
+        if fmt == "json":
+            return json.dumps(payload, indent=2)
+        return f"Error: {result.error}"
+
+    payload = {"success": True, "data": result.data}
+    if result.metadata:
+        payload["metadata"] = result.metadata
+
+    if fmt == "json":
+        return json.dumps(payload, indent=2)
+    if fmt == "table":
+        return _format_table(result.data)
+    return str(result.data)
+
+
+def _format_table(data: Any) -> str:
+    """Simple table formatter using only stdlib."""
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        headers = list(data[0].keys())
+        widths = {
+            h: max(len(h), max((len(str(row.get(h, ""))) for row in data), default=0))
+            for h in headers
+        }
+        lines = [
+            " | ".join(h.ljust(widths[h]) for h in headers),
+            "-+-".join("-" * widths[h] for h in headers),
+        ]
+        for row in data:
+            lines.append(" | ".join(str(row.get(h, "")).ljust(widths[h]) for h in headers))
+        return "\n".join(lines)
+    if isinstance(data, dict):
+        max_key = max((len(str(k)) for k in data), default=0)
+        return "\n".join(f"{str(k).ljust(max_key)}  {v}" for k, v in data.items())
+    return str(data)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build argument parser with POSIX conventions."""
+    parser = argparse.ArgumentParser(
+        prog="${tool_name}",
+        description="${tool_description}",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "action",
+        nargs="?",
+        default="help",
+        choices=list(ACTIONS.keys()),
+        help="Action to perform",
+    )
+    parser.add_argument(
+        "args",
+        nargs="*",
+        help="Action arguments",
+    )
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["json", "table", "auto"],
+        default="auto",
+        help="Output format (default: auto-detect TTY)",
+    )
+    parser.add_argument("--quiet", "-q", action="store_true", help="Exit code only")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--yes", action="store_true", help="Skip confirmation prompts")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entry point. Returns exit code."""
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    kwargs = {}
+    if args.args:
+        kwargs["positional"] = args.args
+    if args.yes:
+        kwargs["confirmed"] = True
+    if args.verbose:
+        kwargs["verbose"] = True
+
+    result = dispatch(args.action, **kwargs)
+
+    if not args.quiet:
+        output = format_output(result, fmt=args.output_format)
+        if output:
+            if result.ok:
+                print(output)
+            else:
+                print(output, file=sys.stderr)
+
+    return result.exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,28 @@
+[project]
+name = "${tool_name}"
+version = "0.1.0"
+description = "${tool_description}"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0", "pydantic"]
+keyring = ["keyring"]
+dev = ["pytest>=7.0", "ruff"]
+
+[project.scripts]
+${tool_name} = "${module_name}.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

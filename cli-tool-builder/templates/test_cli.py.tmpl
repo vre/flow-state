@@ -1,0 +1,56 @@
+"""Tests for ${tool_name} CLI entry point.
+
+Tests exit codes, output format, and argument parsing.
+"""
+
+from __future__ import annotations
+
+import json
+
+from ${module_name}.cli import main
+
+
+class TestCLIExitCodes:
+    """Test CLI returns correct exit codes."""
+
+    def test_help_exits_zero(self):
+        code = main(["help"])
+        assert code == 0
+
+    def test_unknown_action_exits_two(self):
+        """Unknown action should exit 2 (usage error)."""
+        # argparse handles this with SystemExit
+        import pytest
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["nonexistent_action"])
+        assert exc_info.value.code == 2
+
+
+class TestCLIOutput:
+    """Test CLI output formatting."""
+
+    def test_json_format(self, capsys):
+        main(["help", "--format", "json"])
+        captured = capsys.readouterr()
+        data = json.loads(captured.out)
+        assert data["success"] is True
+
+    def test_quiet_suppresses_output(self, capsys):
+        main(["help", "--quiet"])
+        captured = capsys.readouterr()
+        assert captured.out == ""
+
+    def test_table_format(self, capsys):
+        main(["help", "--format", "table"])
+        captured = capsys.readouterr()
+        assert "action" in captured.out
+        assert "help" in captured.out
+
+
+class TestCLIArgs:
+    """Test argument parsing."""
+
+    def test_default_action_is_help(self, capsys):
+        code = main([])
+        assert code == 0

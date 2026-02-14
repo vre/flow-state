@@ -1,0 +1,48 @@
+"""Tests for ${tool_name} core logic.
+
+Auto-generated TDD stubs. Tests FAIL until action functions are implemented.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from ${module_name}.${module_name} import EXIT_USAGE, Result, dispatch, show_help
+
+
+class TestDispatch:
+    """Test action dispatcher."""
+
+    def test_unknown_action_returns_error(self):
+        result = dispatch("nonexistent_action")
+        assert not result.ok
+        assert result.exit_code == EXIT_USAGE
+        assert "Unknown action" in result.error
+
+    def test_unknown_action_suggests_valid(self):
+        result = dispatch("nonexistent_action")
+        assert "help" in result.error
+
+    def test_help_action(self):
+        result = dispatch("help")
+        assert result.ok
+        assert isinstance(result.data, list)
+        assert any(a["action"] == "help" for a in result.data)
+
+
+class TestHelp:
+    """Test help action."""
+
+    def test_help_lists_all_actions(self):
+        result = show_help()
+        assert result.ok
+        action_names = [a["action"] for a in result.data]
+${help_test_assertions}
+
+    def test_help_topic(self):
+        result = show_help(topic="help")
+        assert result.ok
+        assert result.data["action"] == "help"
+
+
+${action_test_classes}
