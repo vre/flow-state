@@ -1,5 +1,4 @@
-"""
-Channel listing and video matching library.
+"""Channel listing and video matching library.
 
 Lists channel videos via yt-dlp flat-playlist, matches against
 locally extracted files, and checks comment growth.
@@ -13,6 +12,8 @@ from pathlib import Path
 from lib.check_existing import extract_metadata_from_file
 from lib.prepare_update import parse_count
 from lib.shared_types import format_count
+
+CHECKED_SELECTION_RE = re.compile(r"^- \[[xX]\] \*\*.+?\*\* .*?\(([A-Za-z0-9_-]{11})\)\s*$")
 
 
 def parse_channel_entry(entry: dict) -> dict:
@@ -34,6 +35,7 @@ def parse_channel_entry(entry: dict) -> dict:
         "video_id": entry["id"],
         "title": entry.get("title", "Untitled"),
         "views": views,
+        "view_count": view_count,
         "duration": entry.get("duration_string", "N/A"),
         "url": entry.get("url") or entry.get("webpage_url", ""),
     }
@@ -98,8 +100,10 @@ def list_channel_videos(
             "yt-dlp",
             "--flat-playlist",
             "--dump-json",
-            "--sleep-requests", "0.5",
-            "--playlist-items", f"{start}:{end}",
+            "--sleep-requests",
+            "0.5",
+            "--playlist-items",
+            f"{start}:{end}",
             url,
         ],
         capture_output=True,
@@ -108,9 +112,7 @@ def list_channel_videos(
     )
 
     if result.returncode != 0 and not result.stdout.strip():
-        raise RuntimeError(
-            f"yt-dlp failed: {result.stderr.strip() or 'unknown error'}"
-        )
+        raise RuntimeError(f"yt-dlp failed: {result.stderr.strip() or 'unknown error'}")
 
     entries = []
     for line in result.stdout.strip().split("\n"):
@@ -135,7 +137,7 @@ def _find_summary_for_video_id(video_id: str, output_dir: Path) -> Path | None:
     """Find summary file for a video ID in output_dir and one level of subdirs."""
     dirs = [output_dir] + [d for d in output_dir.iterdir() if d.is_dir()]
     for d in dirs:
-        for f in d.glob(f"youtube - * ({video_id}).md"):
+        for f in d.glob(f"*youtube - * ({video_id}).md"):
             if _is_summary_file(f):
                 return f
     return None
@@ -197,25 +199,29 @@ def check_comment_growth(
         stored = parse_count(metadata.get("comments"))
 
         if stored is None or stored == 0:
-            results.append({
+            results.append(
+                {
+                    "video_id": video_id,
+                    "title": metadata.get("title", "Unknown"),
+                    "stored_comments": stored,
+                    "current_comments": current,
+                    "growth_pct": 0.0,
+                    "needs_refresh": False,
+                }
+            )
+            continue
+
+        growth_pct = ((current - stored) / stored) * 100
+        results.append(
+            {
                 "video_id": video_id,
                 "title": metadata.get("title", "Unknown"),
                 "stored_comments": stored,
                 "current_comments": current,
-                "growth_pct": 0.0,
-                "needs_refresh": False,
-            })
-            continue
-
-        growth_pct = ((current - stored) / stored) * 100
-        results.append({
-            "video_id": video_id,
-            "title": metadata.get("title", "Unknown"),
-            "stored_comments": stored,
-            "current_comments": current,
-            "growth_pct": round(growth_pct, 1),
-            "needs_refresh": growth_pct > 10,
-        })
+                "growth_pct": round(growth_pct, 1),
+                "needs_refresh": growth_pct > 10,
+            }
+        )
 
     return results
 
@@ -249,6 +255,92 @@ def suggest_output_dir(base_dir: Path, channel_name: str, channel_id: str) -> Pa
     Returns:
         Suggested Path (not created).
     """
-    clean_name = re.sub(r'[<>:"/\\|?*]', '', channel_name)
+    clean_name = re.sub(r'[<>:"/\\|?*]', "", channel_name)
     clean_name = clean_name.replace("..", "")
     return base_dir / f"{clean_name} ({channel_id})"
+
+
+def check_view_growth(
+    existing_videos: list[dict],
+    output_dir: Path,
+    threshold: float = 0.3,
+) -> list[dict]:
+    """Compare flat-playlist view_count vs stored views.
+
+    Args:
+        existing_videos: List of video dicts with 'view_count' (raw int from flat-playlist).
+        output_dir: Directory with existing extractions.
+        threshold: Fractional growth threshold (0.3 = 30%).
+
+    Returns:
+        List of videos exceeding threshold, each with video_id, title,
+        stored_views, current_views, growth_pct, has_growth.
+    """
+    results = []
+
+    for video in existing_videos:
+        video_id = video["video_id"]
+        current = video.get("view_count")
+        if current is None:
+            continue
+
+        summary_file = _find_summary_for_video_id(video_id, output_dir)
+        if summary_file is None:
+            continue
+
+        metadata = extract_metadata_from_file(summary_file.read_text())
+        stored = parse_count(metadata.get("views"))
+
+        if stored is None or stored == 0:
+            continue
+
+        growth = (current - stored) / stored
+        if growth <= threshold:
+            continue
+
+        results.append(
+            {
+                "video_id": video_id,
+                "title": video.get("title", "Unknown"),
+                "stored_views": format_count(stored),
+                "current_views": format_count(current),
+                "growth_pct": round(growth * 100, 1),
+                "has_growth": True,
+            }
+        )
+
+    return results
+
+
+def parse_selection_checkboxes(content: str) -> list[dict]:
+    """Parse checked items from markdown checkbox file.
+
+    Tracks which section each item belongs to for routing:
+    "## New videos" → section="new", "## Videos with activity" → section="growth".
+
+    Args:
+        content: Markdown file content with checkbox lines.
+
+    Returns:
+        List of dicts with video_id and section ("new" or "growth").
+    """
+    if not content:
+        return []
+
+    results = []
+    current_section = "new"
+
+    for line in content.split("\n"):
+        # Track section headers only when they are top-level.
+        if line == "## New videos":
+            current_section = "new"
+            continue
+        if line.startswith("## Videos with activity"):
+            current_section = "growth"
+            continue
+
+        match = CHECKED_SELECTION_RE.match(line)
+        if match:
+            results.append({"video_id": match.group(1), "section": current_section})
+
+    return results

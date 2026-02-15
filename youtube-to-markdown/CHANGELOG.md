@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.6.0] - 2026-02-14
+
+### Channel Browser UX Improvements
+- Video descriptions (≤200 chars) fetched for informed selection via new `24_enrich_metadata.py`
+- View growth detection replaces per-video comment count API calls (free, uses flat-playlist data)
+- Checkbox markdown file for selecting from >4 videos (opened in editor, parsed by video_id)
+- Selection parsing returns section info (new vs growth) for correct routing
+- Date-prefixed summary filenames now included in view-growth lookup
+- Selection parser now only accepts top-level checkbox rows with valid 11-char YouTube IDs
+
+### New Files
+- `scripts/24_enrich_metadata.py` - Fetches video descriptions with 1s rate limiting
+- `tests/` - 31 tests for view growth, checkbox parsing, enrichment, list-channel output, parse_channel_entry
+
+### Changes
+- `lib/channel_listing.py` - Added `view_count` raw int to `parse_channel_entry()`, `check_view_growth()`, `parse_selection_checkboxes()`
+- `subskills/channel_browse.md` - Rewritten C2-C5 flow with enrichment, view growth, checkbox selection
+- `scripts/22_list_channel.py` - Clarified output contract to include both `views` and `view_count`
+- `scripts/24_enrich_metadata.py` - Normalizes multiline descriptions to single-line snippets
+
 ## [2.5.0] - 2026-02-13
 
 ### Filename Format: Date Prefix

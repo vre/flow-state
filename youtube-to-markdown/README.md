@@ -82,6 +82,7 @@ scripts/             # CLI entry points (numbered by pipeline order)
   21_prepare_update.py
   22_list_channel.py
   23_check_comment_growth.py
+  24_enrich_metadata.py
   30_clean_vtt.py
   31_format_transcript.py
   32_filter_comments.py

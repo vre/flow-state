@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""
-Lists YouTube channel videos and matches against local extractions.
+"""Lists YouTube channel videos and matches against local extractions.
 
 Usage: 22_list_channel.py <CHANNEL_URL> <OUTPUT_DIR> [--offset N]
 Output: JSON with channel metadata, new/existing videos, pagination info.
+Video entries include both `views` (formatted) and `view_count` (raw int).
 
 Rate limiting: uses --sleep-requests 0.5 for flat-playlist listing.
 """
@@ -14,9 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from lib.channel_listing import (
+    find_output_dir,
     list_channel_videos,
     match_existing_videos,
-    find_output_dir,
     parse_channel_entry,
     parse_channel_metadata,
     suggest_output_dir,
@@ -62,7 +62,7 @@ def main() -> None:
     # Parse channel metadata from first entry
     channel_meta = parse_channel_metadata(raw_entries[0])
 
-    # Parse video entries
+    # Parse video entries (includes both formatted views and raw view_count).
     videos = [parse_channel_entry(e) for e in raw_entries]
 
     # Resolve output directory
