@@ -65,9 +65,14 @@ def parse_channel_metadata(entry: dict) -> dict:
 def _normalize_channel_url(url: str) -> str:
     """Ensure channel URL points to /videos tab.
 
+    Accepts full URLs or bare channel IDs (UC..., 24 chars).
     YouTube channel URLs without /videos return Videos + Shorts + Live
     as separate playlists, breaking --playlist-items pagination.
     """
+    url = url.strip()
+    # Bare channel ID: UCxxxxxxxxxxxxxxxxxxxxxxxx
+    if re.match(r"^UC[A-Za-z0-9_-]{22}$", url):
+        return f"https://www.youtube.com/channel/{url}/videos"
     url = url.rstrip("/")
     if url.endswith("/videos"):
         return url

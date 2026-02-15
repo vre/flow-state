@@ -16,7 +16,7 @@ Multiple videos: Process one video at a time, sequentially. Do not run parallel 
 
 ## Step -1: Detect input type
 
-If URL is a channel URL (contains `/@`, `/channel/`, `/c/`, or `/user/`, but NOT `watch?v=`):
+If input is a channel URL (contains `/@`, `/channel/`, `/c/`, `/user/`) or a bare channel ID (starts with `UC`, 24 chars), but NOT `watch?v=`:
   Read and follow `./subskills/channel_browse.md`.
 
 Otherwise: Continue to Step 0.
