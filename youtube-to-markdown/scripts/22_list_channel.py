@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Lists YouTube channel videos and matches against local extractions.
 
-Usage: 22_list_channel.py <CHANNEL_URL> <OUTPUT_DIR> [--offset N]
+Usage: 22_list_channel.py <CHANNEL_URL> <OUTPUT_DIR> [--offset N] [--limit N]
 Output: JSON with channel metadata, new/existing videos, pagination info.
 Video entries include both `views` (formatted) and `view_count` (raw int).
 
@@ -26,11 +26,15 @@ from lib.channel_listing import (
 def main() -> None:
     """CLI entry point."""
     offset = 0
+    limit = 50
     positional = []
     i = 1
     while i < len(sys.argv):
         if sys.argv[i] == "--offset" and i + 1 < len(sys.argv):
             offset = int(sys.argv[i + 1])
+            i += 2
+        elif sys.argv[i] == "--limit" and i + 1 < len(sys.argv):
+            limit = int(sys.argv[i + 1])
             i += 2
         else:
             positional.append(sys.argv[i])
@@ -39,7 +43,7 @@ def main() -> None:
 
     if len(args) != 2:
         print(
-            "Usage: 22_list_channel.py <CHANNEL_URL> <OUTPUT_DIR> [--offset N]",
+            "Usage: 22_list_channel.py <CHANNEL_URL> <OUTPUT_DIR> [--offset N] [--limit N]",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -47,7 +51,7 @@ def main() -> None:
     channel_url = args[0]
     output_dir = Path(args[1])
     offset = max(0, offset)
-    limit = 20
+    limit = max(1, limit)
 
     # Fetch channel video list
     try:

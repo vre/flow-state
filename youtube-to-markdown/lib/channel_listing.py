@@ -23,7 +23,7 @@ def parse_channel_entry(entry: dict) -> dict:
         entry: Raw JSON dict from yt-dlp --flat-playlist --dump-json.
 
     Returns:
-        Dict with video_id, title, views, duration, url.
+        Dict with video_id, title, views, view_count, description, duration, url.
     """
     view_count = entry.get("view_count")
     if view_count is not None:
@@ -36,6 +36,8 @@ def parse_channel_entry(entry: dict) -> dict:
         "title": entry.get("title", "Untitled"),
         "views": views,
         "view_count": view_count,
+        # Keep enough text for model-based cleanup without exploding context size.
+        "description": (entry.get("description") or "")[:500],
         "duration": entry.get("duration_string", "N/A"),
         "url": entry.get("url") or entry.get("webpage_url", ""),
     }

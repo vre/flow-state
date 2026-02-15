@@ -13,6 +13,8 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Timestamp links** - Jump back to specific moments in the original video
 - **Comment analysis** - Curated comments cross-analyzed against video content
 - **Channel browser** - Browse channel videos, batch-extract new ones, detect comment growth on existing
+  - Uses flat-playlist descriptions + Haiku batch one-liners for cleaner selection context
+  - Default channel page size is 50 (override with `--limit`)
 - **Update mode** - Refresh existing extractions when video metadata changes
 
 ## Security
@@ -56,7 +58,7 @@ Also works: `get`, `fetch`, `transcript`, `subtitles`, `captions`
 ## Output Options
 
 | Option | Output |
-|--------|--------|
+| ------ | ------ |
 | Summary only | Summary with TL;DR and key insights |
 | Transcript only | Cleaned, formatted full transcript |
 | Comments only | Curated top comments |
@@ -82,7 +84,6 @@ scripts/             # CLI entry points (numbered by pipeline order)
   21_prepare_update.py
   22_list_channel.py
   23_check_comment_growth.py
-  24_enrich_metadata.py
   30_clean_vtt.py
   31_format_transcript.py
   32_filter_comments.py

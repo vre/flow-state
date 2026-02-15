@@ -154,6 +154,21 @@ Currently uses raw 200-char truncation. Replace with Haiku-summarized snippet fr
 - Manual test: channel listing with 50 videos, Haiku summarization quality
 - Existing tests: `test_check_view_growth.py`, `test_checkbox_parsing.py`, `test_parse_channel_entry.py` must still pass
 
+## Tasks
+
+- [x] Add `description` passthrough to `parse_channel_entry()` with 500-char cap
+- [x] Add `--limit N` support to `22_list_channel.py` and use effective limit in pagination
+- [x] Replace per-video enrich flow in `channel_browse.md` with one Haiku batch summarization step
+- [x] Remove `24_enrich_metadata.py` and `tests/test_enrich_metadata.py`
+- [x] Update references in `youtube-to-markdown/README.md` and `youtube-to-markdown/CHANGELOG.md`
+- [x] Merge-phase docs updated in root and plugin scope (`README.md`, `DEVELOPMENT.md`, `TESTING.md`, `TODO.md`, `CHANGELOG.md` where present)
+- [x] Version numbers bumped consistently (`.claude-plugin/marketplace.json`, `youtube-to-markdown/pyproject.toml`, `youtube-to-markdown/CHANGELOG.md`)
+- [x] Rebased branch with `git pull --rebase origin main` (no conflicts)
+- [x] Post-rebase validation run (`pytest` pass, targeted `ruff check` pass, markdownlint pass)
+- [+] Discovered and fixed: Step 5 pagination text implied page size comes from output instead of invocation context
+- [+] Discovered and fixed: checkbox snippet spacing needed explicit blank lines for readability in editor flow
+- [>] Deferred: squash merge into `main` until local `main` workspace cleanliness decision (`core/TODO.md` has separate local edits)
+
 ## Acceptance Criteria
 
 - [x] `parse_channel_entry()` includes `description` field from flat-playlist
@@ -188,6 +203,17 @@ Builds on `2026-02-12-channel-browser-ux.md` (merged to main).
   - descriptions present in listing JSON
   - selection markdown generation works with 4-item sample
 
+## Surprises and Decisions
+
+- Surprise: `--flat-playlist` already returns useful `description` data for this channel shape.
+  Decision: remove `24_enrich_metadata.py` flow entirely instead of keeping dual paths.
+- Surprise: batching descriptions into one Haiku call stayed within context budget with a 500-char cap.
+  Decision: keep cap in `parse_channel_entry()` to bound prompt size deterministically.
+- Surprise: pagination wording in skill text caused ambiguity around where `limit` comes from.
+  Decision: treat effective `--limit` as invocation-state and use it explicitly when advancing `--offset`.
+- Surprise: readability of checkbox files impacted selection confidence in manual use.
+  Decision: keep blank-line spacing between checkbox row and summary snippet.
+
 ## Reflection
 
 What worked:
@@ -201,3 +227,4 @@ What changed from initial plan:
 Lessons:
 - For selection routing, embedding canonical IDs in labels (`(VIDEO_ID)`) is the most robust contract when UI returns strings.
 - Plan text should avoid wording that suggests values are read from output when they are known from invocation context (effective `--limit`).
+- Merge readiness: implementation and plan updates are complete in the worktree branch; squash merge to `main` was intentionally deferred until explicit approval.

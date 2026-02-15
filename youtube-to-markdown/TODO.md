@@ -4,6 +4,7 @@
 
 - [x] Pull list of videos on a youtube channel and propose to fetch the new ones and update comments for older (v2.4.0)
 - [x] Channel browser UX: description enrich + secure checkbox parsing + view-growth lookup for date-prefixed files (v2.6.0)
+- [x] Channel browse cleanup: remove per-video enrich script, use Haiku batch summaries, add `--limit` pagination control (v2.7.0)
 - [ ] Providing yt-dlp logged in cookie signed to download restricted/member/etc transcripts
 - [ ] Try modding skill to run on opencode, github copilot, openai codex, ...
 

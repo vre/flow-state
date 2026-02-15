@@ -72,6 +72,26 @@ claude plugin validate .
 4. Changes are live (may need Claude reload)
 5. Test, iterate, repeat
 
+## Release Checklist
+
+When releasing a plugin update from a worktree branch:
+
+1. Update docs in root + affected plugin directory:
+   - `README.md`
+   - `DEVELOPMENT.md`
+   - `TESTING.md`
+   - `TODO.md`
+   - `CHANGELOG.md` (where present)
+2. Bump versions consistently:
+   - `.claude-plugin/marketplace.json` (`metadata.version` and plugin `version`)
+   - `<plugin>/pyproject.toml`
+   - `<plugin>/CHANGELOG.md`
+3. Rebase branch before merge:
+   - `git pull --rebase origin main`
+4. Validate after rebase:
+   - run tests for affected plugin(s)
+   - run lints/checks for changed files
+
 ## LLM Agent Development Guidelines
 
 For comprehensive guidance on building Skills, MCPs, CLI tools, and instruction files:

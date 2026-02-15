@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+## [2.7.0] - 2026-02-15
+
+### Channel Browse
+- Removed per-video `24_enrich_metadata.py` enrichment step
+- Channel browser now uses flat-playlist descriptions and Haiku batch summarization
+- `22_list_channel.py` now supports `--limit` with default 50 for channel listing pages
+
+### UX
+- Selection markdown now uses explicit blank-line spacing between checkbox row and description snippet
+- Pagination flow text now explicitly uses effective `--limit` for offset progression
+
 ## [2.6.0] - 2026-02-14
 
 ### Channel Browser UX Improvements

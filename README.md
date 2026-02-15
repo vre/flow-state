@@ -26,6 +26,13 @@
 - 🛡️ **Content Safety**: Encapsulates email content to avoid context poisoning
 - 🏢 **Multi-account**: Multiple account support with named switching
 
+## Latest Release Highlights
+
+- `youtube-to-markdown v2.7.0`
+  - Channel browse no longer does per-video enrich fetches (`24_enrich_metadata.py` removed)
+  - Flat-playlist descriptions are summarized in one Haiku batch call for selection snippets
+  - Channel listing page size defaults to 50 (`--limit` supported)
+
 ## Quick Start
 
 ### Installation
@@ -64,7 +71,7 @@ As you don't have any configured yet, it will show you how to set up.
 All examples are CC-licensed videos with full summary and comment analysis.
 
 | Type | Summary | Links |
-|------|---------|-------|
+| ----- | ------- | ----- |
 | Tutorial | [Faro Shuffle Tutorial!](examples/2017-08-17%20-%20youtube%20-%20Faro%20Shuffle%20Tutorial!%20(RXhNA0xLRgY).md) | [transcript](examples/2017-08-17%20-%20youtube%20-%20Faro%20Shuffle%20Tutorial!%20-%20transcript%20(RXhNA0xLRgY).md) · [video](https://www.youtube.com/watch?v=RXhNA0xLRgY) |
 | Educational | [Brain: Parts & functions](examples/2019-09-13%20-%20youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20(DtkRGbTp1s8).md) | [transcript](examples/2019-09-13%20-%20youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20-%20transcript%20(DtkRGbTp1s8).md) · [video](https://www.youtube.com/watch?v=DtkRGbTp1s8) |
 | Educational | [Happiness is all in your mind](examples/2014-06-15%20-%20youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20(xnLoToJVQH4).md) | [transcript](examples/2014-06-15%20-%20youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20-%20transcript%20(xnLoToJVQH4).md) · [video](https://www.youtube.com/watch?v=xnLoToJVQH4) |

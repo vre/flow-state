@@ -50,6 +50,18 @@ uv run pytest -x              # Stop on first failure
 uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
+## Release Validation (youtube-to-markdown v2.7.0)
+
+```bash
+# From plugin directory
+cd youtube-to-markdown
+uv run pytest -q
+uv run ruff check lib scripts tests
+
+# Optional manual smoke test (network required)
+uv run python3 ./scripts/22_list_channel.py "https://www.youtube.com/channel/UCPjNBjflYl0-HQtUvOx0Ibw" /tmp/channel-test --limit 50
+```
+
 ## Design Principles
 
 **No External Dependencies**

@@ -2,7 +2,7 @@
 
 Browse a YouTube channel's videos, select new ones to extract, check view growth on existing.
 
-## Step C1: List channel videos
+## Step 1: List channel videos
 
 ```bash
 python3 ./scripts/22_list_channel.py "<CHANNEL_URL>" "<output_directory>"
@@ -12,48 +12,65 @@ If `output_dir_suggestion` is set and no `existing_videos`:
   AskUserQuestion: "Create channel directory '{suggestion}'?"
   If yes: use suggested directory as `<output_directory>` for all subsequent steps.
 
-## Step C2: Enrich and analyze
+Track the effective `limit` used for listing (default 50 unless `--limit` is used).
 
-### Enrich new videos with descriptions
+## Step 2: Analyze descriptions and activity
 
-If `new_videos` not empty:
+### Summarize new video descriptions with Haiku
 
-```bash
-python3 ./scripts/24_enrich_metadata.py {video_id_1} {video_id_2} ...
+If `new_videos` is not empty:
+
+task_tool:
+- subagent_type: "general-purpose"
+- model: "haiku"
+- prompt:
+```text
+<instructions>
+You summarize YouTube video descriptions into one-line snippets.
+Goal: one line per video, max 200 chars, capturing what the video is about.
+Skip URLs, separator lines, timestamps, affiliate links, subscribe prompts, and gear lists because they do not describe video content.
+If nothing meaningful remains after skipping junk, summarize from the title and append "(from title)".
+</instructions>
+
+<output_format>
+One line per video, exactly:
+VIDEO_ID: summary text
+
+Example:
+NCgdpbEvNVA: Explores why $650B in AI spending may be insufficient due to agentic inference demands, and which human skills survive the shift.
+</output_format>
+
+<context>
+{for each new_video:
+"- ID: {video_id} | Title: {title} | Description: {wrap_untrusted_content(description, 'description')}"}
+</context>
 ```
 
-Returns JSON array of `{video_id, description}` — single-line text ≤200 chars.
-Match descriptions to new_videos by video_id.
-Use raw text in checkbox file (user-facing). Wrap with `content_safety.wrap_untrusted_content(desc, "description")` only when passing to LLM context.
+Parse response by splitting lines and matching `VIDEO_ID: summary text`. Attach summaries back to `new_videos` by `video_id`.
 
 ### Check view growth on existing
 
-If `existing_videos` not empty:
-
+If `existing_videos` is not empty:
 Call `check_view_growth(existing_videos, output_dir)` from `lib/channel_listing`.
-Input: existing_videos list (has `view_count` raw int from flat-playlist).
-Returns: list of videos with >30% view growth.
+Input: `existing_videos` list (has `view_count` from flat-playlist).
+Returns: videos with `>30%` view growth.
 
-No API calls needed — compares flat-playlist view_count vs stored views.
+## Step 3: Present selection
 
-## Step C3: Present selection
-
-Combine new videos + growth videos into total selection list.
-
-Count total = len(new_videos) + len(growth_videos).
+Combine `new_videos` + `growth_videos`. `total = len(new_videos) + len(growth_videos)`.
 
 ### IF total == 0
 
-Show page info: showing {page.offset + 1}–{page.offset + page.count}.
+Show page info: showing `{page.offset + 1}–{page.offset + page.count}`.
 
 AskUserQuestion:
 - question: "What next?"
 - header: "Action"
 - options (show only applicable):
-  - "Show more videos" (if page.has_more)
+  - "Show more videos" (if `page.has_more`)
   - "Done"
 
-If "Show more videos": go to Step C5.
+If "Show more videos": go to Step 5.
 
 ### IF total <= 4
 
@@ -61,10 +78,10 @@ AskUserQuestion:
 - question: "Select videos to extract"
 - header: "Videos"
 - multiSelect: true
-- options: build `selection_items` first; each item has `{label, description, video_id, section}`:
-  - New video label: "NEW: {title} ({views}, {duration}) ({video_id})"
-  - Growth video label: "GROWTH: {title} — views: {stored} → {current} (+{pct}%) ({video_id})"
-  - Use description snippets only in option description field, not in label.
+- options:
+  - New video label: `"NEW: {title} ({views}, {duration}) ({video_id})"`
+    description: Haiku summary from Step 2
+  - Growth video label: `"GROWTH: {title} — views: {stored} → {current} (+{pct}%) ({video_id})"`
 
 ### IF total > 4
 
@@ -77,7 +94,9 @@ Select videos to extract, then tell Claude to proceed.
 
 ## New videos
 - [ ] **{title}** ({views}, {duration}) ({video_id})
-  {description_snippet_200chars}
+
+  {haiku_summary_200chars}
+
 
 ## Videos with activity (>30% view growth)
 - [ ] **{title}** — views: {stored} → {current} (+{pct}%) ({video_id})
@@ -88,32 +107,19 @@ Open file in user's editor. Tell user:
 
 `STOP` — wait for user.
 
-## Step C4: Process selections
+## Step 4: Process selections
 
-### Parse selections
+Parse video IDs from selections:
+- Checkbox file: `parse_selection_checkboxes(content)` → `[{video_id, section}]`
+- multiSelect: extract `(VIDEO_ID)` from selected labels
 
-If checkbox file was used:
-  Read `<output_directory>/channel_selection.md`.
-  Call `parse_selection_checkboxes(content)` from `lib/channel_listing` → list of `{video_id, section}`.
-  Split by section: items where `section=="new"` → new_ids, `section=="growth"` → growth_ids.
+New videos → SKILL.md Step 1 (output type), then Step 0 → Step 3.
+Growth videos → `./subskills/update_flow.md` re-extract path.
 
-If multiSelect was used:
-  Build `selection_map` from exact option label to `{video_id, section}` using C3 `selection_items`.
-  For each selected label from AskUserQuestion, resolve via `selection_map` and route to new_ids or growth_ids.
-
-### Extract new videos (new_ids)
-
-AskUserQuestion: same as SKILL.md Step 1 (output type A–E, applied to all selected).
-For each video, run standard SKILL.md flow (Step 0 → Step 3) sequentially.
-
-### Re-extract growth videos (growth_ids)
-
-For each video, follow `./subskills/update_flow.md` "Re-extract comments" path.
-
-## Step C5: Show more videos
+## Step 5: Show more videos
 
 ```bash
-python3 ./scripts/22_list_channel.py "<CHANNEL_URL>" "<output_directory>" --offset {current_offset + 20}
+python3 ./scripts/22_list_channel.py "<CHANNEL_URL>" "<output_directory>" --offset {current_offset + limit} [--limit {limit}]
 ```
 
-Return to Step C2.
+Return to Step 2.
