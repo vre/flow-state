@@ -53,6 +53,34 @@ These should be routed to Sonnet/Opus instead:
 - Sustained context tracking across many files [5]
 - Tasks requiring coherent state across a long session [2]
 
+## Constrained Output for Subagents
+
+When subagents write results to files, their final text message is the only content returned to the coordinator via TaskOutput [9]. Unconstrained agents produce verbose final messages — confirmations, content echoing, reasoning summaries — bloating coordinator context by ~30K chars per call [10].
+
+Add a constrained output instruction to every subagent prompt:
+
+```
+Do not output text during execution — only make tool calls.
+Your final message must be ONLY one of:
+  {step}: wrote {output_file}
+  {step}: FAIL - {what went wrong}
+```
+
+This reduces TaskOutput from ~30K to ~40-130 chars per call [11]. Tested with both Sonnet and Haiku (2026-02-15).
+
+### Model differences in constraint following
+
+Haiku copies instruction formatting literally [12]. A dash-list format like:
+```
+- Success: summarize: wrote file.md
+- Failure: summarize: FAIL - reason
+```
+produces `Success: summarize: wrote file.md` — Haiku includes the label prefix. Use plain indented format without labels to avoid this.
+
+Sonnet interprets the list as choices and picks the correct branch without copying labels.
+
+Both models reliably suppress intermediate text output when instructed [12].
+
 ## Sonnet and Opus Prompts
 
 Larger models handle ambiguity, parse unstructured prompts, and maintain state across long conversations. Key differences from Haiku:
@@ -85,3 +113,7 @@ This outperforms single-model approaches because each model operates in its stre
 [6]: https://portkey.ai/blog/optimize-token-efficiency-in-prompts/ "Optimize token efficiency"
 [7]: https://platform.claude.com/docs/en/build-with-claude/effort "Effort parameter"
 [8]: https://news.mit.edu/2025/enabling-small-language-models-solve-complex-reasoning-tasks-1212 "MIT DisCIPL: small models solve complex tasks"
+[9]: https://github.com/anthropics/claude-code/issues/16789 "TaskOutput returns final result text"
+[10]: https://www.richsnapp.com/article/2025/10-05-context-management-with-subagents-in-claude-code "Context management with subagents"
+[11]: Empirical finding, youtube-to-markdown context analysis, session f3ce1cae, 2026-02-15
+[12]: Empirical finding, youtube-to-markdown testing, 2026-02-15

@@ -123,9 +123,30 @@ Start with INPUT and OUTPUT file paths. This tells the subagent exactly what it'
 
 Why INPUT/OUTPUT first: Subagents start fresh without your context. They need to know immediately what files to read and where to write. Burying this information in a paragraph of instructions leads to missed outputs.
 
+### Constrain subagent output
+
+TaskOutput returns the agent's final text message to the coordinator's context [1]. Without constraints, agents produce verbose final messages ("I've analyzed the transcript and written a comprehensive summary covering...") that inflate coordinator context by ~30K chars per call [2] — causing compaction every 2-3 subagent dispatches.
+
+Always end subagent prompts with:
+
+```
+Do not output text during execution — only make tool calls.
+Your final message must be ONLY one of:
+  {step}: wrote {output_file}
+  {step}: FAIL - {what went wrong}
+```
+
+This reduces TaskOutput from ~30K to ~40-130 chars [3]. The subagent still writes full output to files — only the status message is constrained.
+
+See `docs/writing-model-specific-prompts.md` for model-specific formatting differences (Haiku copies instruction format literally).
+
+### Background agents cannot use Write
+
+Background Tasks (`run_in_background: true`) cannot prompt for tool permissions [4]. The Write tool is auto-denied with "prompts unavailable". Use blocking Tasks when subagents need to write files. Background Tasks can use Bash for file writes, but this is fragile for large or complex content.
+
 ## Simple Markdown
 
-Skills are for LLM consumption. Use simple markdown:
+Skills are for LLM consumption [5]. Use simple markdown:
 - Plain headers and bullets
 - No emojis or visual formatting tricks
 - No complex table layouts
@@ -171,4 +192,8 @@ If one step has many sub-parts, split it into multiple steps. Each step should d
 
 ## References
 
-- [Skill authoring best practices | Anthropic](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices) - Official guidance on skill structure and efficiency
+[1]: https://github.com/anthropics/claude-code/issues/16789 "TaskOutput returns final result text"
+[2]: https://www.richsnapp.com/article/2025/10-05-context-management-with-subagents-in-claude-code "Context management with subagents"
+[3]: Empirical finding, youtube-to-markdown context analysis, session f3ce1cae, 2026-02-15
+[4]: https://apidog.com/blog/claude-code-background-tasks/ "Background tasks limitations"
+[5]: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices "Skill authoring best practices"

@@ -8,6 +8,7 @@
 - [ ] Providing yt-dlp logged in cookie signed to download restricted/member/etc transcripts
 - [ ] Try modding skill to run on opencode, github copilot, openai codex, ...
 
+- [ ] Comment evolution — cross-compare old and new comments on re-extract, surface deltas (plan: `docs/youtube-to-markdown/plans/2026-02-12-comment-evolution.md`)
 - [ ] Highlighting notable content to browseability
 - [ ] Analysis keywords linking to transcript/commentary
 - [ ] Check for alternative extraction methods
