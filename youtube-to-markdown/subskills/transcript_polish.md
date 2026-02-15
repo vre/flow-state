@@ -21,6 +21,11 @@ Target ~500 chars per paragraph. Find natural break points at topic shifts or se
 
 Write to OUTPUT in format:
 15,42,78,103,...
+
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  paragraphs: wrote ${BASE_NAME}_transcript_paragraphs.txt
+  paragraphs: FAIL - {what went wrong}
 ```
 
 ```bash
@@ -45,6 +50,10 @@ Tasks:
 - Keep timestamps at end of paragraphs
 
 ACTION REQUIRED: Use the Write tool NOW to save output to <output_directory>/${BASE_NAME}_transcript_cleaned.md. Do not ask for confirmation.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  clean: wrote ${BASE_NAME}_transcript_cleaned.md
+  clean: FAIL - {what went wrong}
 ```
 
 ## Step 3: Add topic headings
@@ -64,4 +73,8 @@ Read <output_directory>/${BASE_NAME}_chapters.json:
 - If empty: Add ### headings where major topics change
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  headings: wrote ${BASE_NAME}_transcript.md
+  headings: FAIL - {what went wrong}
 ```

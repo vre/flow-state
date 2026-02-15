@@ -15,6 +15,7 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Channel browser** - Browse channel videos, batch-extract new ones, detect comment growth on existing
   - Uses flat-playlist descriptions + Haiku batch one-liners for cleaner selection context
   - Default channel page size is 50 (override with `--limit`)
+- **Context-efficient subagents** - Task subagents return one-line final status messages to keep coordinator context growth low
 - **Update mode** - Refresh existing extractions when video metadata changes
 
 ## Security

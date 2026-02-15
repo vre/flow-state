@@ -29,6 +29,10 @@ FORMATS: ./summary_formats.md
 
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  summarize: wrote ${BASE_NAME}_summary.md
+  summarize: FAIL - {what went wrong}
 ```
 
 ## Step 2: Review and tighten summary
@@ -53,4 +57,8 @@ Rules:
 Preserve original language - do not translate.
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  tighten: wrote ${BASE_NAME}_summary_tight.md
+  tighten: FAIL - {what went wrong}
 ```

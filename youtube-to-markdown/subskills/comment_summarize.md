@@ -52,6 +52,10 @@ Rules:
 - Include commenter attribution only if expertise matters
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  insights: wrote ${BASE_NAME}_comment_insights.md
+  insights: FAIL - {what went wrong}
 ```
 
 ## Step 2: Review and tighten comment insights
@@ -74,4 +78,8 @@ Rules:
 - Preserve type-specific sections (Common Failures, What Worked/Didn't, etc.)
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  tighten: wrote ${BASE_NAME}_comment_insights_tight.md
+  tighten: FAIL - {what went wrong}
 ```

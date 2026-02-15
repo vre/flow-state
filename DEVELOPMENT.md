@@ -91,6 +91,9 @@ When releasing a plugin update from a worktree branch:
 4. Validate after rebase:
    - run tests for affected plugin(s)
    - run lints/checks for changed files
+5. For prompt-only workflow changes:
+   - run interactive extraction regression checks
+   - verify context/token behavior with historian session inspection
 
 ## LLM Agent Development Guidelines
 

@@ -50,7 +50,7 @@ uv run pytest -x              # Stop on first failure
 uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
-## Release Validation (youtube-to-markdown v2.7.0)
+## Release Validation (youtube-to-markdown v2.7.1)
 
 ```bash
 # From plugin directory
@@ -60,6 +60,11 @@ uv run ruff check lib scripts tests
 
 # Optional manual smoke test (network required)
 uv run python3 ./scripts/22_list_channel.py "https://www.youtube.com/channel/UCPjNBjflYl0-HQtUvOx0Ibw" /tmp/channel-test --limit 50
+
+# Prompt-only optimization checks (interactive)
+# - Run extraction option A and verify subagent TaskOutput stays one-line per step
+# - Run 3+ sequential extractions and verify no compaction event in historian
+# - Run update flow: Re-extract transcript on existing extraction
 ```
 
 ## Design Principles

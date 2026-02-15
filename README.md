@@ -28,10 +28,10 @@
 
 ## Latest Release Highlights
 
-- `youtube-to-markdown v2.7.0`
-  - Channel browse no longer does per-video enrich fetches (`24_enrich_metadata.py` removed)
-  - Flat-playlist descriptions are summarized in one Haiku batch call for selection snippets
-  - Channel listing page size defaults to 50 (`--limit` supported)
+- `youtube-to-markdown v2.7.1`
+  - Subagent `Task` prompts now enforce one-line final status output to reduce coordinator context growth
+  - No pipeline/script changes; summary/transcript/comments file generation behavior remains unchanged
+  - Update flow and existing tests remain valid
 
 ## Quick Start
 

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-02-15
+
+### Prompting / Context
+- Constrained all 7 `Task` subagent final messages to one-line status output (`{step}: wrote ...` or `{step}: FAIL - ...`)
+- Reduced coordinator context growth from verbose `TaskOutput` messages while keeping file outputs unchanged
+- Preserved model assignments (including Haiku in `transcript_polish` Step 2)
+
+### Reliability
+- Verified with both automated test suites plus delegated manual extraction/update-flow checks
+
 ## [2.7.0] - 2026-02-15
 
 ### Channel Browse
