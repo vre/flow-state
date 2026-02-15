@@ -42,21 +42,19 @@ AskUserQuestion:
 - header: "Output"
 - multiSelect: false
 - options:
-  A. "Summary only" - Tight summary of video content
-  B. "Transcript only" - Cleaned, formatted full transcript
-  C. "Comments only" - Curated comments
-  D. "Summary + Comments" - Summary with cross-analyzed comment insights
-  E. "Full (Recommended)" - All: summary, transcript, comments
+  A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Transcript stored if it should be processed.
+  B. "Summary + Comments + Formatted Transcript" - Option A + cleaned and formatted full transcript → double tokens
+  C. "Summary Only" - Summary of video content
+  D. "Formatted Transcript Only" - Cleaned and formatted full transcript
 
 ## Step 2: Execute modules
 
 Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" marks possibility to run concurrently.
 
-- A: transcript_extract.md → transcript_summarize.md
-- B: transcript_extract.md → transcript_polish.md
-- C: comment_extract.md
-- D: transcript_extract.md → (transcript_summarize.md | comment_extract.md) → comment_summarize.md
-- E: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md
+- A: transcript_extract.md → (transcript_summarize.md | comment_extract.md) → comment_summarize.md
+- B: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md
+- C: transcript_extract.md → transcript_summarize.md
+- D: transcript_extract.md → transcript_polish.md
 
 ## Step 3: Finalize
 
@@ -64,6 +62,6 @@ Based on user's choice, read and follow each subskill instruction in `./subskill
 python3 ./scripts/50_assemble.py [flag] "${BASE_NAME}" "<output_directory>"
 ```
 
-Flags: A=`--summary-only`, B=`--transcript-only`, C=`--comments-only`, D=`--summary-comments`, E=(none)
+Flags: A=`--summary-comments`, B=(none), C=`--summary-only`, D=`--transcript-only`
 
 Use `--debug` to keep intermediate files.

@@ -113,7 +113,7 @@ Parse video IDs from selections:
 - Checkbox file: `parse_selection_checkboxes(content)` → `[{video_id, section}]`
 - multiSelect: extract `(VIDEO_ID)` from selected labels
 
-New videos → SKILL.md Step 1 (output type), then Step 0 → Step 3.
+New videos → SKILL.md Step 1 (output type A–D), then Step 0 → Step 3.
 Growth videos → `./subskills/update_flow.md` re-extract path.
 
 ## Step 5: Show more videos
