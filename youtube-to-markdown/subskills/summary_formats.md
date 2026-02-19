@@ -1,35 +1,32 @@
-# Summary Formats
+# Content Classification & Format Routing
 
-Start headers from ## level (no H1).
+## 1. Classify content type
 
-## TIPS
-**TL;DR**: [1 sentence synthesis]
-- **[Category]**: [item], [item], [item]
-- **[Category]**: [item], [item]
+- TIPS: gear reviews, rankings, "X ways to...", practical advice lists
+- INTERVIEW: podcasts, conversations, Q&A, multiple perspectives
+- EDUCATIONAL: concept explanations, analysis, "how X works"
+- TUTORIAL: step-by-step instructions, coding, recipes
 
-## INTERVIEW
-**TL;DR**: [1 sentence synthesis]
-### [Content Unit Title]
-[2-3 sentence narrative. "Quote if impactful."]
+Ambiguity: classify by dominant structure. Default fallback: INTERVIEW.
 
-## EDUCATIONAL
-**TL;DR**: [1 sentence synthesis]
-### [Content Unit Title]
-**What**: [definition/description]
-**Why**: [reasoning/importance]
-**How**: [mechanism/application]
-**What Then**: [implications if actionable]
+## 2. Select format file
 
-## TUTORIAL
-**TL;DR**: [1 sentence synthesis]
-**Prerequisites**: [if any]
-1. [Step with outcome]
-2. [Step with outcome]
-**Result**: [what you end up with]
+| Content type | Format file |
+|---|---|
+| TIPS | flat-bullets.md |
+| INTERVIEW | concept-card.md |
+| EDUCATIONAL | what-why-how.md |
+| TUTORIAL | step-list.md |
 
-## Hidden Gems
-Add ## Hidden Gems for valuable tangents/side narratives that don't fit main structure.
+Read the format file. Apply its template and rules to produce the summary.
 
-## Rules
-- TL;DR is MANDATORY - never remove
-- Preserve structural elements (Prerequisites, Result, What/Why/How)
+## 3. Cross-cutting rules
+
+Apply to ALL formats, in addition to format-specific rules:
+
+- Start headers from ## level (no H1)
+- First element: `## [Main heading for the entire video]` — one sentence, informative
+- Second element: `**TL;DR**: [1 sentence synthesis]` — mandatory, never remove
+- Last section (optional): `## Hidden Gems` — valuable tangents/side narratives outside main structure
+- No language switching: output in the language the video is spoken in
+- Preserve structural elements specific to each format (Prerequisites, Result, What/Why/How)

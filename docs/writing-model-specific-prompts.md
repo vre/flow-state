@@ -62,7 +62,7 @@ Add a constrained output instruction to every subagent prompt:
 ```
 Do not output text during execution — only make tool calls.
 Your final message must be ONLY one of:
-  {step}: wrote {output_file}
+  {step}: wrote {output_file} [optional metadata]
   {step}: FAIL - {what went wrong}
 ```
 
@@ -72,7 +72,7 @@ This reduces TaskOutput from ~30K to ~40-130 chars per call [11]. Tested with bo
 
 Haiku copies instruction formatting literally [12]. A dash-list format like:
 ```
-- Success: summarize: wrote file.md
+- Success: summarize: wrote file.md [TYPE]
 - Failure: summarize: FAIL - reason
 ```
 produces `Success: summarize: wrote file.md` — Haiku includes the label prefix. Use plain indented format without labels to avoid this.

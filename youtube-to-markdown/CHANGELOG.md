@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Summary Format Refactor
+- Replaced monolithic `summary_formats.md` with routing table + individual format files in `formats/`
+- New Concept Card format for INTERVIEW content: claim heading → core idea → evidence bullets → implication
+- Existing formats (TIPS, EDUCATIONAL, TUTORIAL) extracted to separate files, unchanged
+- Archive formats: claim-first, dialogue-essence, interview-prose (tested, documented)
+- Orchestrator handoff: Step 1 reports `[TYPE]`, orchestrator resolves format path for Step 2
+- Cross-cutting rules (TL;DR, ## heading, Hidden Gems, language) in routing file
+- Research: `docs/youtube-to-markdown/research/2026-02-15-summary-format-research.md`
+
 ## [2.7.1] - 2026-02-15
 
 ### Prompting / Context

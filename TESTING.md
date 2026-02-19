@@ -50,7 +50,7 @@ uv run pytest -x              # Stop on first failure
 uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
-## Release Validation (youtube-to-markdown v2.7.1)
+## Release Validation (youtube-to-markdown v2.8.0)
 
 ```bash
 # From plugin directory
@@ -65,6 +65,12 @@ uv run python3 ./scripts/22_list_channel.py "https://www.youtube.com/channel/UCP
 # - Run extraction option A and verify subagent TaskOutput stays one-line per step
 # - Run 3+ sequential extractions and verify no compaction event in historian
 # - Run update flow: Re-extract transcript on existing extraction
+
+# Summary format routing checks (interactive)
+# - Run INTERVIEW video: verify Concept Card output (claim headings, core+bullets+implication)
+# - Run TIPS video: verify flat-bullets output
+# - Run EDUCATIONAL video: verify what-why-how output
+# - Verify Step 1 reports [TYPE] in status message
 ```
 
 ## Design Principles

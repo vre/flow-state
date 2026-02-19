@@ -132,7 +132,7 @@ Always end subagent prompts with:
 ```
 Do not output text during execution — only make tool calls.
 Your final message must be ONLY one of:
-  {step}: wrote {output_file}
+  {step}: wrote {output_file} [optional metadata]
   {step}: FAIL - {what went wrong}
 ```
 
