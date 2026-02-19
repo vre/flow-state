@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.9.0] - 2026-02-18
 
 ### Summary Format Refactor
 - Replaced monolithic `summary_formats.md` with routing table + individual format files in `formats/`
@@ -11,9 +11,26 @@
 - Cross-cutting rules (TL;DR, ## heading, Hidden Gems, language) in routing file
 - Research: `docs/youtube-to-markdown/research/2026-02-15-summary-format-research.md`
 
-### Other
-- Fix: output menu had 5 options but AskUserQuestion supports max 4; removed "Comments only", reordered by minimal work
+### Comment Re-extract Flow
+- New `--update-comments` assembler mode: replaces insights in existing summary, creates comments-only file
+- `replace_comment_insights_in_summary()`: finds `## Comment Insights` heading, replaces to next `## ` or EOF
+- `find_existing_summary()`: locates summary by video ID pattern, excludes transcript/comments files
+- comment_summarize now updates existing insights during re-extract (keep valid, add new, note drops with reason)
+
+### Classification
+- INTERVIEW: "multiple claims or perspectives, opinion-driven analysis" (was: "podcasts, conversations, Q&A")
+- EDUCATIONAL: "single concept explained in depth" (was: "concept explanations, analysis")
+
+### Fixes
+- Intermediate file cleanup: `_warmup.tmp` added to all mode-specific cleanup lists
+- Intermediate file cleanup: `_upload_date.txt` and `_comments_filtered.md` (legacy) added to comments cleanup
+- Channel browse: `channel_selection.md` deleted after processing selections
+- Concept Card format: removed `---` separators between cards
+- Output menu had 5 options but AskUserQuestion supports max 4; removed "Comments only", reordered
 - Removed dead "Comments only" option (C) — standalone comment extraction without summary had no practical use case
+
+### Testing
+- 8 new tests (284 total)
 
 ## [2.7.1] - 2026-02-15
 
