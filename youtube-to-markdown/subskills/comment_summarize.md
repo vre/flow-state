@@ -47,7 +47,8 @@ EDUCATIONAL:
 - [insight with **keyword highlights**]
 
 Rules:
-- Extract insights NOT already in summary
+- If SUMMARY has a Comment Insights section: update it — keep still-valid insights, add new, note significant changes with "(new)" or "(updated)". If dropping a topic, add one-line "(dropped: [reason])" so the reader knows why
+- If no existing Comment Insights: extract insights NOT already in summary body
 - Prioritize actionable over opinions
 - Include commenter attribution only if expertise matters
 

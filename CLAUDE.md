@@ -13,6 +13,7 @@ You are a deep expert in your subject area. Your goal is what is best for the us
 ## THE DEVELOPMENT PROCESS
 
 Move to Plan Phase if the user request requires more than 5 tool calls or file changes to implement.
+Inform HC what the next step is. Do not just say what you did.
 
 ### 1. Plan Phase Rules
 
@@ -24,6 +25,7 @@ PLANNING RULES:
 - Mission Command: include intent, goal, constraints, situational context and matching testing strategy (levels, tools, pass criteria). Research these before writing.
 - Use exact requirements, no temporal references ("current best practices", "latest version")
 - Critical assumption in plan → test with quick experiment before finalizing. Document result in plan. Untested assumption that proves wrong wastes the implementation cycle.
+- API/library assumptions → delegate to subagents: verify behavior against official documentation. Correct plan where wrong.
 - Interface change in plan → propose design exploration, with HC in cooperation iterate initial 3-5 designs. Delegate to subagent: create mockups with realistic content.
 - Implementation is delegated to an agent who has only the plan as context — plan must be self-contained
 
@@ -46,8 +48,8 @@ PHASE SETUP:
 PHASE LOOP:
 - Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
 - Problem found: investigate. STOP if not solved by 3 rounds → alert HC. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
-- Update plan task and acceptance criteria status as you progress: `[/]` in progress `[x]` done `[+]` discovered and done `[-]` cancelled - why? `[>]` deferred - why?
 - Document surprises and decisions - the plan is a living document during implementation
+- Update plan task and acceptance criteria status as you progress: `[/]` in progress `[x]` done `[+]` discovered and done `[-]` cancelled - why? `[>]` deferred - why?
 - For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
 
 CODING RULES:
@@ -59,11 +61,11 @@ CODING RULES:
 - Google style docstrings
 - NOT writing documentation or a book
 
-PHASE END:
-- When you think that the implementation is ready ask if there is something else or proceed to self-review
-- When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Print instruction to the HC: "Ask the job applicant: Do a complete code review from all aspects on the changes introduced in the worktree <worktree path>. Then review against the updated plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
-- Finally, ask the HC if they approve the functionality and implementation to proceed to Merge Phase
+PHASE END (when implementation has ended continue straigh from here):
+- Do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives if not certain of the options.
+- Print instruction to the HC: "Ask the job applicant: Do a complete code review of the changes in worktree <worktree path>. Find everything that's wrong. Then cross-check with the living plan <relative path of the plan>" - you will get applicants review back (would you hire them?).
+- Ask the HC: "Please do Acceptance testing of <feature(s)>. <details how to test>"
+- Confirm from HC that they agree to proceed to Merge Phase
 
 ### 3. Merge Phase Rules
 
@@ -71,8 +73,8 @@ PHASE END:
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 - `git pull --rebase` with the main. Test and validate after each rebase step. If conflicts: validate that existing functionality from main was not broken.
-- Ask HC approval to proceed with merge → `git merge --squash` to main with oneline commit message, no co-authors.
-- Ask HC for final acceptance testing and approval
+- Ask HC permission to merge with main → `git merge --squash` to main with oneline commit message, no co-authors.
+- Ask HC for permission to clean the worktree and branch away
 
 ## Writing AGENTS.md / CLAUDE.md
 

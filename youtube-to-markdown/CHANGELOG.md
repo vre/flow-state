@@ -11,6 +11,10 @@
 - Cross-cutting rules (TL;DR, ## heading, Hidden Gems, language) in routing file
 - Research: `docs/youtube-to-markdown/research/2026-02-15-summary-format-research.md`
 
+### Other
+- Fix: output menu had 5 options but AskUserQuestion supports max 4; removed "Comments only", reordered by minimal work
+- Removed dead "Comments only" option (C) — standalone comment extraction without summary had no practical use case
+
 ## [2.7.1] - 2026-02-15
 
 ### Prompting / Context

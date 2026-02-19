@@ -571,3 +571,133 @@ class TestFinalizeFull:
         # Work files should be cleaned up
         assert output_dir / f"{base_name}_metadata.md" not in mock_fs.files
         assert output_dir / f"{base_name}_upload_date.txt" not in mock_fs.files
+
+
+class TestReplaceCommentInsightsInSummary:
+    """Tests for replace_comment_insights_in_summary method."""
+
+    def test_replaces_existing_insights(self, finalizer, mock_fs):
+        """Test replacing old Comment Insights with new ones."""
+        summary_path = Path("/output/summary.md")
+        mock_fs.files[summary_path] = (
+            "## Summary heading\n\nSummary content\n\n## Comment Insights (old theme)\n\n**Old insight**: old stuff\n"
+        )
+
+        finalizer.replace_comment_insights_in_summary(summary_path, "## Comment Insights (new theme)\n\n**New insight**: new stuff")
+
+        result = mock_fs.files[summary_path]
+        assert "new stuff" in result
+        assert "old stuff" not in result
+        assert "Summary content" in result
+
+    def test_appends_when_no_existing_insights(self, finalizer, mock_fs):
+        """Test appending insights when summary has none."""
+        summary_path = Path("/output/summary.md")
+        mock_fs.files[summary_path] = "## Summary heading\n\nSummary content"
+
+        finalizer.replace_comment_insights_in_summary(summary_path, "## Comment Insights (theme)\n\nNew insights")
+
+        result = mock_fs.files[summary_path]
+        assert "Summary content" in result
+        assert "New insights" in result
+
+    def test_empty_insights_removes_old_section(self, finalizer, mock_fs):
+        """Test that empty new insights still removes old section."""
+        summary_path = Path("/output/summary.md")
+        mock_fs.files[summary_path] = "## Summary heading\n\nContent\n\n## Comment Insights (old)\n\nOld stuff\n"
+
+        finalizer.replace_comment_insights_in_summary(summary_path, "  ")
+
+        result = mock_fs.files[summary_path]
+        assert "Old stuff" not in result
+        assert "Content" in result
+
+    def test_missing_file_does_nothing(self, finalizer, mock_fs):
+        """Test that missing summary file doesn't raise error."""
+        summary_path = Path("/output/missing.md")
+        finalizer.replace_comment_insights_in_summary(summary_path, "Insights")
+
+    def test_preserves_hidden_gems_after_insights(self, finalizer, mock_fs):
+        """Test that Hidden Gems section after insights is preserved."""
+        summary_path = Path("/output/summary.md")
+        mock_fs.files[summary_path] = (
+            "## Summary heading\n\nContent\n\n## Comment Insights (old)\n\nOld insights\n\n## Hidden Gems\n\nGem content\n"
+        )
+
+        finalizer.replace_comment_insights_in_summary(summary_path, "## Comment Insights (new)\n\nNew insights")
+
+        result = mock_fs.files[summary_path]
+        assert "New insights" in result
+        assert "Old insights" not in result
+        assert "Gem content" in result
+
+
+class TestUpdateComments:
+    """Tests for update_comments method."""
+
+    def test_updates_existing_summary_and_creates_comments(self, finalizer, mock_fs):
+        """Test update_comments inserts insights into summary, creates comments file."""
+        output_dir = Path("/output")
+        base_name = "youtube_abc123"
+        template_dir = Path("/templates")
+
+        # Existing summary file
+        summary_filename = "2024-01-15 - youtube - Test Title (abc123).md"
+        mock_fs.files[output_dir / summary_filename] = "## Video\n\nMeta\n\n## Summary\n\nContent"
+
+        # Templates and work files
+        mock_fs.files[template_dir / "comments.md"] = "## Curated Comments\n\n{comments}"
+        mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
+        mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "## Comment Insights (theme)\n\nInsights here"
+        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Curated comments here"
+
+        summary_path, comments_path = finalizer.update_comments(base_name, output_dir, template_dir, debug=True)
+
+        # Summary should have insights appended
+        assert "Insights here" in mock_fs.files[summary_path]
+        assert "Content" in mock_fs.files[summary_path]
+
+        # Comments file should NOT have insights
+        comments_content = mock_fs.files[comments_path]
+        assert "Curated comments here" in comments_content
+        assert "Insights here" not in comments_content
+
+    def test_replaces_old_insights_in_summary(self, finalizer, mock_fs):
+        """Test update_comments replaces existing insights in summary."""
+        output_dir = Path("/output")
+        base_name = "youtube_abc123"
+        template_dir = Path("/templates")
+
+        summary_filename = "2024-01-15 - youtube - Test Title (abc123).md"
+        mock_fs.files[output_dir / summary_filename] = "## Summary\n\nContent\n\n## Comment Insights (old)\n\nOld insights\n"
+
+        mock_fs.files[template_dir / "comments.md"] = "## Curated Comments\n\n{comments}"
+        mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_upload_date.txt"] = "2024-01-15"
+        mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "## Comment Insights (new)\n\nNew insights"
+        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
+
+        summary_path, _ = finalizer.update_comments(base_name, output_dir, template_dir, debug=True)
+
+        result = mock_fs.files[summary_path]
+        assert "New insights" in result
+        assert "Old insights" not in result
+
+    def test_cleans_up_work_files(self, finalizer, mock_fs):
+        """Test update_comments cleans work files when not debug."""
+        output_dir = Path("/output")
+        base_name = "youtube_abc123"
+        template_dir = Path("/templates")
+
+        summary_filename = "youtube - Test Title (abc123).md"
+        mock_fs.files[output_dir / summary_filename] = "## Summary\n\nContent"
+
+        mock_fs.files[template_dir / "comments.md"] = "{comments}"
+        mock_fs.files[output_dir / f"{base_name}_title.txt"] = "Test Title"
+        mock_fs.files[output_dir / f"{base_name}_comment_insights_tight.md"] = "Insights"
+        mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
+
+        finalizer.update_comments(base_name, output_dir, template_dir, debug=False)
+
+        assert output_dir / f"{base_name}_comment_insights_tight.md" not in mock_fs.files

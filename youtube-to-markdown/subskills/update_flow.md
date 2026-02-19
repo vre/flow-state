@@ -40,7 +40,7 @@ AskUserQuestion:
 - header: "Update"
 - multiSelect: false
 - options (show only applicable):
-  - "Re-extract comments" (if existing_files.comments exists)
+  - "Re-extract comments" - Fetch fresh comments, cross-analyze against existing summary for new insights (if old extracted comments saved)
   - "Re-extract transcript" (if existing_files.transcript exists)
   - "Update metadata only" (if action=metadata_only)
   - "Add comments" (if existing_files.comments missing, existing_files.summary exists)
@@ -55,7 +55,7 @@ python3 ./scripts/40_backup.py backup "<existing_files.comments>"
 ```
 Run: comment_extract.md → comment_summarize.md
 ```bash
-python3 ./scripts/50_assemble.py --comments-only "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/50_assemble.py --update-comments "${BASE_NAME}" "<output_directory>"
 ```
 DONE
 

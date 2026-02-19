@@ -3,8 +3,8 @@
 ## 1. Classify content type
 
 - TIPS: gear reviews, rankings, "X ways to...", practical advice lists
-- INTERVIEW: podcasts, conversations, Q&A, multiple perspectives
-- EDUCATIONAL: concept explanations, analysis, "how X works"
+- INTERVIEW: multiple claims or perspectives, opinion-driven analysis, podcasts, conversations, Q&A
+- EDUCATIONAL: single concept explained in depth, "how X works", mechanism breakdowns
 - TUTORIAL: step-by-step instructions, coding, recipes
 
 Ambiguity: classify by dominant structure. Default fallback: INTERVIEW.

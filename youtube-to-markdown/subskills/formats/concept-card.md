@@ -8,8 +8,6 @@ Claim heading + core idea sentence + evidence bullets + implication sentence. Fo
 ## Template
 
 ```
----
-
 ### [One complete claim sentence as heading, normal punctuation]
 
 [Core idea in one sentence. No label, no bold, no bullet.]
@@ -24,8 +22,6 @@ Claim heading + core idea sentence + evidence bullets + implication sentence. Fo
 ## Example
 
 ```
----
-
 ### Running 5-10 parallel sessions beats going deep on one task
 
 Boris typically runs concurrent sessions across terminal, web, and mobile simultaneously.
@@ -44,7 +40,6 @@ Individual task speed matters less than total throughput across concurrent work.
 - Core idea: one plain sentence providing context. Reader should understand the section topic without reading bullets
 - Bullets: 3-5 per section, front-loaded (important words first). Concrete evidence, data points, quotes
 - Implication: one plain sentence answering "so what" — why this matters or what follows from it
-- Separator: `---` before each section (creates visual boundary)
 - Section count: typically 5-8 per video, driven by content not quota
 - No labels (no "Core idea:", "Evidence:", "So what:")
 - No bold in core idea or implication lines

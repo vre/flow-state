@@ -157,6 +157,55 @@ class Finalizer:
         self.fs.write_text(summary_path, updated_content)
         print(f"Inserted Comment Insights into summary file: {summary_path.name}")
 
+    def replace_comment_insights_in_summary(self, summary_path: Path, comment_insights: str) -> None:
+        """Replace existing Comment Insights section in summary, or append if none exists.
+
+        Finds '## Comment Insights' heading and replaces everything from there
+        to next '## ' heading (or end of file). Preserves sections after insights
+        like Hidden Gems.
+        """
+        if not self.fs.exists(summary_path):
+            return
+
+        content = self.fs.read_text(summary_path)
+        marker = "## Comment Insights"
+
+        idx = content.find(marker)
+        if idx == -1:
+            # No existing insights — append
+            if comment_insights.strip():
+                self.fs.write_text(summary_path, content.rstrip() + f"\n\n{comment_insights.strip()}\n")
+                print(f"Inserted Comment Insights into summary file: {summary_path.name}")
+            return
+
+        # Find end of insights section: next ## heading or end of file
+        after_marker = content[idx + len(marker) :]
+        next_heading = after_marker.find("\n## ")
+        if next_heading != -1:
+            tail = after_marker[next_heading:]
+        else:
+            tail = ""
+
+        before = content[:idx].rstrip()
+        if comment_insights.strip():
+            updated = before + f"\n\n{comment_insights.strip()}" + tail
+        else:
+            updated = before + tail
+
+        self.fs.write_text(summary_path, updated.rstrip() + "\n")
+        print(f"Replaced Comment Insights in summary file: {summary_path.name}")
+
+    def find_existing_summary(self, video_id: str, output_dir: Path) -> Path | None:
+        """Find existing summary file by video ID pattern."""
+        pattern = f"*({video_id}).md"
+        matches = self.fs.glob(pattern, output_dir)
+        # Exclude transcript and comments files
+        for match in matches:
+            name = match.name
+            if " - transcript " not in name and " - comments " not in name:
+                return match
+        return None
+
     def cleanup_work_files(self, work_files: list[str], output_dir: Path) -> None:
         """Remove intermediate work files."""
         seen = set()
@@ -216,6 +265,37 @@ class Finalizer:
             self.cleanup_work_files(get_transcript_work_files(base_name), output_dir)
 
         return output_path
+
+    def update_comments(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> tuple[Path, Path]:
+        """Re-extract comments: replace insights in existing summary, create comments file without insights."""
+        cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
+
+        # Find existing summary
+        summary_path = self.find_existing_summary(video_id, output_dir)
+        if summary_path is None:
+            raise FileOperationError(f"No existing summary file found for video {video_id}")
+
+        # Replace comment insights in summary
+        comment_insights = self.read_component_or_empty(output_dir / f"{base_name}_comment_insights_tight.md")
+        self.replace_comment_insights_in_summary(summary_path, comment_insights)
+
+        # Create comments file (without insights — uses non-standalone template)
+        comments_template = self.read_template(template_dir, "comments.md")
+        comments_content = self.assemble_comments_content(comments_template, base_name, output_dir, standalone=False)
+
+        if cleaned_title:
+            comments_filename = self.build_filename(upload_date, cleaned_title, video_id, " - comments")
+        else:
+            comments_filename = f"{base_name}_comments.md"
+
+        comments_path = output_dir / comments_filename
+        self.fs.write_text(comments_path, comments_content)
+        print(f"Created comments file: {comments_filename}")
+
+        if not debug:
+            self.cleanup_work_files(get_comments_work_files(base_name), output_dir)
+
+        return summary_path, comments_path
 
     def finalize_comments_only(self, base_name: str, output_dir: Path, template_dir: Path, debug: bool = False) -> Path:
         """Create only comments file (standalone with insights)."""

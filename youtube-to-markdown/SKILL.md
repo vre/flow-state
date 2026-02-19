@@ -42,7 +42,7 @@ AskUserQuestion:
 - header: "Output"
 - multiSelect: false
 - options:
-  A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Transcript stored if it should be processed.
+  A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Transcript stored if user would like to format it later.
   B. "Summary + Comments + Formatted Transcript" - Option A + cleaned and formatted full transcript → double tokens
   C. "Summary Only" - Summary of video content
   D. "Formatted Transcript Only" - Cleaned and formatted full transcript

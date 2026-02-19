@@ -109,6 +109,8 @@ Open file in user's editor. Tell user:
 
 ## Step 4: Process selections
 
+Delete `<output_directory>/channel_selection.md` if it exists.
+
 Parse video IDs from selections:
 - Checkbox file: `parse_selection_checkboxes(content)` → `[{video_id, section}]`
 - multiSelect: extract `(VIDEO_ID)` from selected labels

@@ -8,6 +8,7 @@ Used by finalize.py for cleanup and prepare_update.py for detection.
 def get_summary_work_files(base_name: str) -> list[str]:
     """Work files created during summary extraction."""
     return [
+        f"{base_name}_warmup.tmp",
         f"{base_name}_title.txt",
         f"{base_name}_upload_date.txt",
         f"{base_name}_metadata.md",
@@ -25,6 +26,7 @@ def get_summary_work_files(base_name: str) -> list[str]:
 def get_transcript_work_files(base_name: str) -> list[str]:
     """Work files created during transcript extraction."""
     return [
+        f"{base_name}_warmup.tmp",
         f"{base_name}_title.txt",
         f"{base_name}_upload_date.txt",
         f"{base_name}_description.md",
@@ -42,8 +44,11 @@ def get_transcript_work_files(base_name: str) -> list[str]:
 def get_comments_work_files(base_name: str) -> list[str]:
     """Work files created during comments extraction."""
     return [
+        f"{base_name}_warmup.tmp",
         f"{base_name}_title.txt",
+        f"{base_name}_upload_date.txt",
         f"{base_name}_comments.md",
+        f"{base_name}_comments_filtered.md",
         f"{base_name}_comments_prefiltered.md",
         f"{base_name}_comment_insights.md",
         f"{base_name}_comment_insights_tight.md",
