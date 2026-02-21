@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.10.0] - 2026-02-21
+
+### Two-Tier Comment Filter
+- Comments split into tier 1 (likes >= p75 OR length >= 400 chars) and tier 2 (rest)
+- Tier 2 screened by Haiku inline prompt, substantive comments merged back
+- Compact format for tier 2: `[N|@author|X likes] text` — one line per comment
+- New `33_merge_tier2.py` script: merges Haiku-kept comments with correct numbering
+- Candidates file (`_comments_candidates.md`) added to intermediate file cleanup
+- Videos with ≤80 comments after junk filter skip tier split (single-tier path)
+- Token warning when tier output exceeds 25K tokens
+
+### Robustness
+- KEEP parser: case-insensitive, tolerates trailing periods, multiline, non-numeric tokens
+- Merge: direct sequential numbering instead of global regex renumber (prevents body text corruption)
+- Duplicate KEEP indices deduplicated
+- Stale candidates file cleaned up on single-tier reruns
+
+### Testing
+- 8 new tests (69 in youtube-to-markdown, 379 total)
+
 ## [2.9.0] - 2026-02-18
 
 ### Summary Format Refactor

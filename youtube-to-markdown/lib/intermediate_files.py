@@ -50,6 +50,7 @@ def get_comments_work_files(base_name: str) -> list[str]:
         f"{base_name}_comments.md",
         f"{base_name}_comments_filtered.md",
         f"{base_name}_comments_prefiltered.md",
+        f"{base_name}_comments_candidates.md",
         f"{base_name}_comment_insights.md",
         f"{base_name}_comment_insights_tight.md",
     ]

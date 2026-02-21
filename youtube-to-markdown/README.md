@@ -88,6 +88,7 @@ scripts/             # CLI entry points (numbered by pipeline order)
   30_clean_vtt.py
   31_format_transcript.py
   32_filter_comments.py
+  33_merge_tier2.py
   40_backup.py
   41_update_metadata.py
   50_assemble.py

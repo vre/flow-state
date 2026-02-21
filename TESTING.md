@@ -12,8 +12,9 @@ tests/youtube-to-markdown/
 ├── test_channel_listing.py (33 tests)
 ├── test_check_existing.py (12 tests)
 ├── test_comment_extractor.py (32 tests)
-├── test_comment_filter.py (19 tests)
+├── test_comment_filter.py (17 tests)
 ├── test_content_safety.py (25 tests)
+├── test_merge_tier2.py (24 tests)
 ├── test_file_ops.py (9 tests)
 ├── test_paragraph_breaker.py (20 tests)
 ├── test_prepare_update.py (33 tests)
@@ -50,7 +51,7 @@ uv run pytest -x              # Stop on first failure
 uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
-## Release Validation (youtube-to-markdown v2.8.0)
+## Release Validation (youtube-to-markdown v2.10.0)
 
 ```bash
 # From plugin directory

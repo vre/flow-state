@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Knowledge work, context management, and productivity tools/skills/etc. for Claude Code",
-    "version": "20260218.2100",
+    "version": "20260221.1200",
     "pluginRoot": "./"
   },
   "plugins": [
@@ -14,7 +14,7 @@
       "name": "youtube-to-markdown",
       "source": "./youtube-to-markdown",
       "description": "Transform YouTube video to storagable knowledge. Choose from summary only, transcript only, comments only, or full extraction. Get tight summary, cleaned transcript, and curated comment insights cross-analyzed against video content. Browse channels to batch-extract or refresh comments. Modular architecture runs independent steps in parallel.",
-      "version": "2.9.0",
+      "version": "2.10.0",
       "category": "media-extraction",
       "keywords": ["youtube", "transcript", "captions", "markdown", "summary", "chapters", "comments", "channel"],
       "skills": ["./"]
