@@ -10,7 +10,7 @@
 - [ ] Try modding skill to run on opencode, github copilot, openai codex, ...
 
 - [x] ~~Comment evolution~~ — already handled by comment_summarize.md re-extract delta logic (new/updated/dropped markers)
-- [ ] Highlighting notable content to browseability
+- [x] ~~Highlighting notable content to browseability~~ — covered by Hidden Gems feature
 - [ ] Analysis keywords linking to transcript/commentary
 - [ ] Check for alternative extraction methods
 
