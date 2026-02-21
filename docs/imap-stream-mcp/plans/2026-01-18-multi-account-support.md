@@ -1,4 +1,4 @@
-# Multi-Account Support
+# DONE: Multi-Account Support
 
 Support for multiple email accounts.
 

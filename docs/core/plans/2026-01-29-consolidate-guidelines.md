@@ -1,4 +1,4 @@
-# Plan: Consolidate LLM Agent Documentation
+# DONE: Consolidate LLM Agent Documentation
 
 ## Problem
 We have gathered significant insights (AGENTS.md standardization, MCP evolution, persuasion principles, tool architecture) which are currently scattered in `docs/2026.01.28-gemini3pro-huomiot.md` and `DEVELOPMENT.md`. The core documentation files (`writing-claude-agents-md.md`, `mcp-design-principles.md`, `writing-skills.md`) are outdated or specific to older practices.

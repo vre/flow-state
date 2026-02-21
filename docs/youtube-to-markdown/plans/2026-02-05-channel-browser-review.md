@@ -1,4 +1,4 @@
-# Channel Browser — Implementation Review
+# DONE: Channel Browser — Implementation Review
 
 Per-file diff with rationale for each change. Branch `feature/channel-browser` vs `main` (8 commits, 10 files, +925/-5 lines).
 

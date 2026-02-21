@@ -1,4 +1,4 @@
-# Plugin Marketplace Credentials Handling
+# DONE: Plugin Marketplace Credentials Handling
 
 ## Research Summary
 

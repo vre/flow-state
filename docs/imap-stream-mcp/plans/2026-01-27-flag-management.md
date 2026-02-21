@@ -1,4 +1,4 @@
-# Flag Management for IMAP Stream MCP
+# DONE: Flag Management for IMAP Stream MCP
 
 ## Summary
 

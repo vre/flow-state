@@ -1,4 +1,4 @@
-# Channel Browser Feature
+# DONE: Channel Browser Feature
 
 ## Intent
 

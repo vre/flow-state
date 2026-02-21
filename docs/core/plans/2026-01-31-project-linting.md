@@ -1,4 +1,4 @@
-# Project-Level Linting Setup
+# DONE: Project-Level Linting Setup
 
 **Date:** 2026-01-31
 **Status:** Implemented (partial)

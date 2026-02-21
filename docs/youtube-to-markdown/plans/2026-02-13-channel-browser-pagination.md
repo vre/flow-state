@@ -1,4 +1,4 @@
-# Channel Browser: Cumulative Pagination + Batch Tracking
+# DONE: Channel Browser: Cumulative Pagination + Batch Tracking
 
 ## Context
 

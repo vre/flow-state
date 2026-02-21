@@ -1,4 +1,4 @@
-# HTML Email Support via Markdown
+# DONE: HTML Email Support via Markdown
 
 ## Goal
 Enable HTML-formatted email drafts. Claude writes markdown, server converts to HTML + plain text.

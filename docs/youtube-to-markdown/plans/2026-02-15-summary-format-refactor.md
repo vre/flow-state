@@ -1,4 +1,4 @@
-# Summary Format Refactor
+# DONE: Summary Format Refactor
 
 ## Context
 

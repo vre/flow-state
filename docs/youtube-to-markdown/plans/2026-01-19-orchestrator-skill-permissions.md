@@ -1,4 +1,4 @@
-# Plan: Eliminate Permission Prompts from Skills
+# DONE: Eliminate Permission Prompts from Skills
 
 ## Problem
 Skills trigger permission prompts because Claude generates compound commands like:

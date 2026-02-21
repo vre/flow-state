@@ -1,4 +1,4 @@
-# Channel Browse: Haiku Descriptions & Skill Cleanup
+# DONE: Channel Browse: Haiku Descriptions & Skill Cleanup
 
 ## Context
 

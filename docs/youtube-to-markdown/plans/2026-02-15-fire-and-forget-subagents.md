@@ -1,4 +1,4 @@
-# Plan: Constrained Subagent Output
+# DONE: Constrained Subagent Output
 
 ## Situation
 

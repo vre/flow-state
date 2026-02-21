@@ -1,4 +1,4 @@
-# Permission Prompts Fix
+# DONE: Permission Prompts Fix
 
 **Goal:** Eliminate permission prompts by making commands match `Bash(python3:*)` pattern.
 

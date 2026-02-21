@@ -1,4 +1,4 @@
-# Update Mode Redesign
+# DONE: Update Mode Redesign
 
 ## Intent
 

@@ -1,4 +1,4 @@
-# Channel Browser UX: Description Enrich + Checkbox Selection
+# DONE: Channel Browser UX: Description Enrich + Checkbox Selection
 
 ## Context
 
