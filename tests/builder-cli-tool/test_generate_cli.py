@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "cli-tool-builder" / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-cli-tool" / "scripts"))
 
 from generate_cli import (
     generate,
@@ -296,7 +296,7 @@ class TestBookmarkManagerIntegration:
 
     def test_passes_validation(self, bookmark_dir: Path):
         """validate_tool.py should pass on the generated tool."""
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "cli-tool-builder" / "scripts"))
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-cli-tool" / "scripts"))
         from validate_tool import validate
 
         result = validate(bookmark_dir)

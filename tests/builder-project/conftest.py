@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 # Add project-builder directory to Python path for lib imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "project-builder"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-project"))
 
 
 @pytest.fixture

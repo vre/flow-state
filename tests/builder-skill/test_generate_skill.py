@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "skill-builder" / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-skill" / "scripts"))
 
 from generate_skill import generate_skill_md
 

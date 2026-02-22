@@ -36,10 +36,10 @@ If scripts pipe to each other: define shared output schema (field names, types).
 Pure functions, type hints, Google docstrings. Thin `main()` glue.
 Each script: `#!/usr/bin/env python3`, stdin/stdout, JSON output, exit codes.
 
-If script is a CLI tool with actions, use cli-tool-builder `--flat`:
+If script is a CLI tool with actions, use builder-cli-tool `--flat`:
 
 ```bash
-python3 ./cli-tool-builder/scripts/generate_cli.py --name ${SCRIPT} --operations '["action1", "action2"]' --output ${SKILL_DIR}/scripts/ --flat
+python3 ./builder-cli-tool/scripts/generate_cli.py --name ${SCRIPT} --operations '["action1", "action2"]' --output ${SKILL_DIR}/scripts/ --flat
 ```
 
 Then fill in action stubs with real logic.

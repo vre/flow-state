@@ -17,7 +17,7 @@ from project_builder.build_project import (
     to_pkg_name,
 )
 
-PROJECT_BUILDER_ROOT = str(Path(__file__).parents[2] / "project-builder")
+PROJECT_BUILDER_ROOT = str(Path(__file__).parents[2] / "builder-project")
 
 
 class TestNameConversion:

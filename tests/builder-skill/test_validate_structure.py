@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "skill-builder" / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-skill" / "scripts"))
 
 from validate_structure import (
     check_script_syntax,
@@ -614,7 +614,7 @@ class TestRealSkillFiles:
     """Validate actual SKILL.md files in the repo."""
 
     def test_skill_builder_passes(self):
-        skill_md = Path(__file__).parent.parent.parent / "skill-builder" / "SKILL.md"
+        skill_md = Path(__file__).parent.parent.parent / "builder-skill" / "SKILL.md"
         if not skill_md.exists():
             pytest.skip("skill-builder/SKILL.md not found")
         result = validate_file(str(skill_md))
@@ -622,7 +622,7 @@ class TestRealSkillFiles:
         assert len(errors) == 0, f"Errors: {errors}"
 
     def test_cli_tool_builder_passes_with_builder_budget(self):
-        skill_md = Path(__file__).parent.parent.parent / "cli-tool-builder" / "SKILL.md"
+        skill_md = Path(__file__).parent.parent.parent / "builder-cli-tool" / "SKILL.md"
         if not skill_md.exists():
             pytest.skip("cli-tool-builder/SKILL.md not found")
         result = validate_file(str(skill_md))

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "cli-tool-builder" / "scripts"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "builder-cli-tool" / "scripts"))
 
 from validate_tool import (
     check_dependency_count,
