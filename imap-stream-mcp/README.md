@@ -13,7 +13,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **list** - List messages in any folder
 - **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text
-- **draft** - Create/modify draft replies (adding attachments to drafts not supported)
+- **draft** - Create/modify draft replies with file attachments
 - **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)
 - **folders** - List available folders
 - **accounts** - List configured email accounts

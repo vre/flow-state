@@ -10,4 +10,4 @@
 - [x] Marking messages for deletion (v0.3.0, via \Deleted flag)
 - [x] Marking messages as spam/not spam (v0.3.0, via $Junk keyword)
 - [x] Support for Labels (v0.3.0, via keywords)
-- [ ] Attachment upload to drafts
+- [x] Attachment upload to drafts (v0.5.0)

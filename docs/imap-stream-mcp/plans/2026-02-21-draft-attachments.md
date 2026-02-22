@@ -17,7 +17,9 @@ Add file attachment support to drafts. LLM provides file path(s), MCP handles bi
 | Mail → file | Works | `attachment` action → `download_attachment()` → temp file |
 | File → draft | Missing | `create_draft()` / `modify_draft()` use `msg.set_content()` only |
 
-Existing `attachment` action saves to temp (`/tmp/streammail/`), returns path. LLM can then use Read tool for images/text or pass path back to draft action.
+Existing `attachment` action saves to temp (`Path(tempfile.gettempdir()) / "streammail"`), returns path. On macOS this resolves to `/private/var/folders/.../T/streammail/`, not `/tmp/`. LLM can then use Read tool for images/text or pass path back to draft action.
+
+**Known issue:** `modify_draft()` already rebuilds the message from scratch — existing attachments added via email client are silently dropped. This plan fixes that as part of the attachment work.
 
 ## Design
 
@@ -39,8 +41,8 @@ Extend `draft` action payload with optional `attachments` field:
 
 ```
 1. read message → see "Attachments: (1) report.pdf (245 KB)"
-2. attachment action → download to /tmp/streammail/report.pdf
-3. draft action with attachments: ["/tmp/streammail/report.pdf"] → draft with attachment
+2. attachment action → download to <tempdir>/streammail/report.pdf
+3. draft action with attachments: ["<tempdir>/streammail/report.pdf"] → draft with attachment
 4. User reviews in email client → send
 ```
 
@@ -48,30 +50,41 @@ Extend `draft` action payload with optional `attachments` field:
 
 **`imap_client.py`:**
 - Add `import mimetypes` at top
-- `create_draft()`: add `attachments: list[str] = None` param
-  - For each path: validate (exists, is file, not symlink-to-dir, ≤25 MB)
-  - `mimetypes.guess_type(path)` returns `(type/subtype, encoding)` — split on `/` to get `maintype`, `subtype` for `msg.add_attachment(data, maintype, subtype, filename=basename)`
-  - Fallback: `application/octet-stream` → `maintype='application'`, `subtype='octet-stream'`
-- `modify_draft()`: same attachment handling, but legacy `Message` problem:
-  - `email.message_from_bytes()` returns legacy `Message`, not `EmailMessage`
-  - Cannot call `add_attachment()` on legacy `Message`
-  - Solution: build new `EmailMessage`, copy headers (Subject, To, Cc, In-Reply-To, References, Message-ID), extract body from old message, then walk old message parts to re-attach existing attachments (`walk()` → filter non-text parts → `add_attachment()`), then add new attachments
+- Extract shared helper `_attach_files(msg: EmailMessage, paths: list[str]) -> list[dict]`:
+  - **Fail-fast:** validate ALL paths first, raise on first failure before reading any file data or modifying the message
+  - For each path: `Path(p).is_absolute()` (reject relative), `Path.is_file()` (covers dirs and symlinks-to-dirs), size ≤25 MB via `Path.stat().st_size` before `read_bytes()`
+  - `mimetypes.guess_type(path)` returns `(type, encoding)` — type can be `None` for unknown extensions. If `None` or no `/` in type string: fallback `application/octet-stream`. Otherwise split on `/` to get `maintype`, `subtype` for `msg.add_attachment(data, maintype, subtype, filename=basename)`
+  - Returns list of `{name, size}` dicts for response formatting
+- `create_draft()`: add `attachments: list[str] = None` param, call `_attach_files()`
+- `modify_draft()` — **this is the largest piece of work**, refactoring required:
+  - Current: reads original via `email.message_from_bytes()` (legacy `Message`, line 714), rebuilds as `EmailMessage` but **silently drops existing attachments**
+  - New: build `EmailMessage` with the **new body from parameters** (not extracted from original — `modify_draft` always receives new body), copy headers (Subject, To, Cc, In-Reply-To, References, Message-ID), **walk original parts to re-attach existing attachments** (`walk()` → identify attachments by `Content-Disposition` being `attachment` OR `inline` with a filename — matches existing `download_attachment` logic at line 381/454 → `add_attachment()`), then add new attachments via `_attach_files()`
+  - **Append-before-delete:** build and append new draft first, only delete old draft after successful append. Current code deletes first (line 765/781) — with attachments adding failure points, this order change prevents data loss.
+  - This fixes an existing bug (attachment loss on modify) as a side effect
 - Response includes attachment info (name + human-readable size) for both create and modify
 
 **`imap_stream_mcp.py`:**
 - Parse `attachments` from draft JSON payload, pass to `create_draft` / `modify_draft`
-- Update `MailAction` description field (~line 203) — this is the LLM tool schema hint, always visible. Add `attachments?` to the draft JSON example: `'{"to":"x","subject":"y","body":"z","attachments?":["/path"]}'`
+- Update `MailAction.payload` description (~line 202): add `attachments?` AND the already-missing `format?` field (NOT `html?` — html is derived from `format` via `convert_body()`, not a payload field): `'{"to":"x","subject":"y","body":"z","format?":"markdown","attachments?":["/path"]}'`
+- Update `MailAction.action` description (~line 193): add missing `attachment` and `cleanup` to the action list
 - Update draft help text
 
-**Tests** (`tests/test_draft_attachments.py`):
-- Mock pattern: patch `session.get_session` and `imap_client.get_credentials`
-- Unit: draft with attachment creates multipart message with correct MIME type
-- Unit: plain text (no HTML) + attachment — verify multipart/mixed structure
-- Unit: missing file raises clear error
-- Unit: directory path rejected, symlink-to-dir rejected
-- Unit: file >25 MB rejected with actionable error
-- Unit: modify with attachments preserves threading (In-Reply-To, References headers)
-- Unit: modify preserves existing attachments from original draft
+**Tests** — extend existing files in `tests/imap-stream-mcp/`. `conftest.py` exists there already.
+
+`tests/imap-stream-mcp/test_imap_client.py` (extend):
+- Unit `_attach_files`: correct MIME type detection, fallback to octet-stream for unknown extension, `None` type handling
+- Unit `_attach_files`: missing file → clear error, relative path → rejected, directory → rejected, >25 MB → rejected
+- Unit `create_draft` + attachment: multipart message with correct MIME parts
+- Unit `create_draft` plain text (no HTML) + attachment: valid multipart/mixed
+- Unit `modify_draft` + new attachments: preserves threading headers (In-Reply-To, References)
+- Unit `modify_draft`: preserves existing attachments (both `attachment` and `inline`+filename) from original draft
+- Unit `modify_draft`: append-before-delete — verify append called before delete
+- Unit roundtrip: mock `download_attachment` returning a temp path, pass path to `create_draft` — verify attachment in resulting message
+
+`tests/imap-stream-mcp/test_imap_stream_mcp.py` (extend):
+- MCP-layer: `attachments` field parsed from draft JSON payload, validated as `list[str]`
+- MCP-layer: invalid `attachments` type (string instead of list) → clear error
+- MCP-layer: response output includes attachment names + sizes
 
 ### Response format
 
@@ -89,24 +102,51 @@ Draft response includes attachment info when present:
 ## Constraints
 
 - File size: max 25 MB per file. Check `Path.stat().st_size` before `read_bytes()` to avoid loading oversized files into memory. Error: `"File too large: {name} is {size} MB (max 25 MB)"`.
-- Path validation: file must exist, be a regular file, be readable. Reject directories and symlinks pointing to directories. No glob/wildcard.
-- modify_draft: rebuilds as `EmailMessage` (original uses legacy `Message` from `email.message_from_bytes()`), copies existing attachments via walk + re-attach, then adds new ones. Avoids surprise data loss when user added attachments via email client.
-- Security: LLM already has file access via Read/Bash tools. MCP attachment adds no new attack surface — it just avoids routing binary content through the LLM context.
+- Path validation: `Path.is_absolute()` required, then `Path.is_file()` — returns `False` for directories and symlinks-to-directories, `True` for regular files and symlinks-to-files. No glob/wildcard.
+- modify_draft: rebuilds as `EmailMessage` (original uses legacy `Message` from `email.message_from_bytes()`), copies existing attachments via walk + re-attach, then adds new ones. Append-before-delete to prevent data loss. **Fixes existing bug** where modify silently dropped attachments from the original draft.
+- Security: LLM already has file access via Read/Bash tools. MCP attachment reads arbitrary absolute paths as binary — this adds no new capability beyond what Read/Bash provide. No path restriction beyond is_absolute + is_file. Note: 25 MB per-file limit does not account for base64 MIME overhead (~37% increase); total message size depends on server limits — IMAP append will return an error if exceeded.
 
 ## Out of scope
 
-- Save attachment to user-specified path (current: always `/tmp/streammail/`). Separate feature.
+- Save attachment to user-specified path (current: always `tempfile.gettempdir() / "streammail"`). Separate feature.
 - Inline images in HTML body. Only discrete attachments.
 
 ## Acceptance Criteria
 
-- [ ] `create_draft` with `attachments` produces multipart email with correct MIME parts
-- [ ] `create_draft` plain text (no HTML) + attachment produces valid multipart/mixed
-- [ ] `modify_draft` with `attachments` works, preserves threading headers and existing attachments
-- [ ] Error on missing/unreadable file with actionable message
-- [ ] Error on directory, symlink-to-dir, or >25 MB file
-- [ ] `MailAction` description field includes `attachments?` hint
-- [ ] Help text updated
-- [ ] Response format includes attachment names + sizes for both create and modify
-- [ ] Tests for: single attachment, multiple attachments, plain text + attachment, missing file, invalid path types, oversize file, modify preserves existing attachments, roundtrip with download
+- [x] `create_draft` with `attachments` produces multipart email with correct MIME parts
+- [x] `create_draft` plain text (no HTML) + attachment produces valid multipart/mixed
+- [x] `modify_draft` with `attachments` works, preserves threading headers and existing attachments
+- [x] Error on missing/unreadable file with actionable message
+- [x] Error on relative path, non-file path, or >25 MB file
+- [x] `modify_draft` appends new draft before deleting old (append-before-delete)
+- [x] `modify_draft` preserves existing inline+filename attachments from original
+- [x] `MailAction.payload` description includes `attachments?`, `format?` hints
+- [x] `MailAction.action` description includes `attachment` and `cleanup`
+- [x] Help text updated
+- [x] Response format includes attachment names + sizes for both create and modify
+- [x] Tests (imap_client): single attachment, multiple, plain text + attachment, missing file, relative path, oversize, modify preserves existing attachments, append-before-delete, roundtrip
+- [x] Tests (imap_stream_mcp): payload parsing, invalid attachments type, response formatting
 - [ ] Manual test: create draft with PDF, verify visible in Thunderbird
+
+## Reflection
+
+### What went well
+
+- Plan was thorough enough that implementation was straightforward — no architectural surprises
+- TDD approach caught nothing during red→green (clean implementation), but gave confidence for the modify_draft refactor
+- Three-round review process (self-review, codex review, fixes) caught real bugs: zero-byte attachment loss (`if payload:` vs `if payload is not None:`), missing OSError handling, shallow input validation
+- Append-before-delete pattern was identified in planning and implemented correctly first time
+- Existing test infrastructure (MockIMAPClient, conftest fixtures) made new tests easy to write
+
+### What changed from plan
+
+- Added OSError→IMAPError wrapping in `_attach_files` (not in original plan, found in codex review)
+- Added element-type validation for attachments list in MCP layer (not in plan)
+- Added zero-byte attachment preservation test (not in plan)
+- Plan had 14 acceptance criteria, 13 met via automated tests, 1 pending manual test
+
+### Lessons learned
+
+- `if payload:` vs `if payload is not None:` is a classic Python trap — empty bytes `b""` is falsy. Code review caught what self-review missed.
+- Codex review found 3 actionable issues that self-review did not. External review adds value even after careful self-review.
+- The plan's explicit Content-Disposition filtering spec (`attachment` OR `inline` with filename) translated directly to code without ambiguity — precise specs prevent implementation debates.

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""
-IMAP Stream MCP Server - Lightweight IMAP client for Claude.
+"""IMAP Stream MCP Server - Lightweight IMAP client for Claude.
 
 Inspired by Jesse Vincent's MCP design philosophy:
 - Single tool with action dispatcher (~500 tokens vs typical 15,000+)
@@ -21,30 +20,43 @@ Usage with Claude Desktop/Code:
 
 import json
 from pathlib import Path
-from typing import Optional
 
 import html2text
-
-from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-
 from imap_client import (
     IMAPError,
-    list_accounts,
+    cleanup_attachments,
+    create_draft,
+    download_attachment,
     get_default_account,
+    list_accounts,
     list_folders,
     list_messages,
-    read_message,
-    download_attachment,
-    cleanup_attachments,
-    search_messages,
-    create_draft,
     modify_draft,
     modify_flags,
     parse_folder_path,
+    read_message,
+    search_messages,
 )
 from markdown_utils import convert_body
+from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+
+def _format_attachment_line(attachments: list[dict]) -> str:
+    """Format attachment info for draft response."""
+    if not attachments:
+        return ""
+    parts = []
+    for att in attachments:
+        size = att["size"]
+        if size >= 1024 * 1024:
+            size_str = f"{size / (1024 * 1024):.1f} MB"
+        elif size >= 1024:
+            size_str = f"{size / 1024:.0f} KB"
+        else:
+            size_str = f"{size} B"
+        parts.append(f"{att['name']} ({size_str})")
+    return f"\n**Attachments:** {', '.join(parts)}"
 
 
 def format_flags(flags: list[str]) -> str:
@@ -103,10 +115,7 @@ def _wrap_email(headers: str, body: str) -> tuple[str, bool]:
     Returns:
         Tuple of (wrapped_content, injection_detected)
     """
-    injection_detected = (
-        _contains_injection_patterns(headers) or
-        _contains_injection_patterns(body)
-    )
+    injection_detected = _contains_injection_patterns(headers) or _contains_injection_patterns(body)
     safe_headers = _sanitize_for_delimiters(headers)
     safe_body = _sanitize_for_delimiters(body)
 
@@ -140,21 +149,21 @@ def parse_flag_payload(payload: str) -> tuple[list[int], list[str], list[str]]:
     """
     payload = payload.strip()
 
-    if ':' not in payload:
+    if ":" not in payload:
         raise ValueError("Invalid payload format. Expected 'MSG_ID:+FLAG,-FLAG'")
 
-    ids_part, flags_part = payload.split(':', 1)
+    ids_part, flags_part = payload.split(":", 1)
     ids_part = ids_part.strip()
     flags_part = flags_part.strip()
 
     # Parse message IDs
     message_ids = []
-    for id_str in ids_part.split(','):
+    for id_str in ids_part.split(","):
         id_str = id_str.strip()
         try:
             message_ids.append(int(id_str))
-        except ValueError:
-            raise ValueError(f"Invalid message ID: '{id_str}'")
+        except ValueError as exc:
+            raise ValueError(f"Invalid message ID: '{id_str}'") from exc
 
     # Parse flags
     if not flags_part:
@@ -163,14 +172,14 @@ def parse_flag_payload(payload: str) -> tuple[list[int], list[str], list[str]]:
     add_flags = []
     remove_flags = []
 
-    for flag_str in flags_part.split(','):
+    for flag_str in flags_part.split(","):
         flag_str = flag_str.strip()
         if not flag_str:
             continue
 
-        if flag_str.startswith('+'):
+        if flag_str.startswith("+"):
             add_flags.append(flag_str[1:])
-        elif flag_str.startswith('-'):
+        elif flag_str.startswith("-"):
             remove_flags.append(flag_str[1:])
         else:
             raise ValueError(f"Flag '{flag_str}' must start with '+' or '-'")
@@ -190,29 +199,18 @@ class MailAction(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    action: str = Field(
-        ...,
-        description="Action: list|read|search|draft|flag|folders|accounts|help"
-    )
-    folder: Optional[str] = Field(
+    action: str = Field(..., description="Action: list|read|search|draft|flag|attachment|cleanup|folders|accounts|help")
+    folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
+    payload: str | None = Field(
         default=None,
-        description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')"
+        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | flag=MSG_ID:+FLAG,-FLAG",
     )
-    payload: Optional[str] = Field(
-        default=None,
-        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?} | flag=MSG_ID:+FLAG,-FLAG"
-    )
-    limit: Optional[int] = Field(
-        default=20,
-        description="Max results for list/search",
-        ge=1,
-        le=100
-    )
+    limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
 
-    @field_validator('action')
+    @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {'list', 'read', 'search', 'draft', 'folders', 'help', 'attachment', 'cleanup', 'accounts', 'flag'}
+        valid = {"list", "read", "search", "draft", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -243,7 +241,6 @@ Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com"}
 Create draft: {action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
 Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 """,
-
     "list": """
 # list - List Messages
 
@@ -258,7 +255,6 @@ Lists messages in a folder, newest first.
 {action: "list", folder: "INBOX/Projects", limit: 50}
 {action: "list", folder: "imap://user@server/INBOX/Sub"}  # URL format extracts folder
 """,
-
     "read": """
 # read - Read Message
 
@@ -274,7 +270,6 @@ Full message with: subject, from, to, cc, date, body_text, body_html, message_id
 ## Example
 {action: "read", folder: "INBOX", payload: "12345"}
 """,
-
     "search": """
 # search - Search Messages
 
@@ -303,33 +298,43 @@ Search messages in a folder.
 {action: "search", folder: "INBOX", payload: "flagged"}
 {action: "search", folder: "INBOX", payload: "is:unread"}
 """,
-
     "draft": """
 # draft - Create or Modify Draft
 
 Creates a new draft or modifies an existing one.
 
 ## Create New Draft
-- payload: JSON with to, subject, body (required), in_reply_to, cc, format (optional)
+- payload: JSON with to, subject, body (required), in_reply_to, cc, format, attachments (optional)
 
 {action: "draft", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
+
+## Attachments
+- attachments: list of absolute file paths
+- Max 25 MB per file. MIME type auto-detected.
+- Works with both create and modify
+
+{action: "draft", payload: '{"to":"x@y.com","subject":"Report","body":"See attached","attachments":["/path/to/file.pdf"]}'}
 
 ## Format
 - "markdown" (default): HTML + plain text. Supports: **bold**, *italic*, ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes
 - "plain": plain text only
 
 ## Modify Existing Draft
-- payload: JSON with id (required), body (required), subject/to/cc/format (optional)
-- Preserves In-Reply-To and References for reply threading
+- payload: JSON with id (required), body (required), subject/to/cc/format/attachments (optional)
+- Preserves In-Reply-To, References, and existing attachments
 
 {action: "draft", folder: "Drafts", payload: '{"id":1253,"body":"Updated..."}'}
 
-## Workflow
+## Forward Attachment Workflow
+1. Use 'read' to see attachments
+2. Use 'attachment' to download: {action: "attachment", payload: "msg_id:index"}
+3. Use 'draft' with attachments: the downloaded file path
+
+## Reply Workflow
 1. Use 'read' to get message (note message_id for replies)
 2. Use 'draft' with in_reply_to - quote relevant parts with >
 3. Open email client → Drafts → review and send
 """,
-
     "folders": """
 # folders - List Folders
 
@@ -344,7 +349,6 @@ None required.
 ## Returns
 List of folders with their names and IMAP flags.
 """,
-
     "flag": """
 # flag - Add or Remove Flags/Labels
 
@@ -367,7 +371,6 @@ $label1-5 (Thunderbird), or any server-supported keyword
 {action: "flag", folder: "INBOX", payload: "123,124,125:+Deleted"}
 {action: "flag", folder: "INBOX", payload: "123:+$label1"}
 """,
-
     "attachment": """
 # attachment - Download Attachment
 
@@ -383,7 +386,6 @@ File path, content type, size. Use Read tool for images, pdf/docx skills for doc
 ## Example
 {action: "attachment", folder: "Drafts", payload: "1253:0"}
 """,
-
     "cleanup": """
 # cleanup - Remove Downloaded Attachments
 
@@ -395,7 +397,6 @@ None required.
 ## Example
 {action: "cleanup"}
 """,
-
     "accounts": """
 # accounts - List Configured Accounts
 
@@ -412,7 +413,7 @@ When multiple accounts are configured, specify which account to use:
 {action: "list", folder: "INBOX", account: "work"}
 
 If no account is specified, the default account is used.
-"""
+""",
 }
 
 
@@ -423,8 +424,8 @@ If no account is specified, the default account is used.
         "readOnlyHint": False,  # draft action modifies
         "destructiveHint": False,
         "idempotentHint": False,
-        "openWorldHint": True
-    }
+        "openWorldHint": True,
+    },
 )
 async def use_mail(params: MailAction) -> str:
     """IMAP email operations. Actions: list|read|search|draft|folders|accounts|help.
@@ -529,25 +530,27 @@ uv run --directory {plugin_dir} python setup.py
                 f"From: {', '.join(msg['from'])}",
                 f"To: {', '.join(msg['to'])}",
             ]
-            if msg['cc']:
+            if msg["cc"]:
                 header_lines.append(f"Cc: {', '.join(msg['cc'])}")
-            header_lines.extend([
-                f"Subject: {msg['subject']}",
-                f"Date: {msg['date']}",
-                f"Message-ID: {msg['message_id']}",
-            ])
-            if msg['in_reply_to']:
+            header_lines.extend(
+                [
+                    f"Subject: {msg['subject']}",
+                    f"Date: {msg['date']}",
+                    f"Message-ID: {msg['message_id']}",
+                ]
+            )
+            if msg["in_reply_to"]:
                 header_lines.append(f"In-Reply-To: {msg['in_reply_to']}")
 
             # Get body content
             body_content = ""
-            if msg['body_text']:
-                body_content = msg['body_text']
-            elif msg['body_html']:
+            if msg["body_text"]:
+                body_content = msg["body_text"]
+            elif msg["body_html"]:
                 h = html2text.HTML2Text()
                 h.ignore_links = False
                 h.body_width = 0  # No wrapping
-                body_content = h.handle(msg['body_html'])
+                body_content = h.handle(msg["body_html"])
 
             # Wrap email content with safety delimiters
             wrapped, injection_detected = _wrap_email("\n".join(header_lines), body_content)
@@ -559,10 +562,10 @@ uv run --directory {plugin_dir} python setup.py
 
             # Attachments info (safe metadata, outside wrapper)
             attachments_info = ""
-            if msg.get('attachments'):
+            if msg.get("attachments"):
                 att_lines = [f"**Attachments:** ({len(msg['attachments'])})"]
-                for att in msg['attachments']:
-                    size_kb = att['size'] / 1024
+                for att in msg["attachments"]:
+                    size_kb = att["size"] / 1024
                     att_lines.append(f"  - {att['filename']} ({att['content_type']}, {size_kb:.1f} KB)")
                 attachments_info = "\n" + "\n".join(att_lines) + "\n"
 
@@ -600,60 +603,78 @@ uv run --directory {plugin_dir} python setup.py
                 return f"Error: Invalid JSON in payload: {e}"
 
             # Modify existing draft if 'id' provided
-            if 'id' in draft_data:
+            if "id" in draft_data:
                 if not folder:
                     return "Error: folder required for modify (e.g., 'Drafts')"
-                if 'body' not in draft_data:
+                if "body" not in draft_data:
                     return "Error: 'body' required for modify"
 
-                body = draft_data['body']
-                format_type = draft_data.get('format', 'markdown')
+                body = draft_data["body"]
+                format_type = draft_data.get("format", "markdown")
                 html_body, plain_body = convert_body(body, format_type)
+
+                # Parse and validate attachments
+                att_paths = draft_data.get("attachments")
+                if att_paths is not None and not isinstance(att_paths, list):
+                    return "Error: 'attachments' must be a list of file paths"
+                if att_paths and not all(isinstance(p, str) for p in att_paths):
+                    return "Error: each attachment must be a file path string"
 
                 result = modify_draft(
                     folder=folder,
-                    message_id=int(draft_data['id']),
+                    message_id=int(draft_data["id"]),
                     body=plain_body,
-                    subject=draft_data.get('subject'),
-                    to=draft_data.get('to'),
-                    cc=draft_data.get('cc'),
-                    html=html_body
+                    subject=draft_data.get("subject"),
+                    to=draft_data.get("to"),
+                    cc=draft_data.get("cc"),
+                    html=html_body,
+                    attachments=att_paths,
                 )
 
-                reply_info = " (reply threading preserved)" if result['preserved_reply_to'] else ""
+                reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
+                att_info = _format_attachment_line(result.get("attachments", []))
                 return f"""# Draft Modified{reply_info}
 
-**To:** {result['to']}
-**Subject:** {result['subject']}
-**Saved to:** {result['folder']}
+**To:** {result["to"]}
+**Subject:** {result["subject"]}{att_info}
+**Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""
 
             # Create new draft
-            required = ['to', 'subject', 'body']
+            required = ["to", "subject", "body"]
             missing = [f for f in required if f not in draft_data]
             if missing:
                 return f"Error: Missing required fields: {', '.join(missing)}"
 
-            body = draft_data['body']
-            format_type = draft_data.get('format', 'markdown')
+            body = draft_data["body"]
+            format_type = draft_data.get("format", "markdown")
             html_body, plain_body = convert_body(body, format_type)
+
+            # Parse and validate attachments
+            att_paths = draft_data.get("attachments")
+            if att_paths is not None and not isinstance(att_paths, list):
+                return "Error: 'attachments' must be a list of file paths"
+            if att_paths and not all(isinstance(p, str) for p in att_paths):
+                return "Error: each attachment must be a file path string"
 
             result = create_draft(
                 folder=folder or "INBOX",
-                to=draft_data['to'],
-                subject=draft_data['subject'],
+                to=draft_data["to"],
+                subject=draft_data["subject"],
                 body=plain_body,
-                in_reply_to=draft_data.get('in_reply_to'),
-                cc=draft_data.get('cc'),
-                html=html_body
+                in_reply_to=draft_data.get("in_reply_to"),
+                cc=draft_data.get("cc"),
+                html=html_body,
+                attachments=att_paths,
             )
 
+            att_info = _format_attachment_line(result.get("attachments", []))
             return f"""# Draft Created
 
-**To:** {result['to']}
-**Subject:** {result['subject']}
-**Saved to:** {result['folder']}
+**To:** {result["to"]}
+**Subject:** {result["subject"]}{att_info}
+**Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""
 
@@ -665,22 +686,22 @@ Open Thunderbird → Drafts to review and send."""
                 return "Error: payload required. Format: 'msg_id:index' (e.g., '1253:0')"
 
             try:
-                parts = params.payload.split(':')
+                parts = params.payload.split(":")
                 if len(parts) != 2:
                     raise ValueError("Expected format 'msg_id:index'")
                 msg_id = int(parts[0])
                 att_index = int(parts[1])
-            except ValueError as e:
+            except ValueError:
                 return f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')"
 
             result = download_attachment(folder, msg_id, att_index)
 
             return f"""# Attachment Downloaded
 
-**File:** {result['filename']}
-**Type:** {result['content_type']}
-**Size:** {result['size'] / 1024:.1f} KB
-**Saved to:** {result['saved_to']}
+**File:** {result["filename"]}
+**Type:** {result["content_type"]}
+**Size:** {result["size"] / 1024:.1f} KB
+**Saved to:** {result["saved_to"]}
 
 Use Read tool for images, pdf/docx skills for documents."""
 
@@ -722,7 +743,7 @@ Use Read tool for images, pdf/docx skills for documents."""
         # Cleanup
         if action == "cleanup":
             result = cleanup_attachments()
-            freed_kb = result['freed_bytes'] / 1024
+            freed_kb = result["freed_bytes"] / 1024
             return f"Cleaned up {result['deleted']} file(s), freed {freed_kb:.1f} KB"
 
         return f"Unknown action '{action}'. Use 'help' for available actions."

@@ -259,3 +259,109 @@ class TestReadActionWrapping:
         assert attachments_pos != -1
         # Attachments should be AFTER the email wrapper closes
         assert attachments_pos > email_end
+
+
+class TestDraftAttachmentPayload:
+    """Tests for draft action attachment payload handling."""
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_attachments_parsed_from_payload(self, mock_create):
+        """Attachments field parsed and passed to create_draft."""
+        mock_create.return_value = {
+            "status": "created",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Test",
+            "message_id": "<x@y>",
+            "attachments": [{"name": "file.pdf", "size": 1024}],
+        }
+
+        await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":["/tmp/file.pdf"]}',
+            )
+        )
+
+        mock_create.assert_called_once()
+        call_kwargs = mock_create.call_args
+        assert call_kwargs.kwargs.get("attachments") == ["/tmp/file.pdf"] or call_kwargs[1].get("attachments") == ["/tmp/file.pdf"]
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_invalid_attachments_type_returns_error(self, mock_create):
+        """String instead of list → error without calling create_draft."""
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":"/tmp/file.pdf"}',
+            )
+        )
+
+        assert "Error" in result
+        assert "list" in result
+        mock_create.assert_not_called()
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_response_includes_attachment_info(self, mock_create):
+        """Response output includes attachment names and sizes."""
+        mock_create.return_value = {
+            "status": "created",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Report",
+            "message_id": "<x@y>",
+            "attachments": [
+                {"name": "report.pdf", "size": 250880},
+                {"name": "data.csv", "size": 12288},
+            ],
+        }
+
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Report","body":"See attached","attachments":["/tmp/report.pdf","/tmp/data.csv"]}',
+            )
+        )
+
+        assert "report.pdf" in result
+        assert "data.csv" in result
+        assert "**Attachments:**" in result
+
+    @patch("imap_stream_mcp.modify_draft")
+    async def test_modify_draft_with_attachments(self, mock_modify):
+        """Modify draft passes attachments through."""
+        mock_modify.return_value = {
+            "status": "modified",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Updated",
+            "message_id": "<x@y>",
+            "preserved_reply_to": False,
+            "attachments": [{"name": "new.txt", "size": 512}],
+        }
+
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                folder="Drafts",
+                payload='{"id":1,"body":"Updated","attachments":["/tmp/new.txt"]}',
+            )
+        )
+
+        mock_modify.assert_called_once()
+        assert "new.txt" in result
+        assert "**Attachments:**" in result
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_non_string_attachment_entries_rejected(self, mock_create):
+        """Non-string entries in attachments list → error."""
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":[123]}',
+            )
+        )
+
+        assert "Error" in result
+        assert "string" in result
+        mock_create.assert_not_called()

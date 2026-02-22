@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0] - 2026-02-22
+
+### Added
+- File attachment support for drafts (`attachments` field in draft payload)
+- Forward attachment workflow: download → attach to new draft
+- `_attach_files` helper with fail-fast validation (absolute path, is_file, 25 MB max)
+- MIME type auto-detection via `mimetypes.guess_type()`, fallback to `application/octet-stream`
+- Draft help text: Attachments section, Forward Attachment Workflow
+
+### Fixed
+- `modify_draft` now preserves existing attachments from original draft (was silently dropping them)
+- `modify_draft` uses append-before-delete to prevent data loss
+- Zero-byte attachments preserved correctly (`if payload is not None:` guard)
+- OSError during file read wrapped as IMAPError with actionable message
+
+### Changed
+- `MailAction.action` description includes `attachment` and `cleanup`
+- `MailAction.payload` description includes `format?` and `attachments?`
+
 ## [0.4.1] - 2026-01-30
 
 ### Added

@@ -1,6 +1,6 @@
 [project]
 name = "imap-stream-mcp"
-version = "0.4.1"
+version = "0.5.0"
 description = "Lightweight IMAP MCP server for Claude"
 readme = "README.md"
 requires-python = ">=3.10"

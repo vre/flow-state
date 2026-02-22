@@ -1,5 +1,6 @@
 """Tests for imap_client module."""
 
+import email
 import sys
 from pathlib import Path
 from unittest.mock import patch
@@ -12,6 +13,7 @@ import session
 from conftest import MockAddress, MockEnvelope, MockIMAPClient
 from imap_client import (
     IMAPError,
+    _attach_files,
     create_draft,
     decode_header_value,
     format_address,
@@ -750,3 +752,451 @@ Plain text.
         appended = mock_client.appended_messages[0]
         assert b"multipart/alternative" in appended["message"]
         assert b"<strong>Bold</strong>" in appended["message"]
+
+
+class TestAttachFiles:
+    """Tests for _attach_files helper."""
+
+    def test_single_pdf_attachment(self, tmp_path):
+        """Attach a PDF file — correct MIME type."""
+        pdf = tmp_path / "report.pdf"
+        pdf.write_bytes(b"%PDF-1.4 fake content")
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+        result = _attach_files(msg, [str(pdf)])
+
+        assert len(result) == 1
+        assert result[0]["name"] == "report.pdf"
+        assert result[0]["size"] == pdf.stat().st_size
+        # Verify MIME structure
+        parts = list(msg.walk())
+        att_part = [p for p in parts if p.get_content_disposition() == "attachment"]
+        assert len(att_part) == 1
+        assert att_part[0].get_content_type() == "application/pdf"
+
+    def test_unknown_extension_falls_back_to_octet_stream(self, tmp_path):
+        """Unknown extension → application/octet-stream."""
+        f = tmp_path / "data.xyz123"
+        f.write_bytes(b"unknown data")
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+        _attach_files(msg, [str(f)])
+
+        parts = list(msg.walk())
+        att_part = [p for p in parts if p.get_content_disposition() == "attachment"]
+        assert att_part[0].get_content_type() == "application/octet-stream"
+
+    def test_multiple_attachments(self, tmp_path):
+        """Multiple files attached in order."""
+        f1 = tmp_path / "a.txt"
+        f1.write_text("text content")
+        f2 = tmp_path / "b.png"
+        f2.write_bytes(b"\x89PNG fake")
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+        result = _attach_files(msg, [str(f1), str(f2)])
+
+        assert len(result) == 2
+        assert result[0]["name"] == "a.txt"
+        assert result[1]["name"] == "b.png"
+
+    def test_missing_file_raises(self, tmp_path):
+        """Missing file → IMAPError."""
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        with pytest.raises(IMAPError, match="not found"):
+            _attach_files(msg, [str(tmp_path / "nonexistent.pdf")])
+
+    def test_relative_path_rejected(self, tmp_path):
+        """Relative path → IMAPError."""
+        f = tmp_path / "file.txt"
+        f.write_text("content")
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        with pytest.raises(IMAPError, match="absolute"):
+            _attach_files(msg, ["relative/file.txt"])
+
+    def test_directory_rejected(self, tmp_path):
+        """Directory path → IMAPError."""
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        with pytest.raises(IMAPError, match="not a file"):
+            _attach_files(msg, [str(tmp_path)])
+
+    def test_oversize_file_rejected(self, tmp_path):
+        """File >25 MB → IMAPError with size info."""
+        big = tmp_path / "huge.bin"
+        big.write_bytes(b"x" * (25 * 1024 * 1024 + 1))
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        with pytest.raises(IMAPError, match="too large"):
+            _attach_files(msg, [str(big)])
+
+    def test_fail_fast_no_message_modification(self, tmp_path):
+        """If second file is invalid, message is not modified at all."""
+        good = tmp_path / "ok.txt"
+        good.write_text("fine")
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        with pytest.raises(IMAPError):
+            _attach_files(msg, [str(good), str(tmp_path / "missing.txt")])
+
+        # Message should have no attachments
+        parts = list(msg.walk())
+        att_parts = [p for p in parts if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 0
+
+    def test_unreadable_file_raises_imap_error(self, tmp_path):
+        """Permission error → IMAPError, not raw OSError."""
+        f = tmp_path / "secret.txt"
+        f.write_text("content")
+        f.chmod(0o000)
+
+        msg = email.message.EmailMessage()
+        msg.set_content("body")
+
+        try:
+            with pytest.raises(IMAPError, match="Cannot read"):
+                _attach_files(msg, [str(f)])
+        finally:
+            f.chmod(0o644)
+
+
+class TestCreateDraftWithAttachments:
+    """Tests for create_draft with file attachments."""
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_single_attachment(self, mock_creds, mock_create, tmp_path):
+        """Draft with attachment → multipart/mixed."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        pdf = tmp_path / "doc.pdf"
+        pdf.write_bytes(b"%PDF-1.4 test")
+
+        result = create_draft(
+            folder="INBOX",
+            to="r@example.com",
+            subject="See attached",
+            body="Here is the file",
+            attachments=[str(pdf)],
+        )
+
+        assert result["status"] == "created"
+        assert len(result["attachments"]) == 1
+        assert result["attachments"][0]["name"] == "doc.pdf"
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        assert parsed.is_multipart()
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 1
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_plain_text_plus_attachment_is_multipart_mixed(self, mock_creds, mock_create, tmp_path):
+        """Plain text (no HTML) + attachment → multipart/mixed, not multipart/alternative."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        f = tmp_path / "data.csv"
+        f.write_text("a,b,c\n1,2,3")
+
+        create_draft(
+            folder="INBOX",
+            to="r@example.com",
+            subject="Data",
+            body="Attached CSV",
+            attachments=[str(f)],
+        )
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        assert parsed.get_content_type() == "multipart/mixed"
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_invalid_attachment_prevents_draft(self, mock_creds, mock_create):
+        """Invalid file path → no draft created."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        with pytest.raises(IMAPError):
+            create_draft(
+                folder="INBOX",
+                to="r@example.com",
+                subject="Bad",
+                body="body",
+                attachments=["/nonexistent/file.pdf"],
+            )
+
+        assert len(mock_client.appended_messages) == 0
+
+
+class TestModifyDraftWithAttachments:
+    """Tests for modify_draft attachment handling."""
+
+    def _make_multipart_draft(self):
+        """Build a raw email with an existing attachment."""
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Draft with file"
+        msg["Message-ID"] = "<draft1@example.com>"
+        msg["In-Reply-To"] = "<thread@example.com>"
+        msg["References"] = "<thread@example.com>"
+        msg.set_content("Original body")
+        msg.add_attachment(
+            b"existing PDF content",
+            maintype="application",
+            subtype="pdf",
+            filename="existing.pdf",
+        )
+        return msg.as_bytes()
+
+    def _make_inline_attachment_draft(self):
+        """Build a raw email with an inline attachment (has filename)."""
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Draft with inline"
+        msg["Message-ID"] = "<draft2@example.com>"
+        msg.set_content("Body text")
+        msg.add_attachment(
+            b"inline image data",
+            maintype="image",
+            subtype="png",
+            filename="screenshot.png",
+        )
+        # Change disposition to inline
+        for part in msg.walk():
+            if part.get_filename() == "screenshot.png":
+                part.replace_header("Content-Disposition", 'inline; filename="screenshot.png"')
+        return msg.as_bytes()
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_preserves_existing_attachments(self, mock_creds, mock_create):
+        """Existing attachments should survive modify."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        raw = self._make_multipart_draft()
+        envelope = MockEnvelope(
+            subject=b"Draft with file",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        modify_draft("Drafts", 1, body="Updated body")
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 1
+        assert att_parts[0].get_filename() == "existing.pdf"
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_preserves_inline_with_filename(self, mock_creds, mock_create):
+        """Inline attachments with filename should be preserved."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        raw = self._make_inline_attachment_draft()
+        envelope = MockEnvelope(
+            subject=b"Draft with inline",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        modify_draft("Drafts", 1, body="New body")
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        # Should have the inline attachment preserved
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() in ("attachment", "inline") and p.get_filename()]
+        assert len(att_parts) == 1
+        assert att_parts[0].get_filename() == "screenshot.png"
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_adds_new_attachment(self, mock_creds, mock_create, tmp_path):
+        """Adding new attachments to existing draft."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        raw = self._make_multipart_draft()
+        envelope = MockEnvelope(
+            subject=b"Draft with file",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        new_file = tmp_path / "extra.txt"
+        new_file.write_text("extra content")
+
+        modify_draft("Drafts", 1, body="Updated body", attachments=[str(new_file)])
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        filenames = [p.get_filename() for p in att_parts]
+        assert "existing.pdf" in filenames
+        assert "extra.txt" in filenames
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_preserves_threading(self, mock_creds, mock_create, tmp_path):
+        """Threading headers preserved when adding attachments."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        raw = self._make_multipart_draft()
+        envelope = MockEnvelope(
+            subject=b"Draft with file",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        f = tmp_path / "file.txt"
+        f.write_text("content")
+
+        modify_draft("Drafts", 1, body="Updated", attachments=[str(f)])
+
+        appended = mock_client.appended_messages[0]
+        assert b"In-Reply-To: <thread@example.com>" in appended["message"]
+        assert b"References: <thread@example.com>" in appended["message"]
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_append_before_delete(self, mock_creds, mock_create):
+        """New draft appended before old one is deleted."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        raw = b"From: user@example.com\r\nTo: r@example.com\r\nSubject: Test\r\nMessage-ID: <x@y>\r\n\r\nBody"
+        envelope = MockEnvelope(
+            subject=b"Test",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"r", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        # Track operation order
+        ops = []
+        orig_append = mock_client.append
+        orig_delete = mock_client.delete_messages
+
+        def track_append(*args, **kwargs):
+            ops.append("append")
+            return orig_append(*args, **kwargs)
+
+        def track_delete(*args, **kwargs):
+            ops.append("delete")
+            return orig_delete(*args, **kwargs)
+
+        mock_client.append = track_append
+        mock_client.delete_messages = track_delete
+
+        modify_draft("Drafts", 1, body="New body")
+
+        assert ops.index("append") < ops.index("delete")
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_modify_preserves_zero_byte_attachment(self, mock_creds, mock_create):
+        """Zero-byte attachment should not be dropped."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "r@example.com"
+        msg["Subject"] = "Empty file"
+        msg["Message-ID"] = "<z@y>"
+        msg.set_content("Body")
+        msg.add_attachment(b"", maintype="application", subtype="octet-stream", filename="empty.dat")
+        raw = msg.as_bytes()
+
+        envelope = MockEnvelope(
+            subject=b"Empty file",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"r", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        modify_draft("Drafts", 1, body="Updated")
+
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 1
+        assert att_parts[0].get_filename() == "empty.dat"
+        assert att_parts[0].get_payload(decode=True) == b""
+
+
+class TestAttachmentRoundtrip:
+    """Test download → create_draft roundtrip."""
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_downloaded_attachment_reattached(self, mock_creds, mock_create, tmp_path):
+        """File downloaded from one message can be attached to a new draft."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        # Simulate download_attachment result
+        downloaded = tmp_path / "report.pdf"
+        downloaded.write_bytes(b"%PDF-1.4 real pdf content here")
+
+        result = create_draft(
+            folder="INBOX",
+            to="forward@example.com",
+            subject="Fwd: Report",
+            body="Forwarding the report",
+            attachments=[str(downloaded)],
+        )
+
+        assert result["status"] == "created"
+        appended = mock_client.appended_messages[0]
+        parsed = email.message_from_bytes(appended["message"])
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 1
+        assert att_parts[0].get_payload(decode=True) == b"%PDF-1.4 real pdf content here"
