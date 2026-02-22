@@ -1,6 +1,6 @@
 ---
 name: project-builder
-description: Use when user wants to create a new skill, MCP server, or CLI tool project. Creates full project scaffold with dev infrastructure.
+description: Use when creating a new skill, MCP server, or CLI tool project.
 keywords: project, scaffold, init, generator, python
 allowed-tools:
   - Bash
@@ -11,7 +11,17 @@ allowed-tools:
 
 # Project Builder
 
-## Step 0: Discovery
+## Step 0: Challenge
+
+Before scaffolding, research and challenge:
+
+1. What tools/APIs already exist in this domain? Check installed CLIs, existing skills, MCP servers.
+2. Does this need code, or does a SKILL.md with raw commands suffice?
+3. What's the minimum that solves the actual problem?
+
+Present findings to user with recommendation. If no scaffold needed → suggest alternative, STOP.
+
+## Step 1: Discovery
 
 AskUserQuestion (single call, two questions):
 
@@ -26,7 +36,7 @@ Then ask conversationally, one at a time:
 
 Set `${TYPE}` = skill|mcp|cli, `${NAME}`, `${LICENSE}`, `${PROBLEM}`, `${CAPABILITIES}`.
 
-## Step 1: Create project structure
+## Step 2: Create project structure
 
 ```bash
 python3 ./project-builder/project_builder/build_project.py ${TYPE} ${NAME} <output_dir>
@@ -36,19 +46,10 @@ Creates: full directory tree with template files, git repo, verified tests + lin
 
 If script exits non-zero: show error output, `STOP`.
 
-## Step 2: Fill template files
+## Step 3: Fill template files
 
-Using discovery answers, write content into the created project's files:
-
-- README.md: purpose from `${PROBLEM}`, features from `${CAPABILITIES}`, basic usage
-- DEVELOPMENT.md: setup with `uv`, running tests, linting
-- TESTING.md: test structure, running tests
-- CHANGELOG.md: initial 0.1.0 entry
-- LICENSE: `${LICENSE}` text
-- marketplace.json: description, keywords from `${CAPABILITIES}`
-- CLAUDE.md: append `## Tech Stack` and `## Project Structure` sections
-- Type-specific: SKILL.md: leave as stub -- skill-builder fills this / server.py docstring / cli.py help text
+Using discovery answers, fill: README.md, DEVELOPMENT.md, TESTING.md, CHANGELOG.md, LICENSE, marketplace.json, CLAUDE.md (`## Tech Stack` + `## Project Structure`). Type-specific: SKILL.md stub / server.py docstring / cli.py help.
 
 ## Done
 
-Show created files tree. Suggest: invoke skill-builder / mcp-builder / cli-tool-builder to write first failing domain test.
+Show tree. Suggest: invoke skill-builder / mcp-builder / cli-tool-builder next.
