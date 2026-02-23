@@ -10,6 +10,17 @@
         "imap-stream"
       ],
       "env": {}
+    },
+    "codex-cli": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cexll/codex-mcp-server"
+      ],
+      "env": {
+        "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
     }
   }
 }

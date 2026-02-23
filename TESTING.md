@@ -29,8 +29,8 @@ tests/youtube-to-markdown/
 
 ```
 tests/imap-stream-mcp/
-├── test_imap_client.py (71 tests: IMAP operations, credentials, folders, attachments)
-├── test_imap_stream_mcp.py (34 tests: MCP server, action routing, draft attachments)
+├── test_imap_client.py (72 tests: IMAP operations, credentials, folders, attachments)
+├── test_imap_stream_mcp.py (30 tests: MCP server, action routing, draft attachments)
 ├── test_markdown_utils.py (25 tests: markdown to HTML conversion)
 └── test_markdown.py (27 tests: draft formatting)
 ```

@@ -58,15 +58,16 @@ Extend `draft` action payload with optional `attachments` field:
 - `create_draft()`: add `attachments: list[str] = None` param, call `_attach_files()`
 - `modify_draft()` — **this is the largest piece of work**, refactoring required:
   - Current: reads original via `email.message_from_bytes()` (legacy `Message`, line 714), rebuilds as `EmailMessage` but **silently drops existing attachments**
-  - New: build `EmailMessage` with the **new body from parameters** (not extracted from original — `modify_draft` always receives new body), copy headers (Subject, To, Cc, In-Reply-To, References, Message-ID), **walk original parts to re-attach existing attachments** (`walk()` → identify attachments by `Content-Disposition` being `attachment` OR `inline` with a filename — matches existing `download_attachment` logic at line 381/454 → `add_attachment()`), then add new attachments via `_attach_files()`
+  - New: build `EmailMessage` with the **new body from parameters** (not extracted from original — `modify_draft` always receives new body), copy headers (Subject, To, Cc, In-Reply-To, References) — generate **new Message-ID** (correct behavior: modified draft is a new message), **walk original parts to re-attach existing attachments** (`walk()` → identify attachments by `Content-Disposition` being `attachment` OR `inline` with a filename — matches existing `download_attachment` logic at line 381/454 → `add_attachment()`), then add new attachments via `_attach_files()`. Note: re-attached inline parts become `Content-Disposition: attachment` — acceptable, full inline MIME metadata preservation is out of scope.
   - **Append-before-delete:** build and append new draft first, only delete old draft after successful append. Current code deletes first (line 765/781) — with attachments adding failure points, this order change prevents data loss.
   - This fixes an existing bug (attachment loss on modify) as a side effect
-- Response includes attachment info (name + human-readable size) for both create and modify
+- Response includes attachment info (name + human-readable size) for both create and modify — for `modify_draft`, include **both preserved existing and newly added** attachments in the response
 
 **`imap_stream_mcp.py`:**
 - Parse `attachments` from draft JSON payload, pass to `create_draft` / `modify_draft`
 - Update `MailAction.payload` description (~line 202): add `attachments?` AND the already-missing `format?` field (NOT `html?` — html is derived from `format` via `convert_body()`, not a payload field): `'{"to":"x","subject":"y","body":"z","format?":"markdown","attachments?":["/path"]}'`
 - Update `MailAction.action` description (~line 193): add missing `attachment` and `cleanup` to the action list
+- Update overview help topic (~line 227): add `attachment` and `cleanup` to the action summary list
 - Update draft help text
 
 **Tests** — extend existing files in `tests/imap-stream-mcp/`. `conftest.py` exists there already.
@@ -122,11 +123,11 @@ Draft response includes attachment info when present:
 - [x] `modify_draft` preserves existing inline+filename attachments from original
 - [x] `MailAction.payload` description includes `attachments?`, `format?` hints
 - [x] `MailAction.action` description includes `attachment` and `cleanup`
-- [x] Help text updated
-- [x] Response format includes attachment names + sizes for both create and modify
+- [x] Help text updated — overview help now includes `attachment` and `cleanup` actions
+- [x] Response format includes attachment names + sizes for both create and modify — `modify_draft` now reports preserved + new attachments
 - [x] Tests (imap_client): single attachment, multiple, plain text + attachment, missing file, relative path, oversize, modify preserves existing attachments, append-before-delete, roundtrip
 - [x] Tests (imap_stream_mcp): payload parsing, invalid attachments type, response formatting
-- [ ] Manual test: create draft with PDF, verify visible in Thunderbird
+- [x] Manual test: create draft with attachment (verified in Thunderbird), modify draft adds second attachment while preserving first (verified in Thunderbird)
 
 ## Reflection
 
@@ -150,3 +151,4 @@ Draft response includes attachment info when present:
 - `if payload:` vs `if payload is not None:` is a classic Python trap — empty bytes `b""` is falsy. Code review caught what self-review missed.
 - Codex review found 3 actionable issues that self-review did not. External review adds value even after careful self-review.
 - The plan's explicit Content-Disposition filtering spec (`attachment` OR `inline` with filename) translated directly to code without ambiguity — precise specs prevent implementation debates.
+- Second codex review (post-implementation) found 2 implementation gaps missed by first review: modify_draft response omitting preserved attachments, overview help not updated. Plan review is not enough — implementation review against the plan catches different class of bugs.

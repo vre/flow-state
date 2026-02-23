@@ -18,6 +18,8 @@
 ### Changed
 - `MailAction.action` description includes `attachment` and `cleanup`
 - `MailAction.payload` description includes `format?` and `attachments?`
+- Overview help topic lists all actions including `attachment` and `cleanup`
+- `modify_draft` response includes both preserved and newly added attachments
 
 ## [0.4.1] - 2026-01-30
 

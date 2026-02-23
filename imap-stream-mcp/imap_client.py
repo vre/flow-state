@@ -826,6 +826,7 @@ def modify_draft(
             new_msg.add_alternative(html, subtype="html")
 
         # Preserve existing attachments from original draft
+        preserved_att_info = []
         for part in original_msg.walk():
             disposition = part.get_content_disposition()
             filename = part.get_filename()
@@ -839,6 +840,12 @@ def modify_draft(
                         maintype=maintype,
                         subtype=subtype,
                         filename=filename or "unnamed",
+                    )
+                    preserved_att_info.append(
+                        {
+                            "name": filename or "unnamed",
+                            "size": len(payload),
+                        }
                     )
 
         # Attach new files
@@ -870,6 +877,7 @@ def modify_draft(
         if drafts_folder != folder:
             invalidate_message_cache(session.account, drafts_folder)
 
+        all_att_info = preserved_att_info + att_info
         response = {
             "status": "modified",
             "folder": drafts_folder,
@@ -878,8 +886,8 @@ def modify_draft(
             "message_id": new_msg["Message-ID"],
             "preserved_reply_to": bool(in_reply_to),
         }
-        if att_info:
-            response["attachments"] = att_info
+        if all_att_info:
+            response["attachments"] = all_att_info
         return response
 
 

@@ -229,6 +229,8 @@ HELP_TOPICS = {
 - **search** - Search messages
 - **draft** - Create draft reply (saved to Drafts folder)
 - **flag** - Add or remove flags/labels on messages
+- **attachment** - Download email attachment to temp file
+- **cleanup** - Remove downloaded attachment temp files
 - **folders** - List available folders
 - **accounts** - List configured email accounts
 - **help** - Show this help (help topic=<topic> for details)
@@ -428,14 +430,17 @@ If no account is specified, the default account is used.
     },
 )
 async def use_mail(params: MailAction) -> str:
-    """IMAP email operations. Actions: list|read|search|draft|folders|accounts|help.
+    """IMAP email operations. Actions: list|read|search|draft|flag|attachment|cleanup|folders|accounts|help.
 
     Examples:
       {action:"list", folder:"INBOX"} - list messages
       {action:"read", folder:"INBOX", payload:"123"} - read message
-      {action:"accounts"} - list configured accounts
       {action:"search", folder:"INBOX", payload:"from:x@y.com"}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
+      {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Safe: marks only, no expunge
+      {action:"attachment", folder:"INBOX", payload:"123:0"} - save email attachment to temp file, returns path
+      {action:"cleanup"} - delete saved attachment temp files from disk
+      {action:"accounts"} - list configured accounts
       {action:"help", payload:"search"} - help on topic
     """
     try:
