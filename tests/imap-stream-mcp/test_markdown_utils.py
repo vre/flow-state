@@ -4,6 +4,8 @@ TDD: These tests define the interface for the new markdown_utils module.
 Tests are written first, then the module is created to satisfy them.
 """
 
+import pytest
+
 # Import from new module location (will fail until module exists)
 from markdown_utils import (
     MARKDOWN_EXTENSION_CONFIGS,
@@ -157,6 +159,16 @@ class TestConvertBody:
 
         # Should render as proper list, not inline
         assert "<li>" in html
+
+    def test_invalid_format_raises_value_error(self):
+        """Unknown format should raise ValueError."""
+        with pytest.raises(ValueError, match="Unknown format 'html'"):
+            convert_body("Hello", format_type="html")
+
+    def test_uppercase_format_raises_value_error(self):
+        """Format validation is case-sensitive."""
+        with pytest.raises(ValueError, match="Unknown format 'HTML'"):
+            convert_body("Hello", format_type="HTML")
 
 
 class TestMarkdownConstants:

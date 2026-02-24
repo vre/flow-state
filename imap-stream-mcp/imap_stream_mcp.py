@@ -27,6 +27,7 @@ from imap_client import (
     cleanup_attachments,
     create_draft,
     download_attachment,
+    edit_draft,
     get_default_account,
     list_accounts,
     list_folders,
@@ -199,18 +200,18 @@ class MailAction(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    action: str = Field(..., description="Action: list|read|search|draft|flag|attachment|cleanup|folders|accounts|help")
+    action: str = Field(..., description="Action: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help")
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
 
     @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {"list", "read", "search", "draft", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
+        valid = {"list", "read", "search", "draft", "edit", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -228,6 +229,7 @@ HELP_TOPICS = {
 - **read** - Read a specific message
 - **search** - Search messages
 - **draft** - Create draft reply (saved to Drafts folder)
+- **edit** - Edit specific text in a draft (old→new replacement)
 - **flag** - Add or remove flags/labels on messages
 - **attachment** - Download email attachment to temp file
 - **cleanup** - Remove downloaded attachment temp files
@@ -241,6 +243,7 @@ List inbox: {action: "list", folder: "INBOX"}
 Read message: {action: "read", folder: "INBOX", payload: "123"}
 Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com"}
 Create draft: {action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
+Edit draft: {action: "edit", folder: "Drafts", payload: '{"id":1253,"replacements":[{"old":"foo","new":"bar"}]}'}
 Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 """,
     "list": """
@@ -337,6 +340,29 @@ Creates a new draft or modifies an existing one.
 2. Use 'draft' with in_reply_to - quote relevant parts with >
 3. Open email client → Drafts → review and send
 """,
+    "edit": """
+# edit - Edit Draft (surgical replacement)
+
+Edit specific text in an existing draft without rewriting the entire body.
+
+## Parameters
+- folder: Folder containing draft (e.g., 'Drafts')
+- payload: JSON with id and replacements
+
+## Payload
+- id: Draft message ID (from list/read results)
+- replacements: list of {old, new} pairs
+
+## Example
+{action: "edit", folder: "Drafts", payload: '{"id": 1444, "replacements": [{"old": "11 ducks", "new": "12 ducks"}]}'}
+
+## Notes
+- Each 'old' string must match exactly once in the draft body
+- Multiple replacements applied in order
+- Threading headers and attachments are preserved
+- Use 'read' first to see current draft content
+- For full rewrites, use 'draft' with id instead
+""",
     "folders": """
 # folders - List Folders
 
@@ -430,13 +456,14 @@ If no account is specified, the default account is used.
     },
 )
 async def use_mail(params: MailAction) -> str:
-    """IMAP email operations. Actions: list|read|search|draft|flag|attachment|cleanup|folders|accounts|help.
+    """IMAP email operations. Actions: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help.
 
     Examples:
       {action:"list", folder:"INBOX"} - list messages
       {action:"read", folder:"INBOX", payload:"123"} - read message
       {action:"search", folder:"INBOX", payload:"from:x@y.com"}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
+      {action:"edit", folder:"Drafts", payload:'{"id":1253,"replacements":[{"old":"x","new":"y"}]}'}
       {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Safe: marks only, no expunge
       {action:"attachment", folder:"INBOX", payload:"123:0"} - save email attachment to temp file, returns path
       {action:"cleanup"} - delete saved attachment temp files from disk
@@ -567,11 +594,24 @@ uv run --directory {plugin_dir} python setup.py
 
             # Attachments info (safe metadata, outside wrapper)
             attachments_info = ""
-            if msg.get("attachments"):
-                att_lines = [f"**Attachments:** ({len(msg['attachments'])})"]
-                for att in msg["attachments"]:
+            attachments = msg.get("attachments", [])
+            inline_images = msg.get("inline_images", [])
+            att_lines = []
+
+            if attachments:
+                att_lines.append(f"**Attachments:** ({len(attachments)})")
+                for att in attachments:
                     size_kb = att["size"] / 1024
-                    att_lines.append(f"  - {att['filename']} ({att['content_type']}, {size_kb:.1f} KB)")
+                    index = att.get("index", "?")
+                    att_lines.append(f"  [{index}] {att['filename']} ({att['content_type']}, {size_kb:.1f} KB)")
+
+            if inline_images:
+                inline_parts = [f"[{img.get('index', '?')}] {img['filename']}" for img in inline_images]
+                if att_lines:
+                    att_lines.append("")
+                att_lines.append(f"**Inline images:** ({len(inline_images)}) " + ", ".join(inline_parts))
+
+            if att_lines:
                 attachments_info = "\n" + "\n".join(att_lines) + "\n"
 
             return security_notice + wrapped + attachments_info
@@ -596,6 +636,50 @@ uv run --directory {plugin_dir} python setup.py
                 lines.append("")
 
             return "\n".join(lines)
+
+        # Edit existing draft with surgical replacements
+        if action == "edit":
+            if not folder:
+                return "Error: folder required (e.g., 'Drafts')"
+            if not params.payload:
+                return "Error: payload required. Use 'help edit' for details."
+
+            try:
+                edit_data = json.loads(params.payload)
+            except json.JSONDecodeError as e:
+                return f"Error: Invalid JSON in payload: {e}"
+
+            if "id" not in edit_data:
+                return "Error: 'id' required (draft message ID). Use 'help edit' for details."
+            try:
+                draft_id = int(edit_data["id"])
+            except (ValueError, TypeError):
+                return f"Error: 'id' must be a numeric message ID, got '{edit_data['id']}'"
+            if draft_id <= 0:
+                return f"Error: 'id' must be a positive integer, got {draft_id}"
+
+            if "replacements" not in edit_data:
+                return "Error: 'replacements' required. Use 'help edit' for details."
+            replacements = edit_data["replacements"]
+            if not isinstance(replacements, list) or len(replacements) == 0:
+                return "Error: 'replacements' must be a non-empty list of {old, new} pairs"
+
+            result = edit_draft(
+                folder=folder,
+                message_id=draft_id,
+                replacements=replacements,
+            )
+
+            changes = result.get("changes", [])
+            change_lines = [f'  {idx}. "{item["old"]}" → "{item["new"]}"' for idx, item in enumerate(changes, start=1)]
+            changes_text = "\n".join(change_lines) if change_lines else "  (no changes)"
+
+            return f"""# Draft Edited
+
+**Changes:** {len(changes)} replacements applied
+{changes_text}
+
+**Draft:** {result["subject"]} ({result["folder"]})"""
 
         # Draft (create or modify)
         if action == "draft":
@@ -753,6 +837,8 @@ Use Read tool for images, pdf/docx skills for documents."""
 
         return f"Unknown action '{action}'. Use 'help' for available actions."
 
+    except ValueError as e:
+        return f"Error: {e}"
     except IMAPError as e:
         error_msg = str(e)
         # Provide friendly setup guide for unconfigured credentials

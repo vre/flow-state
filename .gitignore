@@ -38,6 +38,7 @@ uv.lock
 Thumbs.db
 
 # Temporary files
+scratchpad.md
 *.tmp
 *.log
 *.bak

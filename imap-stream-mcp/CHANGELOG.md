@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.5.1] - 2026-02-24
+
+### Added
+- `edit` action for surgical draft modifications (old/new text replacement without full body rewrite)
+- Inline image separation in `read`: real attachments shown prominently, signature images compactly
+- Format validation in `convert_body()`: rejects unknown formats with actionable error message
+
+### Fixed
+- Double IMAP fetch eliminated in `edit_draft` (prefetched draft passed to `modify_draft`)
+- `edit_draft` prefetch uses `readonly=True` (was incorrectly opening writable)
+
+### Changed
+- `read` response shows `[index]` for each attachment/inline image (matches `attachment` action index)
+- `MailAction.action` and help topics updated with `edit`
+
 ## [0.5.0] - 2026-02-22
 
 ### Added

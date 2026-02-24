@@ -27,6 +27,8 @@ MARKDOWN_EXTENSION_CONFIGS = {
     }
 }
 
+VALID_FORMATS = {"markdown", "plain"}
+
 # URL pattern for autolinking (no email - avoids obfuscation issues)
 # Negative lookbehind: skip URLs already in href="..."
 URL_PATTERN = re.compile(r'(?<!href=")(https?://[^\s<>"]+)')
@@ -148,6 +150,12 @@ def convert_body(body: str, format_type: str = "markdown") -> tuple[str | None, 
         - html_body is None for plain format
         - plain_body is always returned
     """
+    if format_type not in VALID_FORMATS:
+        raise ValueError(
+            f"Unknown format '{format_type}'. Use 'markdown' (default, converts to HTML) or 'plain' (text only). "
+            "Write your email in markdown - we handle the HTML conversion."
+        )
+
     if format_type == "markdown":
         preprocessed = preprocess_markdown(body)
         html_body = markdown.markdown(preprocessed, extensions=MARKDOWN_EXTENSIONS, extension_configs=MARKDOWN_EXTENSION_CONFIGS)

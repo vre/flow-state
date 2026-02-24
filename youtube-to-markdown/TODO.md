@@ -14,6 +14,14 @@
 - [ ] Analysis keywords linking to transcript/commentary
 - [ ] Check for alternative extraction methods
 
+## Planned
+
+- [ ] Long transcript chunking for polish pipeline — `docs/youtube-to-markdown/plans/2026-02-24-long-transcript-chunking.md`
+  - Discovery phase: RQ1-RQ6 research, test corpus assembly, strategy selection
+  - Needs: 3-5 long transcripts (2h+) for testing (HC sourcing)
+- [ ] IMAP attachment indicator — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
+- [ ] IMAP snippet preview — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`
+
 ## Maybe later
 
 - [ ] What is comments are in multiple languages? Now hardcoded do not translate.

@@ -16,6 +16,8 @@ from imap_client import (
     _attach_files,
     create_draft,
     decode_header_value,
+    download_attachment,
+    edit_draft,
     format_address,
     format_address_list,
     get_credentials,
@@ -469,6 +471,31 @@ class TestListMessages:
 class TestReadMessage:
     """Tests for read_message function."""
 
+    @staticmethod
+    def _build_message_with_parts(parts: list[tuple[str, str, bytes]]) -> bytes:
+        """Build multipart message for read/download tests.
+
+        Args:
+            parts: Tuples of (disposition, filename, payload_bytes)
+
+        Returns:
+            RFC822 bytes
+        """
+        msg = email.message.EmailMessage()
+        msg["From"] = "sender@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Parts Test"
+        msg.set_content("Body text")
+
+        for disposition, filename, payload in parts:
+            msg.add_attachment(payload, maintype="application", subtype="octet-stream", filename=filename)
+            for part in msg.walk():
+                if part.get_filename() == filename:
+                    part.replace_header("Content-Disposition", f'{disposition}; filename="{filename}"')
+                    break
+
+        return msg.as_bytes()
+
     @patch("session._create_connection")
     def test_read_message_not_found(self, mock_create):
         """Test reading non-existent message."""
@@ -492,6 +519,103 @@ class TestReadMessage:
         assert result["id"] == 1
         assert result["subject"] == "Test Email Subject"
         assert "This is the email body." in result["body_text"]
+
+    @patch("session._create_connection")
+    def test_read_message_only_real_attachments(self, mock_create):
+        """read_message returns real attachments and empty inline_images."""
+        mock_client = MockIMAPClient()
+        raw = self._build_message_with_parts([("attachment", "report.pdf", b"%PDF-test")])
+        envelope = MockEnvelope(
+            subject=b"Attachment only",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1)
+
+        assert len(result["attachments"]) == 1
+        assert result["attachments"][0]["filename"] == "report.pdf"
+        assert "index" in result["attachments"][0]
+        assert result["inline_images"] == []
+
+    @patch("session._create_connection")
+    def test_read_message_only_inline_images(self, mock_create):
+        """read_message returns inline_images and empty attachments."""
+        mock_client = MockIMAPClient()
+        raw = self._build_message_with_parts([("inline", "image001.png", b"PNG")])
+        envelope = MockEnvelope(
+            subject=b"Inline only",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1)
+
+        assert result["attachments"] == []
+        assert len(result["inline_images"]) == 1
+        assert result["inline_images"][0]["filename"] == "image001.png"
+        assert "index" in result["inline_images"][0]
+
+    @patch("session._create_connection")
+    def test_read_message_mixed_parts_separates_and_preserves_indices(self, mock_create):
+        """Mixed inline + attachment are separated with walk-order indices."""
+        mock_client = MockIMAPClient()
+        raw = self._build_message_with_parts(
+            [
+                ("inline", "image001.png", b"IMG1"),
+                ("attachment", "report.pdf", b"PDF"),
+                ("inline", "image002.png", b"IMG2"),
+            ]
+        )
+        envelope = MockEnvelope(
+            subject=b"Mixed",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1)
+
+        assert [x["filename"] for x in result["attachments"]] == ["report.pdf"]
+        assert [x["filename"] for x in result["inline_images"]] == ["image001.png", "image002.png"]
+        assert [x["index"] for x in result["inline_images"]] == [0, 2]
+        assert [x["index"] for x in result["attachments"]] == [1]
+
+    @patch("session._create_connection")
+    def test_download_attachment_index_with_mixed_parts(self, mock_create):
+        """download_attachment index still maps to walk-order mixed parts."""
+        mock_client = MockIMAPClient()
+        raw = self._build_message_with_parts(
+            [
+                ("inline", "image001.png", b"IMG1"),
+                ("attachment", "report.pdf", b"PDF"),
+                ("inline", "image002.png", b"IMG2"),
+            ]
+        )
+        envelope = MockEnvelope(
+            subject=b"Mixed",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        first = download_attachment("INBOX", 1, 0)
+        second = download_attachment("INBOX", 1, 1)
+        third = download_attachment("INBOX", 1, 2)
+
+        assert first["filename"] == "image001.png"
+        assert second["filename"] == "report.pdf"
+        assert third["filename"] == "image002.png"
 
 
 class TestSearchMessages:
@@ -1168,6 +1292,309 @@ class TestModifyDraftWithAttachments:
         assert len(att_parts) == 1
         assert att_parts[0].get_filename() == "empty.dat"
         assert att_parts[0].get_payload(decode=True) == b""
+
+
+class TestEditDraft:
+    """Tests for edit_draft function."""
+
+    @staticmethod
+    def _make_plain_draft(body: str) -> bytes:
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Draft subject"
+        msg["Message-ID"] = "<draft@example.com>"
+        msg["In-Reply-To"] = "<thread@example.com>"
+        msg["References"] = "<thread@example.com>"
+        msg.set_content(body)
+        return msg.as_bytes()
+
+    @staticmethod
+    def _make_html_draft(plain_body: str, html_body: str) -> bytes:
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Draft subject"
+        msg["Message-ID"] = "<draft@example.com>"
+        msg["In-Reply-To"] = "<thread@example.com>"
+        msg["References"] = "<thread@example.com>"
+        msg.set_content(plain_body)
+        msg.add_alternative(html_body, subtype="html")
+        return msg.as_bytes()
+
+    @staticmethod
+    def _make_draft_with_attachment(body: str) -> bytes:
+        msg = email.message.EmailMessage()
+        msg["From"] = "user@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = "Draft with attachment"
+        msg["Message-ID"] = "<draft-att@example.com>"
+        msg["In-Reply-To"] = "<thread@example.com>"
+        msg["References"] = "<thread@example.com>"
+        msg.set_content(body)
+        msg.add_attachment(
+            b"pdf-content",
+            maintype="application",
+            subtype="pdf",
+            filename="existing.pdf",
+        )
+        return msg.as_bytes()
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_single_replacement(self, mock_creds, mock_create):
+        """Single replacement updates draft body."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+        assert result["status"] == "modified"
+        assert result["preserved_reply_to"] is True
+        assert result["changes"] == [{"old": "11 ducks", "new": "12 ducks"}]
+        appended = mock_client.appended_messages[0]
+        assert b"12 ducks" in appended["message"]
+        assert b"11 ducks" not in appended["message"]
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_multiple_replacements_in_order(self, mock_creds, mock_create):
+        """Multiple replacements are applied sequentially."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("11 ducks and 480 kg")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = edit_draft(
+            "Drafts",
+            1,
+            replacements=[
+                {"old": "11 ducks", "new": "12 ducks"},
+                {"old": "480 kg", "new": "450 kg"},
+            ],
+        )
+
+        assert len(result["changes"]) == 2
+        appended = mock_client.appended_messages[0]
+        assert b"12 ducks" in appended["message"]
+        assert b"450 kg" in appended["message"]
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_old_not_found(self, mock_creds, mock_create):
+        """Missing old string should raise actionable IMAPError."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("No match here")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        with pytest.raises(IMAPError, match="not found"):
+            edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_old_matches_multiple_times(self, mock_creds, mock_create):
+        """Ambiguous old string should raise IMAPError."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("duck duck")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        with pytest.raises(IMAPError, match="multiple times"):
+            edit_draft("Drafts", 1, replacements=[{"old": "duck", "new": "goose"}])
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_preserves_existing_attachments(self, mock_creds, mock_create):
+        """Existing attachments should be preserved after edit."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_draft_with_attachment("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft with attachment",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+        parsed = email.message_from_bytes(mock_client.appended_messages[0]["message"])
+        att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
+        assert len(att_parts) == 1
+        assert att_parts[0].get_filename() == "existing.pdf"
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_append_before_delete(self, mock_creds, mock_create):
+        """edit_draft should append new message before deleting old one."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        ops = []
+        orig_append = mock_client.append
+        orig_delete = mock_client.delete_messages
+
+        def track_append(*args, **kwargs):
+            ops.append("append")
+            return orig_append(*args, **kwargs)
+
+        def track_delete(*args, **kwargs):
+            ops.append("delete")
+            return orig_delete(*args, **kwargs)
+
+        mock_client.append = track_append
+        mock_client.delete_messages = track_delete
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+        assert ops.index("append") < ops.index("delete")
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_prefetch_selects_readonly(self, mock_creds, mock_create):
+        """Initial read pass should select folder in readonly mode."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        select_calls = []
+        orig_select = mock_client.select_folder
+
+        def track_select(folder, readonly=False):
+            select_calls.append((folder, readonly))
+            return orig_select(folder, readonly=readonly)
+
+        mock_client.select_folder = track_select
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}], account="default")
+
+        assert select_calls
+        assert select_calls[0] == ("Drafts", True)
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_avoids_second_fetch(self, mock_creds, mock_create):
+        """edit_draft should fetch source draft once and reuse parsed data for modify."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        fetch_calls = []
+        orig_fetch = mock_client.fetch
+
+        def track_fetch(message_ids, data):
+            fetch_calls.append(tuple(data))
+            return orig_fetch(message_ids, data)
+
+        mock_client.fetch = track_fetch
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}], account="default")
+
+        assert fetch_calls == [("RFC822", "ENVELOPE")]
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_plain_only_stays_plain_only(self, mock_creds, mock_create):
+        """Plain-only draft should remain plain-only after edit."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_draft("There are 11 ducks.")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+        parsed = email.message_from_bytes(mock_client.appended_messages[0]["message"])
+        html_parts = [p for p in parsed.walk() if p.get_content_type() == "text/html"]
+        assert len(html_parts) == 0
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_edit_draft_html_regenerated_from_edited_plain(self, mock_creds, mock_create):
+        """Draft with HTML should keep HTML part regenerated from edited plain text."""
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        mock_client = MockIMAPClient()
+        raw = self._make_html_draft("There are 11 ducks.", "<p>There are <strong>11 ducks</strong>.</p>")
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+
+        parsed = email.message_from_bytes(mock_client.appended_messages[0]["message"])
+        html_parts = [p for p in parsed.walk() if p.get_content_type() == "text/html"]
+        assert len(html_parts) == 1
+        html_payload = html_parts[0].get_payload(decode=True).decode("utf-8", errors="replace")
+        assert "12 ducks" in html_payload
 
 
 class TestAttachmentRoundtrip:

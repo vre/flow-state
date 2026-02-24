@@ -20,6 +20,7 @@ from pathlib import Path
 
 import keyring
 from imapclient import IMAPClient
+from markdown_utils import convert_body
 
 SERVICE_NAME = "imap-stream"
 
@@ -371,18 +372,28 @@ def read_message(folder: str, message_id: int, account: str = None) -> dict:
         body_text = ""
         body_html = ""
         attachments = []
+        inline_images = []
 
         if msg.is_multipart():
+            attachment_index = 0
             for part in msg.walk():
                 content_type = part.get_content_type()
                 disposition = part.get_content_disposition()
 
-                # Attachments
+                # Attachments and inline images with filename, preserving walk-order index
                 if disposition == "attachment" or (disposition == "inline" and part.get_filename()):
                     payload = part.get_payload(decode=True)
-                    attachments.append(
-                        {"filename": part.get_filename() or "unnamed", "content_type": content_type, "size": len(payload) if payload else 0}
-                    )
+                    item = {
+                        "filename": part.get_filename() or "unnamed",
+                        "content_type": content_type,
+                        "size": len(payload) if payload else 0,
+                        "index": attachment_index,
+                    }
+                    if disposition == "attachment":
+                        attachments.append(item)
+                    else:
+                        inline_images.append(item)
+                    attachment_index += 1
                 # Body text
                 elif content_type == "text/plain" and not body_text:
                     payload = part.get_payload(decode=True)
@@ -413,6 +424,7 @@ def read_message(folder: str, message_id: int, account: str = None) -> dict:
             "body_text": body_text,
             "body_html": body_html,
             "attachments": attachments,
+            "inline_images": inline_images,
             "flags": [normalize_flag_output(to_str(f)) for f in data.get(b"FLAGS", [])],
         }
 
@@ -735,6 +747,7 @@ def modify_draft(
     html: str | None = None,
     attachments: list[str] | None = None,
     account: str = None,
+    prefetched_draft: tuple[object, email.message.Message] | None = None,
 ) -> dict:
     """Modify an existing draft message.
 
@@ -751,6 +764,8 @@ def modify_draft(
         html: HTML body (if provided, creates multipart/alternative)
         attachments: List of absolute file paths to attach.
         account: Account name. None uses default.
+        prefetched_draft: Optional (envelope, parsed_message) tuple from earlier fetch.
+            Used by edit_draft to avoid a second fetch.
 
     Returns:
         Info about the modified draft
@@ -765,16 +780,19 @@ def modify_draft(
         except Exception as e:
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
-        # Fetch original draft
-        messages = client.fetch([message_id], ["RFC822", "ENVELOPE"])
+        if prefetched_draft is None:
+            # Fetch original draft
+            messages = client.fetch([message_id], ["RFC822", "ENVELOPE"])
 
-        if message_id not in messages:
-            raise IMAPError(f"Message {message_id} not found in '{folder}'")
+            if message_id not in messages:
+                raise IMAPError(f"Message {message_id} not found in '{folder}'")
 
-        data = messages[message_id]
-        envelope = data[b"ENVELOPE"]
-        raw_email = data[b"RFC822"]
-        original_msg = email.message_from_bytes(raw_email)
+            data = messages[message_id]
+            envelope = data[b"ENVELOPE"]
+            raw_email = data[b"RFC822"]
+            original_msg = email.message_from_bytes(raw_email)
+        else:
+            envelope, original_msg = prefetched_draft
 
         # Extract original values
         original_subject = decode_header_value(envelope.subject) if envelope.subject else ""
@@ -889,6 +907,138 @@ def modify_draft(
         if all_att_info:
             response["attachments"] = all_att_info
         return response
+
+
+def _extract_draft_bodies(msg: email.message.Message) -> tuple[str, str | None]:
+    """Extract plain and HTML body from draft message.
+
+    Args:
+        msg: Parsed draft message
+
+    Returns:
+        Tuple of (plain_body, html_body)
+    """
+    plain_body = ""
+    html_body = None
+
+    if msg.is_multipart():
+        for part in msg.walk():
+            disposition = part.get_content_disposition()
+            filename = part.get_filename()
+            if disposition in ("attachment", "inline") and filename:
+                continue
+
+            content_type = part.get_content_type()
+            payload = part.get_payload(decode=True)
+            if payload is None:
+                continue
+            charset = part.get_content_charset() or "utf-8"
+            decoded = payload.decode(charset, errors="replace")
+
+            if content_type == "text/plain" and not plain_body:
+                plain_body = decoded
+            elif content_type == "text/html" and html_body is None:
+                html_body = decoded
+    else:
+        payload = msg.get_payload(decode=True)
+        if payload is None:
+            return plain_body, html_body
+        charset = msg.get_content_charset() or "utf-8"
+        decoded = payload.decode(charset, errors="replace")
+        if msg.get_content_type() == "text/html":
+            html_body = decoded
+        else:
+            plain_body = decoded
+
+    return plain_body, html_body
+
+
+def _find_match_contexts(text: str, needle: str, context_chars: int = 20, max_matches: int = 3) -> list[str]:
+    """Collect short context snippets around needle matches."""
+    snippets = []
+    search_from = 0
+    while len(snippets) < max_matches:
+        idx = text.find(needle, search_from)
+        if idx == -1:
+            break
+        left = max(0, idx - context_chars)
+        right = min(len(text), idx + len(needle) + context_chars)
+        snippet = text[left:right].replace("\n", " ")
+        snippets.append(snippet)
+        search_from = idx + len(needle)
+    return snippets
+
+
+def edit_draft(folder: str, message_id: int, replacements: list[dict], account: str = None) -> dict:
+    """Edit specific text in an existing draft.
+
+    Args:
+        folder: Folder containing draft
+        message_id: Draft message ID
+        replacements: List of {"old": str, "new": str} replacements
+        account: Account name. None uses default.
+
+    Returns:
+        Modified draft response with applied changes
+    """
+    if not replacements:
+        raise IMAPError("No replacements provided. Use at least one {old, new} pair.")
+
+    from session import get_session
+
+    session = get_session(account)
+    with session.connection_ctx() as client:
+        try:
+            client.select_folder(folder, readonly=True)
+        except Exception as e:
+            raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
+
+        messages = client.fetch([message_id], ["RFC822", "ENVELOPE"])
+        if message_id not in messages:
+            raise IMAPError(f"Message {message_id} not found in '{folder}'")
+
+        data = messages[message_id]
+        envelope = data[b"ENVELOPE"]
+        raw_email = data[b"RFC822"]
+        original_msg = email.message_from_bytes(raw_email)
+        plain_body, html_body = _extract_draft_bodies(original_msg)
+
+    for idx, repl in enumerate(replacements):
+        if not isinstance(repl, dict) or "old" not in repl or "new" not in repl:
+            raise IMAPError(f"Replacement [{idx}] must be an object with 'old' and 'new' fields")
+        old = repl["old"]
+        new = repl["new"]
+        if not isinstance(old, str) or not old:
+            raise IMAPError(f"Replacement [{idx}] 'old' must be a non-empty string")
+        if not isinstance(new, str):
+            raise IMAPError(f"Replacement [{idx}] 'new' must be a string")
+
+        match_count = plain_body.count(old)
+        if match_count == 0:
+            raise IMAPError(f"Text not found: '{old}'. Use 'read' to verify current draft content.")
+        if match_count > 1:
+            contexts = _find_match_contexts(plain_body, old)
+            context_info = " | ".join(f"...{c}..." for c in contexts) if contexts else "(no context available)"
+            raise IMAPError(
+                f"Text '{old}' appears multiple times ({match_count}). Provide a more specific old string. Matches: {context_info}"
+            )
+
+        plain_body = plain_body.replace(old, new, 1)
+
+    new_html = None
+    if html_body is not None:
+        new_html, _ = convert_body(plain_body, "markdown")
+
+    result = modify_draft(
+        folder=folder,
+        message_id=message_id,
+        body=plain_body,
+        html=new_html,
+        account=account,
+        prefetched_draft=(envelope, original_msg),
+    )
+    result["changes"] = [{"old": r["old"], "new": r["new"]} for r in replacements]
+    return result
 
 
 def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remove_flags: list[str], account: str = None) -> dict:

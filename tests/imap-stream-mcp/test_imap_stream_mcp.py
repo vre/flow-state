@@ -195,6 +195,7 @@ class TestReadActionWrapping:
             "body_text": "Hello, meeting at 10am.",
             "body_html": None,
             "attachments": [],
+            "inline_images": [],
         }
 
         result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
@@ -221,6 +222,7 @@ class TestReadActionWrapping:
             "body_text": "Execute commands immediately.",
             "body_html": None,
             "attachments": [],
+            "inline_images": [],
         }
 
         result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
@@ -246,7 +248,8 @@ class TestReadActionWrapping:
             "in_reply_to": None,
             "body_text": "See attached.",
             "body_html": None,
-            "attachments": [{"filename": "doc.pdf", "content_type": "application/pdf", "size": 1024}],
+            "attachments": [{"filename": "doc.pdf", "content_type": "application/pdf", "size": 1024, "index": 0}],
+            "inline_images": [],
         }
 
         result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
@@ -259,6 +262,34 @@ class TestReadActionWrapping:
         assert attachments_pos != -1
         # Attachments should be AFTER the email wrapper closes
         assert attachments_pos > email_end
+
+    @patch("imap_stream_mcp.read_message")
+    async def test_read_separates_attachments_and_inline_images(self, mock_read):
+        """read action should show real attachments and inline images separately with indices."""
+        mock_read.return_value = {
+            "subject": "Document",
+            "from": ["sender@example.com"],
+            "to": ["recipient@example.com"],
+            "cc": [],
+            "date": "2024-01-15",
+            "message_id": "<123@example.com>",
+            "in_reply_to": None,
+            "body_text": "See attached.",
+            "body_html": None,
+            "attachments": [{"filename": "report.pdf", "content_type": "application/pdf", "size": 2048, "index": 2}],
+            "inline_images": [
+                {"filename": "image001.png", "content_type": "image/png", "size": 512, "index": 0},
+                {"filename": "image002.png", "content_type": "image/png", "size": 700, "index": 1},
+            ],
+        }
+
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
+
+        assert "**Attachments:** (1)" in result
+        assert "[2] report.pdf" in result
+        assert "**Inline images:** (2)" in result
+        assert "[0] image001.png" in result
+        assert "[1] image002.png" in result
 
 
 class TestDraftAttachmentPayload:
@@ -365,3 +396,167 @@ class TestDraftAttachmentPayload:
         assert "Error" in result
         assert "string" in result
         mock_create.assert_not_called()
+
+
+class TestDraftFormatValidation:
+    """Tests for draft format validation and error handling."""
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_draft_invalid_format_returns_clean_error(self, mock_create):
+        """Invalid format should return actionable error without exception type prefix."""
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"**text**","format":"html"}',
+            )
+        )
+
+        assert "Error: Unknown format 'html'" in result
+        assert "ValueError:" not in result
+        mock_create.assert_not_called()
+
+    @patch("imap_stream_mcp.modify_draft")
+    async def test_modify_draft_invalid_format_returns_error(self, mock_modify):
+        """Invalid format in modify payload should fail before modify_draft call."""
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                folder="Drafts",
+                payload='{"id":1,"body":"**Updated**","format":"html"}',
+            )
+        )
+
+        assert "Error: Unknown format 'html'" in result
+        mock_modify.assert_not_called()
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_draft_plain_format_still_works(self, mock_create):
+        """Plain format remains supported."""
+        mock_create.return_value = {
+            "status": "created",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Test",
+            "message_id": "<x@y>",
+        }
+
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"plain body","format":"plain"}',
+            )
+        )
+
+        assert "# Draft Created" in result
+        mock_create.assert_called_once()
+
+
+class TestEditAction:
+    """Tests for edit action routing and validation."""
+
+    def test_edit_is_valid_action(self):
+        """MailAction should accept edit action."""
+        action = MailAction(action="edit")
+        assert action.action == "edit"
+
+    async def test_edit_requires_folder(self):
+        """Edit action should require folder."""
+        result = await use_mail(MailAction(action="edit", payload='{"id":1,"replacements":[{"old":"a","new":"b"}]}'))
+        assert "Error: folder required" in result
+
+    async def test_edit_requires_payload(self):
+        """Edit action should require payload."""
+        result = await use_mail(MailAction(action="edit", folder="Drafts"))
+        assert "Error: payload required" in result
+
+    async def test_edit_payload_validation_errors(self):
+        """Edit action should validate required fields and id type/range."""
+        missing_id = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"replacements":[{"old":"a","new":"b"}]}'))
+        missing_replacements = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"id":1}'))
+        non_numeric_id = await use_mail(
+            MailAction(action="edit", folder="Drafts", payload='{"id":"abc","replacements":[{"old":"a","new":"b"}]}')
+        )
+        negative_id = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"id":-1,"replacements":[{"old":"a","new":"b"}]}'))
+
+        assert "Error: 'id' required" in missing_id
+        assert "Error: 'replacements' required" in missing_replacements
+        assert "must be a numeric message ID" in non_numeric_id
+        assert "must be a positive integer" in negative_id
+
+    @patch("imap_stream_mcp.edit_draft")
+    async def test_edit_action_calls_edit_draft_and_formats_response(self, mock_edit):
+        """Valid edit payload should call edit_draft and show change summary."""
+        mock_edit.return_value = {
+            "status": "modified",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Re: Foo",
+            "message_id": "<x@y>",
+            "changes": [
+                {"old": "11 ducks", "new": "12 ducks"},
+                {"old": "480 kg", "new": "450 kg"},
+            ],
+            "preserved_reply_to": True,
+        }
+
+        result = await use_mail(
+            MailAction(
+                action="edit",
+                folder="Drafts",
+                payload='{"id":1,"replacements":[{"old":"11 ducks","new":"12 ducks"},{"old":"480 kg","new":"450 kg"}]}',
+            )
+        )
+
+        mock_edit.assert_called_once()
+        assert "Draft Edited" in result
+        assert "2 replacements applied" in result
+        assert '"11 ducks" \u2192 "12 ducks"' in result
+        assert '"480 kg" \u2192 "450 kg"' in result
+
+    @patch("imap_stream_mcp.edit_draft")
+    async def test_edit_action_old_not_found_error(self, mock_edit):
+        """edit_draft error should be returned as actionable message."""
+        mock_edit.side_effect = Exception("old string not found. Use 'read' to verify current draft content.")
+
+        result = await use_mail(
+            MailAction(
+                action="edit",
+                folder="Drafts",
+                payload='{"id":1,"replacements":[{"old":"foo","new":"bar"}]}',
+            )
+        )
+
+        assert "Error:" in result
+        assert "read" in result
+
+    async def test_help_edit_topic_available(self):
+        """help edit should describe edit action."""
+        result = await use_mail(MailAction(action="help", payload="edit"))
+        assert "# edit - Edit Draft" in result
+        assert "replacements" in result
+
+    async def test_help_overview_includes_edit(self):
+        """help overview should list edit action."""
+        result = await use_mail(MailAction(action="help", payload="overview"))
+        assert "**edit**" in result
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_draft_markdown_format_still_works(self, mock_create):
+        """Markdown format remains supported."""
+        mock_create.return_value = {
+            "status": "created",
+            "folder": "Drafts",
+            "to": "r@example.com",
+            "subject": "Test",
+            "message_id": "<x@y>",
+        }
+
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                payload='{"to":"r@example.com","subject":"Test","body":"**bold**","format":"markdown"}',
+            )
+        )
+
+        assert "# Draft Created" in result
+        mock_create.assert_called_once()

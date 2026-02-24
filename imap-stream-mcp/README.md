@@ -14,6 +14,7 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text
 - **draft** - Create/modify draft replies with file attachments
+- **edit** - Surgical draft text replacement (old→new) without full body rewrite
 - **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)
 - **folders** - List available folders
 - **accounts** - List configured email accounts
@@ -88,6 +89,10 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 3. **I would like to answer...** create reply with Claude's help
 4. **Send via email client** → Drafts → Review and send
 
+## Limitations
+
+- **Draft operations are for user-composed content.** Editing drafts originally created in rich email clients (Outlook, Gmail) may lose inline images and complex formatting. The `edit` and `draft` actions reconstruct MIME structure from plain text/HTML — embedded `cid:` image references are not preserved.
+
 ## Security
 
 - **No destructive operations** - No EXPUNGE, no permanent deletion. `\Deleted` flag only marks messages (recoverable). Creates/modifies drafts in Drafts folder only.
@@ -124,6 +129,9 @@ debug_imap.py        # Connection troubleshooting utility
 
 # Create draft
 {action: "draft", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"Thanks!","in_reply_to":"<msgid>"}'}
+
+# Edit draft (surgical replacement)
+{action: "edit", folder: "Drafts", payload: '{"id": 1444, "replacements": [{"old": "11 ducks", "new": "12 ducks"}]}'}
 
 # Flag messages
 {action: "flag", folder: "INBOX", payload: "123:+Flagged"}

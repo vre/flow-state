@@ -11,3 +11,7 @@
 - [x] Marking messages as spam/not spam (v0.3.0, via $Junk keyword)
 - [x] Support for Labels (v0.3.0, via keywords)
 - [x] Attachment upload to drafts (v0.5.0)
+- [ ] Attachment indicator (`[att:N]`) in list/search — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
+- [ ] Snippet (~100 chars preview) in list/search — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md` (depends on attachment indicator)
+- [ ] Thread-aware read: truncate quoted replies to reduce token count (8-msg Outlook thread = ~10k tokens)
+- [ ] Preserve `multipart/related` MIME structure in modify_draft (inline images lose `cid:` linkage)
