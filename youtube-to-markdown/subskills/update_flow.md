@@ -19,6 +19,7 @@ Show component status based on JSON output:
 | Summary | exists/missing | v1/v2 | from issues[] |
 | Transcript | exists/missing | - | from issues[] |
 | Comments | exists/missing | v1/v2 | from issues[] |
+| Watch Guide | exists/missing | - | - |
 
 If stored_metadata and current_metadata differ, show comparison:
 
@@ -63,10 +64,16 @@ DONE
 ```bash
 python3 ./scripts/40_backup.py backup "<existing_files.transcript>"
 ```
+If `existing_files.watch_guide` exists:
+```bash
+python3 ./scripts/40_backup.py backup "<existing_files.watch_guide>"
+rm "<existing_files.watch_guide>"
+```
 Run: transcript_extract.md → transcript_polish.md
 ```bash
 python3 ./scripts/50_assemble.py --transcript-only "${BASE_NAME}" "<output_directory>"
 ```
+Inform user: "Watch guide backed up. Full refresh needed to regenerate."
 DONE
 
 **If "Update metadata only":**
@@ -88,7 +95,9 @@ Backup each existing file (skip if null):
 python3 ./scripts/40_backup.py backup "<existing_files.summary>"
 python3 ./scripts/40_backup.py backup "<existing_files.transcript>"
 python3 ./scripts/40_backup.py backup "<existing_files.comments>"
+python3 ./scripts/40_backup.py backup "<existing_files.watch_guide>"
+rm "<existing_files.watch_guide>"
 ```
-Return to main SKILL.md Step 1.
+Return to main SKILL.md Step 1. Watch guide is regenerated only if user then picks output option B.
 
 **If "Keep existing":** DONE.

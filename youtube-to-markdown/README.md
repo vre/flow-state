@@ -11,6 +11,7 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Summary** - TL;DR + structured summary with four content-specific formats (Tips, Interview, Educational, Tutorial)
 - **Transcript** - Cleaned and formatted with chapters, paragraphs, and topic headings
 - **Timestamp links** - Jump back to specific moments in the original video
+- **Watch guide** - WATCH/SKIM/READ-ONLY gate with timestamped highlights and cross-links to transcript
 - **Comment analysis** - Curated comments cross-analyzed against video content
 - **Channel browser** - Browse channel videos, batch-extract new ones, detect comment growth on existing
   - Uses flat-playlist descriptions + Haiku batch one-liners for cleaner selection context
@@ -63,14 +64,15 @@ Also works: `get`, `fetch`, `transcript`, `subtitles`, `captions`
 | Summary only | Summary with TL;DR and key insights |
 | Transcript only | Cleaned, formatted full transcript |
 | Comments only | Curated top comments |
-| Summary + Comments | Summary with cross-analyzed comment insights |
-| Full | All: summary, transcript, comments |
+| Summary + Comments | Summary with cross-analyzed comment insights. Timestamped transcript stored for reference. |
+| Full | All: summary, transcript, comments, watch guide |
 
 ## Output Files
 
 - `{date} - youtube - {title} ({video_id}).md` - Summary with metadata
 - `{date} - youtube - {title} - transcript ({video_id}).md` - Cleaned transcript with timestamps
 - `{date} - youtube - {title} - comments ({video_id}).md` - Curated comments
+- `{date} - youtube - {title} - watch guide ({video_id}).md` - Watch guide with highlights (Full mode, WATCH/SKIM only)
 
 Date is the video's upload date (YYYY-MM-DD). Falls back to no prefix if unavailable.
 

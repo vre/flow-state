@@ -68,6 +68,7 @@ def get_all_work_files(base_name: str) -> list[str]:
         + get_summary_work_files(base_name)
         + get_transcript_work_files(base_name)
         + get_comments_work_files(base_name)
+        + [f"{base_name}_watch_guide.md"]
     )
     # Deduplicate while preserving order
     seen = set()

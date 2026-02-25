@@ -11,7 +11,7 @@ Options:
   --summary-comments  Create summary and comments files
   --debug             Keep intermediate work files
 
-Default (no mode flag): Create summary, transcript, and comments files (Full mode)
+Default (no mode flag): Create summary, transcript, comments, and watch guide files (Full mode)
 """
 
 import sys

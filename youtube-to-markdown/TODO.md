@@ -16,7 +16,13 @@
 
 ## Planned
 
-- [ ] Watch guide & transcript timestamps — `docs/youtube-to-markdown/plans/2026-02-24-watch-guide-and-transcript-timestamps.md`
+- [ ] Watch guide manual testing and future items
+  - [ ] Manual test: Bas Rutten demo (expect WATCH) + Nate B Jones talking head (expect SKIM/READ-ONLY)
+  - [ ] Obsidian video embed syntax in watch guide
+  - [ ] Chatter/banter summary section in watch guide
+  - [ ] Language preservation test (non-English watch guide)
+  - [ ] 150 KB guard test with real long transcript
+  - [ ] Gate evidence expansion (more signal types)
 - [ ] Long transcript chunking for polish pipeline — `docs/youtube-to-markdown/plans/2026-02-24-long-transcript-chunking.md`
 - [ ] IMAP attachment indicator — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
 - [ ] IMAP snippet preview — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`

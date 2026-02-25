@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.11.0] - 2026-02-25
+
+### Watch Guide (Option B)
+- New watch guide file for option B: WATCH/SKIM/READ-ONLY gate classifies whether video needs watching
+- Highlights with YouTube deep links and "why watch > read" justifications
+- Cross-links to polished transcript headings via assembler post-processing (LLM writes `→ Heading Name`, assembler creates markdown links)
+- Gate fail-safe: unparseable verdict treated as READ-ONLY (no file created)
+- Long transcript guard: skips watch guide for transcripts > 150 KB
+
+### Transcript Timestamp Preservation
+- Option A/C now stores `_transcript_dedup.md` (timestamped) instead of `_transcript_no_timestamps.txt`
+- Fallback chain: polished → dedup → legacy no-timestamps (backward compatible)
+
+### Update Flow
+- Watch guide lifecycle: backup+delete on transcript re-extract (no regenerate), backup+delete on full refresh (regenerate only if user picks option B)
+- `prepare_update()` reports watch guide in `existing_files` for both EXISTS and UNAVAILABLE paths
+
+### File Classification
+- `find_existing_summary()` and `find_existing_files()` correctly exclude/classify watch guide files
+
+### Testing
+- 16 new tests (300 total)
+
 ## [2.10.0] - 2026-02-21
 
 ### Two-Tier Comment Filter

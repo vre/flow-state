@@ -42,8 +42,8 @@ AskUserQuestion:
 - header: "Output"
 - multiSelect: false
 - options:
-  A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Transcript stored if user would like to format it later.
-  B. "Summary + Comments + Formatted Transcript" - Option A + cleaned and formatted full transcript → double tokens
+  A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Timestamped transcript stored for reference.
+  B. "Summary + Comments + Formatted Transcript" - Option A + cleaned and formatted full transcript with watch guide → double tokens
   C. "Summary Only" - Summary of video content
   D. "Formatted Transcript Only" - Cleaned and formatted full transcript
 
@@ -52,7 +52,7 @@ AskUserQuestion:
 Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" marks possibility to run concurrently.
 
 - A: transcript_extract.md → (transcript_summarize.md | comment_extract.md) → comment_summarize.md
-- B: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md
+- B: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md → watch_guide.md
 - C: transcript_extract.md → transcript_summarize.md
 - D: transcript_extract.md → transcript_polish.md
 

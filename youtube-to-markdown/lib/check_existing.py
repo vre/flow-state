@@ -18,6 +18,7 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
     summary_file = None
     comment_file = None
     transcript_file = None
+    watch_guide_file = None
 
     for f in all_files:
         name = f.name
@@ -25,6 +26,8 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
             comment_file = f
         elif " - transcript " in name:
             transcript_file = f
+        elif " - watch guide " in name:
+            watch_guide_file = f
         else:
             # Main summary file (no suffix before video ID)
             summary_file = f
@@ -38,6 +41,7 @@ def find_existing_files(video_id: str, output_dir: Path) -> dict:
         "summary_file": str(summary_file) if summary_file else None,
         "comment_file": str(comment_file) if comment_file else None,
         "transcript_file": str(transcript_file) if transcript_file else None,
+        "watch_guide_file": str(watch_guide_file) if watch_guide_file else None,
         "intermediate_files": found_intermediate if found_intermediate else None,
     }
 
@@ -211,6 +215,7 @@ def check_existing(video_url: str, output_dir: Path) -> dict:
         - summary_file: path or None
         - comment_file: path or None
         - transcript_file: path or None
+        - watch_guide_file: path or None
         - intermediate_files: list of paths or None
         - summary_v1: bool (if summary exists)
         - comments_v1: bool (if comments exist)
