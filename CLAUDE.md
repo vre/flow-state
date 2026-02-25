@@ -38,7 +38,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 3. PLANNING END:
 - When you think that the plan is ready ask if there is something else or proceed to self-review
 - When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Delegate plan review via `codex-session`: "Critically review the plan <path> for correctness, completeness, feasibility, testability, and scope control. Find what's missing."
+- Delegate plan review via `session-codex`: "Critically review the plan <path> for correctness, completeness, feasibility, testability, and scope control. Find what's missing."
 - Review iteration: fix all findings, no debt. `continue` with description of fixes. Iterate until reviewer passes. Disagreement → you decide with justification.
 - Write `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md` — problems encountered, how resolved, what was learned about planning.
 - Ask HC to approve plan for Implementation Phase
@@ -49,7 +49,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development.
 - Copy plan file to worktree, `rm` from main, commit in worktree — plan is a deliverable, must not remain untracked in main.
 - Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml
-- Delegate implementation to IMP via `codex-session` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
+- Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
 
 2. IMPLEMENTATION RULES
 - NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness
@@ -77,16 +77,16 @@ ORC informs HC what the next step is. Do not just say what you did.
 ### 3. Review Phase
 
 1. CODE REVIEW
-- ORC reviews changes in worktree. Cross-check with the living plan. Send findings to IMP via `codex-session` `continue`. Fix all, no debt → iterate until clean.
+- ORC reviews changes in worktree. Cross-check with the living plan. Send findings to IMP via `session-codex` `continue`. Fix all, no debt → iterate until clean.
 
 2. ACCEPTANCE TESTING
-- ORC tests feature(s) or asks HC. Defects → fix via IMP `codex-session` `continue`, re-verify. Iterate until clean.
+- ORC tests feature(s) or asks HC. Defects → fix via IMP `session-codex` `continue`, re-verify. Iterate until clean.
 - Confirm from HC to proceed to Merge Phase
 
 ### 4. Merge Phase
 
 1. DOCUMENTATION
-- Delegate "## Reflection" to IMP via `codex-session` `continue`: what went well, what changed from plan, lessons learned. IMP writes to plan file.
+- Delegate "## Reflection" to IMP via `session-codex` `continue`: what went well, what changed from plan, lessons learned. IMP writes to plan file.
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 
