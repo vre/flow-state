@@ -16,14 +16,18 @@
 
 ## Planned
 
+- [ ] Watch guide & transcript timestamps — `docs/youtube-to-markdown/plans/2026-02-24-watch-guide-and-transcript-timestamps.md`
 - [ ] Long transcript chunking for polish pipeline — `docs/youtube-to-markdown/plans/2026-02-24-long-transcript-chunking.md`
-  - Discovery phase: RQ1-RQ6 research, test corpus assembly, strategy selection
-  - Needs: 3-5 long transcripts (2h+) for testing (HC sourcing)
 - [ ] IMAP attachment indicator — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
 - [ ] IMAP snippet preview — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`
 
 ## Maybe later
 
+- [ ] Watch guide: validate language preservation (guide matches transcript language) — needs test strategy
+- [ ] Watch guide: test 150 KB transcript skip guard with real long transcript
+- [ ] Watch guide: expand gate evidence beyond 2 PoC videos — test with lectures, interviews, music, tutorials
+- [ ] Watch guide: embed YouTube video in Obsidian watch guide file (Obsidian media plugin)
+- [ ] Watch guide: summarize chatter/banter between substantive segments for WATCH/SKIM videos
 - [ ] What is comments are in multiple languages? Now hardcoded do not translate.
   - Comments are mostly in the language of the video, that most probably is the language user wants.
 - [ ] Annoying Write tool asks for "Create a File?" and opens editor

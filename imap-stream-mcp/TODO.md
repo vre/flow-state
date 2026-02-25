@@ -13,5 +13,5 @@
 - [x] Attachment upload to drafts (v0.5.0)
 - [x] Attachment indicator (`[att:N]`) in list/search (v0.6.0) — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
 - [ ] Snippet (~100 chars preview) in list/search — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md` (depends on attachment indicator)
-- [ ] Thread-aware read: truncate quoted replies to reduce token count (8-msg Outlook thread = ~10k tokens)
+- [x] Thread-aware read: truncate quoted replies to reduce token count (v0.6.1) — `docs/imap-stream-mcp/plans/2026-02-25-thread-aware-read.md`
 - [ ] Preserve `multipart/related` MIME structure in modify_draft (inline images lose `cid:` linkage)

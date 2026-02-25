@@ -204,7 +204,7 @@ class MailAction(BaseModel):
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
 
@@ -264,17 +264,18 @@ Output includes `[att:N]` when a message has attachments.
     "read": """
 # read - Read Message
 
-Fetches full message content by ID.
+Fetches message content by ID.
 
 ## Parameters
 - folder: Folder containing message
-- payload: Message ID (from list/search results)
+- payload: Message ID (from list/search results), optionally with :full
 
 ## Returns
 Full message with: subject, from, to, cc, date, body_text, body_html, message_id, in_reply_to
 
 ## Example
 {action: "read", folder: "INBOX", payload: "12345"}
+{action: "read", folder: "INBOX", payload: "12345:full"}
 """,
     "search": """
 # search - Search Messages
@@ -462,7 +463,8 @@ async def use_mail(params: MailAction) -> str:
 
     Examples:
       {action:"list", folder:"INBOX"} - list messages
-      {action:"read", folder:"INBOX", payload:"123"} - read message
+      {action:"read", folder:"INBOX", payload:"123"} - read message (truncated quoted tail by default)
+      {action:"read", folder:"INBOX", payload:"123:full"} - read full message without truncation
       {action:"search", folder:"INBOX", payload:"from:x@y.com"}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
       {action:"edit", folder:"Drafts", payload:'{"id":1253,"replacements":[{"old":"x","new":"y"}]}'}
@@ -556,12 +558,21 @@ uv run --directory {plugin_dir} python setup.py
             if not params.payload:
                 return "Error: payload (message ID) required. Example: {action:'read', folder:'INBOX', payload:'123'}"
 
-            try:
-                msg_id = int(params.payload)
-            except ValueError:
-                return f"Error: payload must be numeric message ID, got '{params.payload}'"
+            if ":" in params.payload:
+                id_str, modifier = params.payload.split(":", 1)
+                if modifier != "full":
+                    return f"Error: unknown modifier '{modifier}'. Use '{id_str}' or '{id_str}:full'"
+                full = True
+            else:
+                id_str = params.payload
+                full = False
 
-            msg = read_message(folder, msg_id)
+            try:
+                msg_id = int(id_str)
+            except ValueError:
+                return f"Error: payload must be numeric message ID, got '{id_str}'"
+
+            msg = read_message(folder, msg_id, full=full)
 
             # Collect header info for wrapped email
             header_lines = [
@@ -598,6 +609,16 @@ uv run --directory {plugin_dir} python setup.py
             if injection_detected:
                 security_notice = INJECTION_DETECTED_WARNING + "\n\n"
 
+            truncation_notice = ""
+            if msg.get("quoted_truncated"):
+                count = msg.get("quoted_message_count", 0)
+                chars = msg.get("quoted_chars_truncated", 0)
+                truncation_notice = (
+                    f"\n**Quoted reply tail omitted** (~{chars // 1000}k chars, estimated {count} messages). "
+                    f'Use read with payload: "{msg_id}:full" for complete message. '
+                    "Note: composing a reply that continues the full quote chain requires `:full`.\n"
+                )
+
             # Attachments info (safe metadata, outside wrapper)
             attachments_info = ""
             attachments = msg.get("attachments", [])
@@ -620,7 +641,7 @@ uv run --directory {plugin_dir} python setup.py
             if att_lines:
                 attachments_info = "\n" + "\n".join(att_lines) + "\n"
 
-            return security_notice + wrapped + attachments_info
+            return security_notice + wrapped + truncation_notice + attachments_info
 
         # Search
         if action == "search":

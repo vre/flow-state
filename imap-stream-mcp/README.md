@@ -121,6 +121,7 @@ debug_imap.py        # Connection troubleshooting utility
 
 # Read message
 {action: "read", folder: "INBOX", payload: "12345"}
+{action: "read", folder: "INBOX", payload: "12345:full"}  # include full quoted tail
 
 # Search
 {action: "search", folder: "INBOX", payload: "from:boss@company.com"}

@@ -206,3 +206,134 @@ Session started as competitive research (YouTube MCPs, IMAP MCPs, skill/MCP buil
 4. **HC's plan splits prevent scope creep.** The combined IMAP plan would have been implemented as one feature. Splitting revealed that attachment indicator is standalone (no IMAP body fetch, no decoding pipeline) while snippet has significant complexity (part numbering, charset decoding, HTML stripping, activation mechanism). Different risk profiles → different implementation timelines.
 
 5. **Parallel subagents for discovery are high-value.** The BODYSTRUCTURE research took 2 subagents ~5 minutes and produced concrete data (BodyData structure, disposition indices, nested examples) that replaced 4 "UNVERIFIED" markers in the plan. Cost: ~$1. Alternative: guess and fix during implementation.
+
+## 2026-02-25 Planning Reflections: Watch Guide & Transcript Timestamps
+
+Plan: `docs/youtube-to-markdown/plans/2026-02-24-watch-guide-and-transcript-timestamps.md`
+
+### How planning went
+
+Started as a loose idea ("what if we suggest parts to watch?") and evolved through PoC discovery into a two-part plan. Three distinct phases: PoC testing, plan writing, and review-driven amendment.
+
+**PoC phase.** Tested watch guide generation on two contrasting videos before writing any plan. Talking head (Nate B Jones) → SKIM verdict, 9/30 min. Dojo demo (Bas Rutten) → WATCH verdict, 14/25 min. Gate mechanism validated across content types. During PoC, HC noticed timestamps were lost in the stored transcript — this coupled the watch guide idea with a transcript quality fix.
+
+**Plan v1 (overengineered).** I proposed a "light polish" subskill for option A that would add an extra LLM call. HC corrected: option A just needs to save a different file (dedup instead of no-timestamps). No new subskill, no extra cost.
+
+**Plan v2 (rewritten).** HC's architecture: option A swaps file (1 line change), watch guide lives only in option B (where polish already runs). Simpler and correct.
+
+**Self-review.** Found 6 issues: invalid cross-link markdown format, missing READ-ONLY gate protocol, dedup UX note needed, missing script update task, option C question, anchor format risk.
+
+**Codex review.** Found 9 issues (5 critical/high). Most impactful: watch guide filename collides with summary detection in 3 locations, assembler fallback chain underspecified, cross-link filenames can't be reliably produced by LLM, update mode doesn't handle watch guide, tests aren't CI-compatible.
+
+**Amendment.** Addressed all 9 issues. Key design change: moved cross-link generation from LLM to assembler (LLM writes `→ Heading Name`, assembler creates `[Heading Name](file.md#slug)`). Implementation tasks grew from 9 to 13.
+
+### HC's part
+
+- Originated the watch guide idea and steered it toward practical implementation
+- Selected test videos and drove PoC testing before planning
+- Corrected overengineering twice: no "light polish" subskill, watch guide only in option B
+- Noticed timestamp loss during PoC — coupled the two features
+- Directed Codex review via codex-session skill
+
+### My part
+
+- Ran PoC tests on two videos, validated gate mechanism
+- Discovered transcript timestamp loss in pipeline (confirmed HC's observation)
+- Wrote and rewrote plan (v1 overengineered → v2 correct)
+- Self-reviewed: found 6 issues
+- Amended plan based on 9 Codex review findings
+
+### What I learned about planning
+
+1. **PoC before plan eliminates format speculation.** The PoC proved the gate works, showed what output looks like, and revealed the timestamp dependency — all before writing a single plan line. Without PoC, I would have speculated about gate signals and output format.
+
+2. **HC corrects architecture, not details.** Both corrections were structural: "don't add a subskill, just swap the file" and "watch guide lives in option B only." These aren't typos or missing edge cases — they're fundamental architecture decisions that prevent unnecessary complexity.
+
+3. **LLMs should not generate filenames or slugs.** The Codex review caught that expecting the LLM to produce correct markdown anchor slugs and filenames is fragile. Moving this to the assembler (Python) is both more reliable and testable. General principle: deterministic formatting belongs in code, not prompts.
+
+4. **File classification is a cross-cutting concern.** Adding a new output file type (watch guide) requires updates in 3+ locations that classify files by suffix. Easy to miss one. A future refactor could centralize file type detection.
+
+## 2026-02-25 Planning Reflections: Thread-Aware Read
+
+Plan: `docs/imap-stream-mcp/plans/2026-02-25-thread-aware-read.md`
+
+### How planning went
+
+Problem emerged from manual acceptance testing of v0.5.1 — reading the VikingPLoP hotel thread (19 messages) consumed ~10k tokens where only ~500 were the newest message. HC flagged it immediately: "miksi jälkimmäinen haku oli yli 10ktoc?" The plan went from observation to written plan in one session.
+
+**Design decisions.** HC drove three key calls:
+- Binary choice (truncated vs full) instead of paginating individual quoted messages — original messages exist as separate IMAP messages in the same folder, quoted text is a redundant copy
+- Language-independent attribution detection — line ending `:` followed by `>` lines catches "On ... wrote:", "Am ... schrieb:", etc. without maintaining a pattern list
+- No forwarded message special handling — forwarded markers vary by client and language ("Forwarded message", "Lähetetty viesti", "Weitergeleitet"), unreliable detection adds complexity without results
+
+HC also raised interleaved quoting as a risk: "joskus jotkut ihmiset harrastavat jotain outoa tapaa kirjoittaa kommenttejaan quoteketjuun sisään." This became the key safety mechanism — if quoted/unquoted blocks alternate multiple times, no truncation.
+
+**Self-review** found 7 items. HC corrected each precisely: `len/4` is fine for token estimation, attribution `:` + `>` is sufficient (no language patterns needed), forwarded = no special handling, and default behavior can change (no existing workflows to break).
+
+**Codex review** found 7 issues (3 high). Most impactful: truncation notice must be outside `<untrusted_email_content>` wrapper (security boundary), and HTML-only emails need `html2text` fallback (verified that html2text preserves `>` markers from blockquotes).
+
+### HC's part
+
+- Identified the problem from real usage (10k tokens for one email read)
+- Drove the binary truncation decision with the key insight: quoted messages are redundant copies, originals are separate IMAP messages
+- Proposed language-independent attribution detection pattern
+- Raised interleaved quoting as a risk case
+- Simplified forwarded message handling: "varies by language, don't bother"
+- Corrected each self-review item with precise reasoning
+
+### My part
+
+- Quantified the problem (19-message thread, ~10k tokens, ~9k waste)
+- Designed the detection algorithm (4 signal types, bottom-up scanning, interleaved safety)
+- Structured the payload extension grammar (`^\\d+(?::full)?$`)
+- Placed truncation notice correctly relative to security wrapper
+- Self-reviewed and incorporated both HC corrections and Codex findings
+- Verified html2text `>` marker preservation via Codex research
+
+### What I learned about planning
+
+1. **Domain knowledge beats engineering instinct.** I would have designed pagination or per-message parsing. HC's "quoted messages are redundant copies of messages already in the folder" collapsed the entire problem to a binary choice. This is IMAP domain knowledge — the protocol stores individual messages, threading is reconstructed.
+
+2. **Language-independent patterns beat pattern lists.** Instead of maintaining regex for "wrote:", "schrieb:", "kirjoitti:", etc., the structural pattern (line ending `:` + next line starts `>`) works across all languages. Structural detection > content detection.
+
+3. **Security boundaries inform placement.** The `<untrusted_email_content>` wrapper isn't just formatting — it's a security boundary. Truncation metadata (message count, char count, `:full` hint) is trusted system output, not untrusted email content. Codex caught this: the notice must be outside the wrapper. Understanding *why* the wrapper exists determines *where* new content goes.
+
+## 2026-02-25 Planning Reflections: Snippet Preview Plan Refinement
+
+Plan: `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`
+
+### How planning went
+
+The snippet plan was drafted in a previous session alongside the attachment indicator plan. This session's task: refine the plan from draft to implementation-ready. Not a new plan — a hardening pass.
+
+**Codebase verification.** Read all four key source files against the plan's claims. Found the plan's line numbers were estimates ("post att-indicator") since attachment indicator (v0.6.0) was now implemented. Updated all line numbers to actual current code. Also discovered test count had changed: 202 tests (plan said 86+43=129 from pre-v0.6.0).
+
+**Structural additions.** The original plan was research-heavy (BODYSTRUCTURE format, IMAP part numbering, decoding pipeline) but lacked implementation structure. Added: 7-step task breakdown, explicit error handling strategy, `is_html` flag tracking pseudocode, session.py code flow description.
+
+**Self-review.** Found 4 issues: `find_text_part`/`find_html_part` missing None guard (inconsistent with `count_attachments` which accepts `tuple | None`), `is_html` tracking not shown in caller code, `_strip_html_tags` didn't handle `<style>`/`<script>` content, session.py code flow vague about insertion point.
+
+**External review (subagent).** Found 6 actionable items: hardcoded "202 tests" in acceptance criteria, `message/rfc822` not recursed (undocumented limitation), `imap_client.py` uses `client` not `conn` (plan handwaved "same pattern"), snippet FETCH error could break entire message listing without try/except, explicit `dict[int, str]` mapping needed for snippet merge, base64 rounding direction unspecified.
+
+### HC's part
+
+- Directed session scope: snippet plan refinement here, attachment indicator discovery via parallel agent
+- Rejected worktree creation (not implementation, just planning)
+- Chose "send to applicant" for review step
+
+### My part
+
+- Verified all plan claims against actual source code (line numbers, function signatures, data flow)
+- Added implementation tasks, error handling, code flow descriptions
+- Self-reviewed as skeptic, found and fixed 4 issues
+- Incorporated all 6 actionable review findings
+- Added "Known limitations" section (message/rfc822, truncated style tags)
+
+### What I learned about planning
+
+1. **Plans written during research need a separate hardening pass.** The original plan had excellent research (BODYSTRUCTURE format, decoding pipeline, competitive analysis) but lacked the practical structure an implementing agent needs: task order, error handling, code flow insertion points. Research and implementation planning are different skills.
+
+2. **Line numbers drift.** The plan was written pre-v0.6.0 with estimated "post att-indicator" line numbers. After implementation of the dependency, all references were stale. Plans that reference specific line numbers need re-verification when the dependency is implemented.
+
+3. **Consistency with existing conventions matters more than correctness alone.** `find_text_part(body: tuple)` was correct but inconsistent with `count_attachments(body: tuple | None)` in the same module. The review caught this — the implementing agent might not. Convention consistency prevents subtle bugs.
+
+4. **"Same pattern" is not a plan.** Saying `imap_client.py` uses "same pattern as session.py" is insufficient when the code structures differ (variable names, loop patterns, context managers). The implementing agent needs explicit instructions per file, even when the logic is similar.

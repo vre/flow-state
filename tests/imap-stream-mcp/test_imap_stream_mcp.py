@@ -353,6 +353,98 @@ class TestReadActionWrapping:
         assert "[0] image001.png" in result
         assert "[1] image002.png" in result
 
+    @patch("imap_stream_mcp.read_message")
+    async def test_read_payload_full_modifier_calls_read_message_with_full(self, mock_read):
+        """read with :full should call read_message(..., full=True)."""
+        mock_read.return_value = {
+            "subject": "Thread",
+            "from": ["sender@example.com"],
+            "to": ["recipient@example.com"],
+            "cc": [],
+            "date": "2024-01-15",
+            "message_id": "<123@example.com>",
+            "in_reply_to": None,
+            "body_text": "Latest reply.",
+            "body_html": None,
+            "attachments": [],
+            "inline_images": [],
+            "quoted_truncated": False,
+            "quoted_message_count": 0,
+            "quoted_chars_truncated": 0,
+        }
+
+        await use_mail(MailAction(action="read", folder="INBOX", payload="123:full"))
+
+        mock_read.assert_called_once_with("INBOX", 123, full=True)
+
+    async def test_read_payload_unknown_modifier_returns_error(self):
+        """Unknown read payload modifier should return guided error."""
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:foo"))
+
+        assert "Error: unknown modifier 'foo'" in result
+        assert "123:full" in result
+
+    @patch("imap_stream_mcp.read_message")
+    async def test_read_truncation_notice_outside_wrapper_before_attachments(self, mock_read):
+        """Truncation notice should be trusted metadata outside wrapper."""
+        mock_read.return_value = {
+            "subject": "Threaded",
+            "from": ["sender@example.com"],
+            "to": ["recipient@example.com"],
+            "cc": [],
+            "date": "2024-01-15",
+            "message_id": "<123@example.com>",
+            "in_reply_to": None,
+            "body_text": "Latest only.",
+            "body_html": None,
+            "attachments": [{"filename": "doc.pdf", "content_type": "application/pdf", "size": 1024, "index": 0}],
+            "inline_images": [],
+            "quoted_truncated": True,
+            "quoted_message_count": 3,
+            "quoted_chars_truncated": 34567,
+        }
+
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
+
+        email_end = result.find("</untrusted_email_content>")
+        notice_pos = result.find("**Quoted reply tail omitted**")
+        attachments_pos = result.find("**Attachments:**")
+        assert email_end != -1
+        assert notice_pos != -1
+        assert attachments_pos != -1
+        assert notice_pos > email_end
+        assert attachments_pos > notice_pos
+        assert "123:full" in result
+
+    @patch("imap_stream_mcp.read_message")
+    async def test_read_short_email_without_quotes_has_no_truncation_notice(self, mock_read):
+        """Short emails without quotes should not include truncation notice."""
+        mock_read.return_value = {
+            "subject": "Short",
+            "from": ["sender@example.com"],
+            "to": ["recipient@example.com"],
+            "cc": [],
+            "date": "2024-01-15",
+            "message_id": "<123@example.com>",
+            "in_reply_to": None,
+            "body_text": "Just a short email body.",
+            "body_html": None,
+            "attachments": [],
+            "inline_images": [],
+            "quoted_truncated": False,
+            "quoted_message_count": 0,
+            "quoted_chars_truncated": 0,
+        }
+
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123"))
+
+        assert "**Quoted reply tail omitted**" not in result
+
+    async def test_help_read_mentions_full_modifier(self):
+        """Help text for read should document :full."""
+        result = await use_mail(MailAction(action="help", payload="read"))
+        assert ":full" in result
+
 
 class TestDraftAttachmentPayload:
     """Tests for draft action attachment payload handling."""

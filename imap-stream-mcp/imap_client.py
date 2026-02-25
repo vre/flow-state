@@ -18,6 +18,7 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+import html2text
 import keyring
 from bodystructure import count_attachments
 from imapclient import IMAPClient
@@ -336,13 +337,138 @@ def list_messages(folder: str, limit: int = 20, account: str = None) -> list[dic
     return session.get_messages(folder, limit)
 
 
-def read_message(folder: str, message_id: int, account: str = None) -> dict:
+def _is_quote_line(line: str) -> bool:
+    """Check whether a line is a quoted line.
+
+    Args:
+        line: Input line.
+
+    Returns:
+        True when line starts with quote marker.
+    """
+    return line.lstrip().startswith(">")
+
+
+def _estimate_quoted_message_count(lines: list[str]) -> int:
+    """Estimate number of messages in quoted tail.
+
+    Args:
+        lines: Quoted-tail lines.
+
+    Returns:
+        Estimated quoted message count.
+    """
+    from_count = sum(1 for line in lines if line.lstrip().startswith("From:"))
+    if from_count > 0:
+        return from_count
+
+    max_depth = 0
+    for line in lines:
+        match = re.match(r"^\s*(>+)", line)
+        if match:
+            max_depth = max(max_depth, len(match.group(1)))
+
+    if max_depth > 0:
+        return max_depth
+    return 1
+
+
+def split_quoted_tail(body: str) -> tuple[str, str | None, int]:
+    """Separate primary content from quoted reply tail.
+
+    Args:
+        body: Plain text email body.
+
+    Returns:
+        Tuple of ``(primary_content, quoted_tail_or_none, estimated_message_count)``.
+    """
+    if not body:
+        return body, None, 0
+
+    lines = body.splitlines()
+    if not lines:
+        return body, None, 0
+
+    # Interleaved replies are safer left intact.
+    non_blank_kinds = ["quote" if _is_quote_line(line) else "plain" for line in lines if line.strip()]
+    transitions = sum(1 for prev, cur in zip(non_blank_kinds, non_blank_kinds[1:], strict=False) if prev != cur)
+    if transitions >= 3 and "quote" in non_blank_kinds and "plain" in non_blank_kinds:
+        return body, None, 0
+
+    # Outlook-style separator with From: line is a high-confidence boundary.
+    outlook_start = None
+    for idx in range(len(lines) - 1):
+        if not re.match(r"^_{30,}\s*$", lines[idx].strip()):
+            continue
+        next_idx = idx + 1
+        while next_idx < len(lines) and not lines[next_idx].strip():
+            next_idx += 1
+        if next_idx < len(lines) and lines[next_idx].lstrip().startswith("From:"):
+            outlook_start = idx
+            break
+
+    # Localized Outlook header block without underscore separator:
+    # "<word(s)>: ... <email>" followed by at least two header-like lines.
+    localized_outlook_start = None
+    localized_first_line = re.compile(r"^\w[\w\s]*:.*<[^>]+@[^>]+>")
+    localized_header_line = re.compile(r"^\w[\w\s]*:.+")
+    for idx, line in enumerate(lines):
+        if not localized_first_line.match(line.strip()):
+            continue
+
+        header_lines = 1
+        next_idx = idx + 1
+        while next_idx < len(lines):
+            next_line = lines[next_idx].strip()
+            if not next_line or not localized_header_line.match(next_line):
+                break
+            header_lines += 1
+            next_idx += 1
+
+        if header_lines >= 3:
+            localized_outlook_start = idx
+            break
+
+    quote_start = None
+    idx = len(lines) - 1
+    while idx >= 0 and not lines[idx].strip():
+        idx -= 1
+
+    if idx >= 0 and _is_quote_line(lines[idx]):
+        quote_start = idx
+        idx -= 1
+        while idx >= 0 and (_is_quote_line(lines[idx]) or not lines[idx].strip()):
+            if _is_quote_line(lines[idx]):
+                quote_start = idx
+            idx -= 1
+        if idx >= 0 and lines[idx].strip().endswith(":"):
+            quote_start = idx
+
+    if outlook_start is not None:
+        tail_start = outlook_start
+    elif localized_outlook_start is not None:
+        tail_start = localized_outlook_start
+    else:
+        tail_start = quote_start
+    if tail_start is None or tail_start <= 0:
+        return body, None, 0
+
+    primary = "\n".join(lines[:tail_start]).rstrip()
+    quoted_tail = "\n".join(lines[tail_start:]).strip()
+    if not primary or not quoted_tail:
+        return body, None, 0
+
+    return primary, quoted_tail, _estimate_quoted_message_count(quoted_tail.splitlines())
+
+
+def read_message(folder: str, message_id: int, account: str = None, full: bool = False) -> dict:
     """Read a specific message.
 
     Args:
         folder: Folder path
         message_id: Message ID (UID)
         account: Account name. None uses default.
+        full: When True, skip quote-tail truncation.
 
     Returns:
         Full message data including body
@@ -413,6 +539,24 @@ def read_message(folder: str, message_id: int, account: str = None) -> dict:
             else:
                 body_text = payload.decode(charset, errors="replace")
 
+        quoted_truncated = False
+        quoted_message_count = 0
+        quoted_chars_truncated = 0
+
+        if not full:
+            if not body_text and body_html:
+                h = html2text.HTML2Text()
+                h.ignore_links = False
+                h.body_width = 0
+                body_text = h.handle(body_html)
+
+            primary, quoted_tail, estimated_count = split_quoted_tail(body_text)
+            if quoted_tail is not None:
+                body_text = primary
+                quoted_truncated = True
+                quoted_message_count = estimated_count
+                quoted_chars_truncated = len(quoted_tail)
+
         return {
             "id": message_id,
             "subject": decode_header_value(envelope.subject) if envelope.subject else "",
@@ -427,6 +571,9 @@ def read_message(folder: str, message_id: int, account: str = None) -> dict:
             "attachments": attachments,
             "inline_images": inline_images,
             "flags": [normalize_flag_output(to_str(f)) for f in data.get(b"FLAGS", [])],
+            "quoted_truncated": quoted_truncated,
+            "quoted_message_count": quoted_message_count,
+            "quoted_chars_truncated": quoted_chars_truncated,
         }
 
 

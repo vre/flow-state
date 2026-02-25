@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.6.1] - 2026-02-25
+
+### Added
+- Thread-aware `read`: quoted reply tails truncated by default, reducing token usage >80% on long threads
+- 5 quote-boundary detection signals: Outlook `____From:` separator, localized Outlook headers (Finnish/German/etc.), attribution+`>` lines, classic `>` tail, bare `>` lines
+- Interleaved reply safety: alternating quoted/unquoted blocks preserved as primary content
+- `:full` modifier for `read` payload (`"123:full"`) to retrieve complete message with quoted tail
+- Truncation notice outside `<untrusted_email_content>` wrapper with char count, message estimate, and `:full` hint
+- HTML-only email support: `html2text` output used for quote detection when no plain text part exists
+
 ## [0.6.0] - 2026-02-25
 
 ### Added

@@ -29,6 +29,7 @@ from imap_client import (
     parse_folder_path,
     read_message,
     search_messages,
+    split_quoted_tail,
     to_str,
 )
 
@@ -522,6 +523,24 @@ class TestReadMessage:
     """Tests for read_message function."""
 
     @staticmethod
+    def _make_plain_message(body: str, subject: str = "Thread Test") -> bytes:
+        """Build plain text RFC822 message bytes.
+
+        Args:
+            body: Message body text.
+            subject: Subject line.
+
+        Returns:
+            RFC822 bytes.
+        """
+        msg = email.message.EmailMessage()
+        msg["From"] = "sender@example.com"
+        msg["To"] = "recipient@example.com"
+        msg["Subject"] = subject
+        msg.set_content(body)
+        return msg.as_bytes()
+
+    @staticmethod
     def _build_message_with_parts(parts: list[tuple[str, str, bytes]]) -> bytes:
         """Build multipart message for read/download tests.
 
@@ -666,6 +685,213 @@ class TestReadMessage:
         assert first["filename"] == "image001.png"
         assert second["filename"] == "report.pdf"
         assert third["filename"] == "image002.png"
+
+    def test_split_quoted_tail_outlook_separator(self):
+        """Outlook separator + From line should split quoted tail."""
+        body = (
+            "Latest reply line.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> older text"
+        )
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary.strip() == "Latest reply line."
+        assert tail is not None
+        assert tail.startswith("________________________________")
+        assert count >= 1
+
+    def test_split_quoted_tail_outlook_multiple_separators_uses_first_boundary(self):
+        """Multiple Outlook separators should split at the first separator."""
+        body = (
+            "Newest reply.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "Older message body from Alice.\n"
+            "________________________________\n"
+            "From: Bob <bob@example.com>\n"
+            "Sent: Sunday, February 23, 2026 9:00 AM\n"
+            "To: Alice <alice@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> Oldest quoted block"
+        )
+        primary, tail, _ = split_quoted_tail(body)
+
+        assert primary.strip() == "Newest reply."
+        assert tail is not None
+        assert tail.startswith("________________________________")
+        assert "From: Alice <alice@example.com>" in tail
+
+    def test_split_quoted_tail_localized_outlook_headers_finnish(self):
+        """Localized Outlook headers without underscores should split."""
+        body = (
+            "Hei, tässä uusin viesti.\n\n"
+            "Lähettäjä: Test User <vreijone@gmail.com>\n"
+            "Lähetetty: keskiviikko 23. huhtikuuta 2025 15.40\n"
+            "Vastaanottaja: Henna Hopia <henna.hopia@hopiasepat.fi>\n"
+            "Kopio: Sami Hotakainen <sami.hotakainen@mpk.fi>\n"
+            "Aihe: Re: KHRU-kerho suunnittelee drone-iltaa huhti-toukokuussa\n"
+            "\n"
+            "Aiempaa sisältöä."
+        )
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary.strip() == "Hei, tässä uusin viesti."
+        assert tail is not None
+        assert tail.startswith("Lähettäjä: Test User <vreijone@gmail.com>")
+        assert "Aihe: Re: KHRU-kerho suunnittelee drone-iltaa huhti-toukokuussa" in tail
+        assert count >= 1
+
+    def test_split_quoted_tail_localized_outlook_headers_german(self):
+        """German Outlook headers without underscores should split."""
+        body = (
+            "Hier ist die neueste Antwort.\n\n"
+            "Von: Max Mustermann <max@example.de>\n"
+            "Gesendet: Mittwoch, 23. April 2025 15:40\n"
+            "An: Erika Musterfrau <erika@example.de>\n"
+            "Betreff: Re: Projektstatus\n"
+            "\n"
+            "Frühere Nachricht."
+        )
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary.strip() == "Hier ist die neueste Antwort."
+        assert tail is not None
+        assert tail.startswith("Von: Max Mustermann <max@example.de>")
+        assert "Betreff: Re: Projektstatus" in tail
+        assert count >= 1
+
+    def test_split_quoted_tail_attribution_and_quote(self):
+        """Attribution followed by quote lines should split."""
+        body = "Thanks.\n\nOn Tue, Alex wrote:\n> First line\n> Second line\n"
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary.strip() == "Thanks."
+        assert tail is not None
+        assert "On Tue, Alex wrote:" in tail
+        assert count >= 1
+
+    def test_split_quoted_tail_bare_quote_lines_without_attribution(self):
+        """Bare quote lines at tail should split even without attribution line."""
+        body = "Top response.\n\n> old line 1\n> old line 2\n"
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary.strip() == "Top response."
+        assert tail is not None
+        assert tail.startswith("> old line 1")
+        assert count >= 1
+
+    def test_split_quoted_tail_no_quote_markers_returns_full_body(self):
+        """Plain body with no quote markers should stay unchanged."""
+        body = "Line 1\nLine 2\n\nLine 3"
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary == body
+        assert tail is None
+        assert count == 0
+
+    def test_split_quoted_tail_interleaved_kept_full(self):
+        """Interleaved quote/unquoted blocks should not be split."""
+        body = "Answer 1\n> Question 1\nAnswer 2\n> Question 2\n"
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary == body
+        assert tail is None
+        assert count == 0
+
+    def test_split_quoted_tail_reduces_more_than_80_percent_on_long_thread(self):
+        """Long quoted thread fixture should shrink by >80%."""
+        quoted_tail = "On Tue, Alice wrote:\n" + "\n".join(f"> Message layer {idx}" for idx in range(1, 400))
+        body = f"Latest response only.\n\n{quoted_tail}\n"
+        primary, tail, _ = split_quoted_tail(body)
+
+        assert primary.strip() == "Latest response only."
+        assert tail is not None
+        reduction = len(tail) / len(body)
+        assert reduction > 0.8
+
+    @patch("session._create_connection")
+    def test_read_message_default_truncates_quoted_tail(self, mock_create):
+        """Default read should trim quoted tail and emit quote metadata."""
+        mock_client = MockIMAPClient()
+        raw = self._make_plain_message("Latest update.\n\nOn Tue, Alice wrote:\n> old 1\n> old 2\n")
+        envelope = MockEnvelope(
+            subject=b"Threaded",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1)
+
+        assert result["quoted_truncated"] is True
+        assert "Latest update." in result["body_text"]
+        assert "On Tue, Alice wrote:" not in result["body_text"]
+        assert result["quoted_chars_truncated"] > 0
+        assert result["quoted_message_count"] >= 1
+
+    @patch("session._create_connection")
+    def test_read_message_full_true_keeps_complete_body(self, mock_create):
+        """full=True should keep complete body and skip truncation metadata."""
+        mock_client = MockIMAPClient()
+        full_body = "Latest update.\n\nOn Tue, Alice wrote:\n> old 1\n> old 2\n"
+        raw = self._make_plain_message(full_body)
+        envelope = MockEnvelope(
+            subject=b"Threaded",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1, full=True)
+
+        assert result["body_text"] == full_body
+        assert result.get("quoted_truncated") is not True
+        assert result.get("quoted_chars_truncated", 0) == 0
+        assert result.get("quoted_message_count", 0) == 0
+
+    @patch("session._create_connection")
+    def test_read_message_html_only_uses_html2text_for_split(self, mock_create):
+        """HTML-only messages should split using html2text output."""
+        mock_client = MockIMAPClient()
+        raw = (
+            b"MIME-Version: 1.0\r\n"
+            b"From: sender@example.com\r\n"
+            b"To: recipient@example.com\r\n"
+            b"Subject: HTML only\r\n"
+            b"Content-Type: text/html; charset=utf-8\r\n"
+            b"\r\n"
+            b"<div>Top reply</div>"
+            b"<blockquote>On Tue, Alice wrote:<br>Older line</blockquote>"
+        )
+        envelope = MockEnvelope(
+            subject=b"HTML only",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1)
+
+        assert result["quoted_truncated"] is True
+        assert "Top reply" in result["body_text"]
+        assert "On Tue, Alice wrote:" not in result["body_text"]
+        assert result["body_html"] != ""
 
 
 class TestSearchMessages:
