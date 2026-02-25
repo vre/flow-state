@@ -442,6 +442,56 @@ class TestListMessages:
         assert len(result) == 1
         assert result[0]["id"] == 1
         assert result[0]["subject"] == "Test Email Subject"
+        assert result[0]["attachment_count"] == 0
+
+    @patch("session._create_connection")
+    def test_list_messages_includes_attachment_count(self, mock_create, sample_envelope):
+        """List results should include attachment_count from BODYSTRUCTURE."""
+        mock_client = MockIMAPClient()
+        bodystructure = (
+            [
+                (b"TEXT", b"PLAIN", (b"CHARSET", b"utf-8"), None, None, b"7BIT", 100, 5, None, None, None, None),
+                (
+                    b"APPLICATION",
+                    b"PDF",
+                    (b"NAME", b"report.pdf"),
+                    None,
+                    None,
+                    b"BASE64",
+                    4096,
+                    None,
+                    (b"attachment", (b"filename", b"report.pdf")),
+                    None,
+                    None,
+                ),
+            ],
+            b"MIXED",
+            (b"BOUNDARY", b"==abc=="),
+            None,
+            None,
+            None,
+        )
+        mock_client.add_message("INBOX", 1, sample_envelope, bodystructure=bodystructure)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20)
+
+        assert len(result) == 1
+        assert result[0]["attachment_count"] == 1
+
+    @patch("session._create_connection")
+    def test_list_messages_missing_bodystructure_defaults_to_zero(self, mock_create, sample_envelope):
+        """Missing BODYSTRUCTURE should not crash and should default to zero."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 1, sample_envelope, bodystructure=None)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20)
+
+        assert len(result) == 1
+        assert result[0]["attachment_count"] == 0
 
     @patch("session._create_connection")
     def test_list_messages_folder_not_found(self, mock_create):
@@ -631,6 +681,49 @@ class TestSearchMessages:
         result = search_messages("INBOX", "nonexistent")
 
         assert result == []
+
+    @patch("session._create_connection")
+    def test_search_messages_includes_attachment_count(self, mock_create, sample_envelope):
+        """Search results should include attachment_count from BODYSTRUCTURE."""
+        mock_client = MockIMAPClient()
+        bodystructure = (
+            b"MESSAGE",
+            b"RFC822",
+            None,
+            None,
+            None,
+            b"7BIT",
+            1234,
+            None,
+            (b"TEXT", b"PLAIN", (b"CHARSET", b"utf-8"), None, None, b"7BIT", 100, 5, None, None, None, None),
+            42,
+            None,
+            (b"attachment", (b"filename", b"forwarded.eml")),
+            None,
+            None,
+        )
+        mock_client.add_message("INBOX", 11, sample_envelope, bodystructure=bodystructure)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = search_messages("INBOX", "anything")
+
+        assert len(result) == 1
+        assert result[0]["id"] == 11
+        assert result[0]["attachment_count"] == 1
+
+    @patch("session._create_connection")
+    def test_search_messages_missing_bodystructure_defaults_to_zero(self, mock_create, sample_envelope):
+        """Missing BODYSTRUCTURE should default attachment_count to zero."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 22, sample_envelope, bodystructure=None)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = search_messages("INBOX", "anything")
+
+        assert len(result) == 1
+        assert result[0]["attachment_count"] == 0
 
 
 class TestCreateDraft:

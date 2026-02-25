@@ -73,6 +73,68 @@ class TestMailActionValidation:
             MailAction(action="invalid")
 
 
+class TestListAndSearchAttachmentIndicator:
+    """Tests for attachment indicator formatting in list/search outputs."""
+
+    @patch("imap_stream_mcp.list_messages")
+    async def test_list_shows_att_indicator_only_for_positive_counts(self, mock_list):
+        """list should append [att:N] when attachment_count > 0."""
+        mock_list.return_value = [
+            {
+                "id": 123,
+                "subject": "With attachment",
+                "from": "user@example.com",
+                "date": "2026-02-24 14:30",
+                "flags": ["\\Seen"],
+                "attachment_count": 2,
+            },
+            {
+                "id": 124,
+                "subject": "Without attachment",
+                "from": "user@example.com",
+                "date": "2026-02-24 14:31",
+                "flags": [],
+                "attachment_count": 0,
+            },
+        ]
+
+        result = await use_mail(MailAction(action="list", folder="INBOX"))
+
+        assert "[att:2]" in result
+        assert "  From: user@example.com | 2026-02-24 14:30 [seen] [att:2]" in result
+        assert "**[124]** Without attachment" in result
+        assert "[att:0]" not in result
+
+    @patch("imap_stream_mcp.search_messages")
+    async def test_search_shows_att_indicator_only_for_positive_counts(self, mock_search):
+        """search should append [att:N] when attachment_count > 0."""
+        mock_search.return_value = [
+            {
+                "id": 456,
+                "subject": "Search hit",
+                "from": "person@host.com",
+                "date": "2026-02-22 11:22",
+                "flags": [],
+                "attachment_count": 1,
+            },
+            {
+                "id": 457,
+                "subject": "No attachment",
+                "from": "person@host.com",
+                "date": "2026-02-22 11:23",
+                "flags": [],
+                "attachment_count": 0,
+            },
+        ]
+
+        result = await use_mail(MailAction(action="search", folder="INBOX", payload="from:boss"))
+
+        assert "[att:1]" in result
+        assert "  From: person@host.com | 2026-02-22 11:22 [att:1]" in result
+        assert "**[457]** No attachment" in result
+        assert "[att:0]" not in result
+
+
 class TestContextPoisoningProtection:
     """Tests for context poisoning protection."""
 
@@ -539,6 +601,23 @@ class TestEditAction:
         """help overview should list edit action."""
         result = await use_mail(MailAction(action="help", payload="overview"))
         assert "**edit**" in result
+
+    async def test_help_overview_mentions_attachment_indicator(self):
+        """help overview should mention list/search attachment indicator."""
+        result = await use_mail(MailAction(action="help", payload="overview"))
+        assert "attachment" in result.lower()
+        assert "list" in result.lower()
+        assert "search" in result.lower()
+
+    async def test_help_list_mentions_att_indicator(self):
+        """help list should document [att:N] output marker."""
+        result = await use_mail(MailAction(action="help", payload="list"))
+        assert "[att:N]" in result
+
+    async def test_help_search_mentions_att_indicator(self):
+        """help search should document [att:N] output marker."""
+        result = await use_mail(MailAction(action="help", payload="search"))
+        assert "[att:N]" in result
 
     @patch("imap_stream_mcp.create_draft")
     async def test_draft_markdown_format_still_works(self, mock_create):

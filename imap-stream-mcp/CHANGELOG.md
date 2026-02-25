@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0] - 2026-02-25
+
+### Added
+- Attachment indicator `[att:N]` in list and search results — shows attachment count from BODYSTRUCTURE without fetching message body
+- New `bodystructure.py` module for IMAP BODYSTRUCTURE parsing
+- Handles `Content-Disposition: attachment` and `inline` with filename (matches `read_message()` predicate)
+- Type-specific disposition index: text/*[9], basic[8], message/rfc822[11]
+
 ## [0.5.1] - 2026-02-24
 
 ### Added

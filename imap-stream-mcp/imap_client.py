@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import keyring
+from bodystructure import count_attachments
 from imapclient import IMAPClient
 from markdown_utils import convert_body
 
@@ -567,7 +568,7 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
         selected_ids = list(reversed(selected_ids))
 
         # Fetch summaries
-        messages = client.fetch(selected_ids, ["ENVELOPE", "FLAGS"])
+        messages = client.fetch(selected_ids, ["ENVELOPE", "FLAGS", "BODYSTRUCTURE"])
 
         results = []
         for msg_id, data in messages.items():
@@ -582,6 +583,7 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
                     "from": from_addr,
                     "date": str(envelope.date) if envelope.date else "",
                     "flags": flags,
+                    "attachment_count": count_attachments(data.get(b"BODYSTRUCTURE")),
                 }
             )
 

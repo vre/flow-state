@@ -10,9 +10,9 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 
 ## Features
 
-- **list** - List messages in any folder
+- **list** - List messages in any folder (`[att:N]` shows attachment count)
 - **read** - Read message content with attachments
-- **search** - Search by sender, subject, date, or text
+- **search** - Search by sender, subject, date, or text (`[att:N]` shows attachment count)
 - **draft** - Create/modify draft replies with file attachments
 - **edit** - Surgical draft text replacement (old→new) without full body rewrite
 - **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)

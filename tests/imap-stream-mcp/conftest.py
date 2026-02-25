@@ -33,6 +33,22 @@ class MockAddress:
     host: bytes = b"example.com"
 
 
+SIMPLE_TEXT_BODYSTRUCTURE = (
+    b"TEXT",
+    b"PLAIN",
+    (b"CHARSET", b"utf-8"),
+    None,
+    None,
+    b"7BIT",
+    100,
+    5,
+    None,
+    None,
+    None,
+    None,
+)
+
+
 class MockIMAPClient:
     """Mock IMAP client for testing."""
 
@@ -128,6 +144,7 @@ class MockIMAPClient:
         body_html: str = "",
         flags: list = None,
         raw_email: bytes = None,
+        bodystructure: tuple | None = SIMPLE_TEXT_BODYSTRUCTURE,
     ):
         """Add a message to a folder for testing."""
         if folder not in self.folders:
@@ -136,17 +153,16 @@ class MockIMAPClient:
         if raw_email is None:
             raw_email = f"Subject: {envelope.subject.decode()}\r\n\r\n{body_text}".encode()
 
-        self.folders[folder].append(
-            {
-                "id": msg_id,
-                "data": {
-                    b"ENVELOPE": envelope,
-                    b"FLAGS": flags or [],
-                    b"RFC822.SIZE": len(raw_email),
-                    b"RFC822": raw_email,
-                },
-            }
-        )
+        data = {
+            b"ENVELOPE": envelope,
+            b"FLAGS": flags or [],
+            b"RFC822.SIZE": len(raw_email),
+            b"RFC822": raw_email,
+        }
+        if bodystructure is not None:
+            data[b"BODYSTRUCTURE"] = bodystructure
+
+        self.folders[folder].append({"id": msg_id, "data": data})
 
 
 @pytest.fixture

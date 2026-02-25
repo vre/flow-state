@@ -8,6 +8,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
+from bodystructure import count_attachments
 from imapclient import IMAPClient
 from imapclient.exceptions import IMAPClientError
 
@@ -228,7 +229,7 @@ class AccountSession:
         selected_ids = message_ids[-limit:] if len(message_ids) > limit else message_ids
         selected_ids = list(reversed(selected_ids))
 
-        data = conn.fetch(selected_ids, ["ENVELOPE", "FLAGS", "RFC822.SIZE"])
+        data = conn.fetch(selected_ids, ["ENVELOPE", "FLAGS", "RFC822.SIZE", "BODYSTRUCTURE"])
 
         messages = []
         for msg_id in selected_ids:
@@ -236,6 +237,7 @@ class AccountSession:
                 continue
             msg_data = data[msg_id]
             envelope = msg_data[b"ENVELOPE"]
+            bodystructure = msg_data.get(b"BODYSTRUCTURE")
 
             from_addr = ""
             if envelope.from_:
@@ -259,6 +261,7 @@ class AccountSession:
                     "date": date_str,
                     "size": msg_data.get(b"RFC822.SIZE", 0),
                     "flags": [_to_str(f).lstrip("\\") for f in msg_data.get(b"FLAGS", [])],
+                    "attachment_count": count_attachments(bodystructure) if bodystructure is not None else 0,
                 }
             )
 

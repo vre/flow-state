@@ -225,9 +225,9 @@ HELP_TOPICS = {
 
 ## Actions
 
-- **list** - List messages in a folder
+- **list** - List messages in a folder (`[att:N]` shown when attachments exist)
 - **read** - Read a specific message
-- **search** - Search messages
+- **search** - Search messages (`[att:N]` shown when attachments exist)
 - **draft** - Create draft reply (saved to Drafts folder)
 - **edit** - Edit specific text in a draft (old→new replacement)
 - **flag** - Add or remove flags/labels on messages
@@ -250,6 +250,7 @@ Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 # list - List Messages
 
 Lists messages in a folder, newest first.
+Output includes `[att:N]` when a message has attachments.
 
 ## Parameters
 - folder: Folder path (required)
@@ -279,6 +280,7 @@ Full message with: subject, from, to, cc, date, body_text, body_html, message_id
 # search - Search Messages
 
 Search messages in a folder.
+Output includes `[att:N]` when a message has attachments.
 
 ## Parameters
 - folder: Folder to search
@@ -537,8 +539,12 @@ uv run --directory {plugin_dir} python setup.py
             lines = [f"# Messages in {folder}", f"Showing {len(messages)} messages", ""]
             for msg in messages:
                 flag_str = format_flags(msg["flags"])
+                attachment_count = msg.get("attachment_count", 0)
+                att_str = f"[att:{attachment_count}]" if attachment_count > 0 else ""
+                suffix_parts = [part for part in [flag_str, att_str] if part]
                 lines.append(f"**[{msg['id']}]** {msg['subject']}")
-                lines.append(f"  From: {msg['from']} | {msg['date']} {flag_str}")
+                suffix = f" {' '.join(suffix_parts)}" if suffix_parts else ""
+                lines.append(f"  From: {msg['from']} | {msg['date']}{suffix}")
                 lines.append("")
 
             return "\n".join(lines)
@@ -631,8 +637,12 @@ uv run --directory {plugin_dir} python setup.py
             lines = [f"# Search Results: {params.payload}", f"Found {len(messages)} in {folder}", ""]
             for msg in messages:
                 flag_str = format_flags(msg.get("flags", []))
+                attachment_count = msg.get("attachment_count", 0)
+                att_str = f"[att:{attachment_count}]" if attachment_count > 0 else ""
+                suffix_parts = [part for part in [flag_str, att_str] if part]
                 lines.append(f"**[{msg['id']}]** {msg['subject']}")
-                lines.append(f"  From: {msg['from']} | {msg['date']} {flag_str}")
+                suffix = f" {' '.join(suffix_parts)}" if suffix_parts else ""
+                lines.append(f"  From: {msg['from']} | {msg['date']}{suffix}")
                 lines.append("")
 
             return "\n".join(lines)
