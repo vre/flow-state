@@ -212,7 +212,7 @@ def imap_connection():
     """
     server, port, username, password = get_credentials()
 
-    client = IMAPClient(server, port=int(port), ssl=True)
+    client = IMAPClient(server, port=int(port), ssl=True, timeout=30)
     try:
         client.login(username, password)
         yield client
@@ -628,9 +628,16 @@ def download_attachment(folder: str, message_id: int, attachment_index: int, acc
         temp_dir = Path(tempfile.gettempdir()) / "streammail"
         temp_dir.mkdir(exist_ok=True)
 
-        # Sanitize filename
+        # Sanitize filename, avoid collision with existing files
         safe_filename = re.sub(r"[^\w\-_\.]", "_", filename)
         file_path = temp_dir / safe_filename
+        if file_path.exists():
+            stem = file_path.stem
+            suffix = file_path.suffix
+            counter = 1
+            while file_path.exists():
+                file_path = temp_dir / f"{stem}_{counter}{suffix}"
+                counter += 1
 
         with open(file_path, "wb") as f:
             f.write(payload)
@@ -931,7 +938,7 @@ def modify_draft(
 
         if prefetched_draft is None:
             # Fetch original draft
-            messages = client.fetch([message_id], ["RFC822", "ENVELOPE"])
+            messages = client.fetch([message_id], ["RFC822", "ENVELOPE", "FLAGS"])
 
             if message_id not in messages:
                 raise IMAPError(f"Message {message_id} not found in '{folder}'")
@@ -940,6 +947,14 @@ def modify_draft(
             envelope = data[b"ENVELOPE"]
             raw_email = data[b"RFC822"]
             original_msg = email.message_from_bytes(raw_email)
+
+            # Safety: verify message has \Draft flag before allowing delete+expunge
+            msg_flags = [to_str(f).lower() for f in data.get(b"FLAGS", [])]
+            if "\\draft" not in msg_flags:
+                raise IMAPError(
+                    f"Message {message_id} does not have \\Draft flag — refusing to modify. "
+                    "Only draft messages can be modified (delete+replace)."
+                )
         else:
             envelope, original_msg = prefetched_draft
 
@@ -1142,7 +1157,7 @@ def edit_draft(folder: str, message_id: int, replacements: list[dict], account: 
         except Exception as e:
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
-        messages = client.fetch([message_id], ["RFC822", "ENVELOPE"])
+        messages = client.fetch([message_id], ["RFC822", "ENVELOPE", "FLAGS"])
         if message_id not in messages:
             raise IMAPError(f"Message {message_id} not found in '{folder}'")
 
@@ -1150,6 +1165,12 @@ def edit_draft(folder: str, message_id: int, replacements: list[dict], account: 
         envelope = data[b"ENVELOPE"]
         raw_email = data[b"RFC822"]
         original_msg = email.message_from_bytes(raw_email)
+
+        # Safety: verify message has \Draft flag before allowing edit (which deletes+replaces)
+        msg_flags = [to_str(f).lower() for f in data.get(b"FLAGS", [])]
+        if "\\draft" not in msg_flags:
+            raise IMAPError(f"Message {message_id} does not have \\Draft flag — refusing to edit. Only draft messages can be edited.")
+
         plain_body, html_body = _extract_draft_bodies(original_msg)
 
     for idx, repl in enumerate(replacements):

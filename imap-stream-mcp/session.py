@@ -15,6 +15,7 @@ from imapclient.exceptions import IMAPClientError
 CONNECTION_IDLE_TIMEOUT = 300  # 5 minutes
 
 _sessions: dict[str, "AccountSession"] = {}
+_sessions_lock = threading.Lock()
 
 
 def get_default_account() -> str | None:
@@ -36,10 +37,10 @@ def get_session(account: str | None = None) -> "AccountSession":
     if account is None:
         account = get_default_account()
 
-    if account not in _sessions:
-        _sessions[account] = AccountSession(account)
-
-    return _sessions[account]
+    with _sessions_lock:
+        if account not in _sessions:
+            _sessions[account] = AccountSession(account)
+        return _sessions[account]
 
 
 def invalidate_message_cache(account: str, folder: str):
@@ -51,7 +52,8 @@ def invalidate_message_cache(account: str, folder: str):
         account: Account name
         folder: Folder to invalidate
     """
-    session = _sessions.get(account)
+    with _sessions_lock:
+        session = _sessions.get(account)
     if session:
         with session.lock:
             session.message_cache.pop(folder, None)
@@ -68,7 +70,8 @@ def update_cached_flags(account: str, folder: str, message_id: int, new_flags: l
         message_id: Message ID
         new_flags: New flag list (user format without backslashes)
     """
-    session = _sessions.get(account)
+    with _sessions_lock:
+        session = _sessions.get(account)
     if not session:
         return
 
@@ -88,7 +91,7 @@ def _create_connection(account: str) -> IMAPClient:
     from imap_client import get_credentials
 
     server, port, username, password = get_credentials(account)
-    client = IMAPClient(server, port=int(port), ssl=True)
+    client = IMAPClient(server, port=int(port), ssl=True, timeout=30)
     client.login(username, password)
     return client
 

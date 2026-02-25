@@ -19,6 +19,7 @@ Usage with Claude Desktop/Code:
 """
 
 import json
+import re
 from pathlib import Path
 
 import html2text
@@ -102,9 +103,9 @@ def _sanitize_for_delimiters(text: str) -> str:
     """Escape patterns that could break content boundaries."""
     if not text:
         return text
-    # Escape closing tag attempts
-    result = text.replace("</untrusted_", "&lt;/untrusted_")
-    result = result.replace("<untrusted_", "&lt;untrusted_")
+    # Escape XML wrapper attempts (case-insensitive to match detection)
+    result = re.sub(r"</untrusted_", "&lt;/untrusted_", text, flags=re.IGNORECASE)
+    result = re.sub(r"<untrusted_", "&lt;untrusted_", result, flags=re.IGNORECASE)
     # Escape legacy delimiters
     result = result.replace("<|", "&lt;|").replace("|>", "|&gt;")
     return result
@@ -468,7 +469,7 @@ async def use_mail(params: MailAction) -> str:
       {action:"search", folder:"INBOX", payload:"from:x@y.com"}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
       {action:"edit", folder:"Drafts", payload:'{"id":1253,"replacements":[{"old":"x","new":"y"}]}'}
-      {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Safe: marks only, no expunge
+      {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Marks only, no expunge
       {action:"attachment", folder:"INBOX", payload:"123:0"} - save email attachment to temp file, returns path
       {action:"cleanup"} - delete saved attachment temp files from disk
       {action:"accounts"} - list configured accounts

@@ -163,11 +163,19 @@ class TestMessageListCaching:
         """First call fetches from server."""
         session = AccountSession("test")
         mock_client = Mock(spec=IMAPClient)
-        mock_client.folder_status.return_value = {b"UIDVALIDITY": 12345, b"UIDNEXT": 100, b"MESSAGES": 50}
+        mock_client.select_folder.return_value = {b"UIDVALIDITY": 12345, b"UIDNEXT": 100, b"EXISTS": 50}
         mock_client.search.return_value = [1, 2, 3]
         mock_client.fetch.return_value = {
-            3: {b"ENVELOPE": Mock(subject=b"Test", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None), b"FLAGS": []},
-            2: {b"ENVELOPE": Mock(subject=b"Test2", from_=[Mock(name=None, mailbox=b"c", host=b"d.com")], date=None), b"FLAGS": []},
+            3: {
+                b"ENVELOPE": Mock(subject=b"Test", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None),
+                b"FLAGS": [],
+                b"BODYSTRUCTURE": None,
+            },
+            2: {
+                b"ENVELOPE": Mock(subject=b"Test2", from_=[Mock(name=None, mailbox=b"c", host=b"d.com")], date=None),
+                b"FLAGS": [],
+                b"BODYSTRUCTURE": None,
+            },
         }
 
         with patch("session._create_connection", return_value=mock_client):
@@ -183,7 +191,7 @@ class TestMessageListCaching:
             messages=[{"uid": 1, "subject": "Cached"}], uidvalidity=12345, uidnext=100, exists=50
         )
         mock_client = Mock(spec=IMAPClient)
-        mock_client.folder_status.return_value = {b"UIDVALIDITY": 12345, b"UIDNEXT": 100, b"MESSAGES": 50}
+        mock_client.select_folder.return_value = {b"UIDVALIDITY": 12345, b"UIDNEXT": 100, b"EXISTS": 50}
         session.connection = mock_client
         session.last_activity = time.time()
 
@@ -199,15 +207,23 @@ class TestMessageListCaching:
             messages=[{"uid": 1, "subject": "Old"}], uidvalidity=12345, uidnext=100, exists=50
         )
         mock_client = Mock(spec=IMAPClient)
-        mock_client.folder_status.return_value = {
+        mock_client.select_folder.return_value = {
             b"UIDVALIDITY": 12345,
             b"UIDNEXT": 101,  # Changed!
-            b"MESSAGES": 51,
+            b"EXISTS": 51,
         }
         mock_client.search.return_value = [1, 2]
         mock_client.fetch.return_value = {
-            2: {b"ENVELOPE": Mock(subject=b"New", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None), b"FLAGS": []},
-            1: {b"ENVELOPE": Mock(subject=b"Old", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None), b"FLAGS": []},
+            2: {
+                b"ENVELOPE": Mock(subject=b"New", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None),
+                b"FLAGS": [],
+                b"BODYSTRUCTURE": None,
+            },
+            1: {
+                b"ENVELOPE": Mock(subject=b"Old", from_=[Mock(name=None, mailbox=b"a", host=b"b.com")], date=None),
+                b"FLAGS": [],
+                b"BODYSTRUCTURE": None,
+            },
         }
         session.connection = mock_client
         session.last_activity = time.time()
