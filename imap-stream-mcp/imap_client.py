@@ -746,21 +746,96 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
 
 MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024  # 25 MB
 
+# Sensitive paths blocked from attachment (security: prevent data exfiltration)
+_BLOCKED_PATH_PREFIXES: list[str] = []
+_SAFE_PATH_PREFIXES: list[str] = []
+
+
+def _init_path_guards():
+    """Initialize blocked and safe path prefix lists."""
+    home = str(Path.home().resolve())
+    _BLOCKED_PATH_PREFIXES.clear()
+    _BLOCKED_PATH_PREFIXES.extend(
+        [
+            os.path.join(home, d)
+            for d in [
+                ".ssh",
+                ".gnupg",
+                ".gpg",
+                ".aws",
+                ".azure",
+                ".config",
+                ".kube",
+                ".docker",
+                ".npmrc",
+                ".pypirc",
+                ".netrc",
+                ".env",
+                ".claude",
+                ".git-credentials",
+            ]
+        ]
+    )
+    _BLOCKED_PATH_PREFIXES.extend(["/etc/shadow", "/etc/passwd", "/etc/ssl/private"])
+    _SAFE_PATH_PREFIXES.clear()
+    _SAFE_PATH_PREFIXES.extend(
+        [
+            str(Path("/tmp").resolve()) + "/",
+            os.path.join(home, "Downloads") + "/",
+            os.path.join(home, "Desktop") + "/",
+            os.path.join(home, "Documents") + "/",
+        ]
+    )
+
+
+_init_path_guards()
+
+
+def _check_attachment_path(path: Path) -> str | None:
+    """Check if path is safe for attachment.
+
+    Args:
+        path: Resolved file path.
+
+    Returns:
+        None if safe, warning string if outside safe dirs.
+
+    Raises:
+        IMAPError: If path matches blocked sensitive locations.
+    """
+    resolved = str(path.resolve())
+
+    for blocked in _BLOCKED_PATH_PREFIXES:
+        if resolved == blocked or resolved.startswith(blocked + "/") or resolved.startswith(blocked + "."):
+            raise IMAPError(f"Blocked: '{path.name}' is in a sensitive location. Cannot attach files from {blocked}.")
+
+    # Dotfiles/dotdirs in home
+    home = str(Path.home().resolve())
+    if resolved.startswith(home + "/."):
+        raise IMAPError(f"Blocked: '{path.name}' is a dotfile/in a dotdir. Cannot attach files from hidden directories.")
+
+    for safe in _SAFE_PATH_PREFIXES:
+        if resolved.startswith(safe):
+            return None
+
+    return f"WARNING: '{path.name}' is outside common directories (Downloads, Documents, Desktop, /tmp)."
+
 
 def _attach_files(msg: email.message.EmailMessage, paths: list[str]) -> list[dict]:
     """Validate and attach files to an EmailMessage.
 
     Fail-fast: validates all paths before reading any file data.
+    Blocks sensitive locations, warns on unusual paths.
 
     Args:
         msg: EmailMessage to attach files to.
         paths: List of absolute file paths.
 
     Returns:
-        List of {name, size} dicts for response formatting.
+        List of {name, size, warning?} dicts for response formatting.
 
     Raises:
-        IMAPError: On invalid path, missing file, or oversize file.
+        IMAPError: On invalid path, missing file, oversize file, or blocked path.
     """
     resolved = []
     for p in paths:
@@ -771,6 +846,7 @@ def _attach_files(msg: email.message.EmailMessage, paths: list[str]) -> list[dic
             if path.exists():
                 raise IMAPError(f"Path is not a file: '{p}'")
             raise IMAPError(f"File not found: '{p}'")
+        warning = _check_attachment_path(path)
         try:
             size = path.stat().st_size
         except OSError as e:
@@ -778,10 +854,10 @@ def _attach_files(msg: email.message.EmailMessage, paths: list[str]) -> list[dic
         if size > MAX_ATTACHMENT_SIZE:
             size_mb = size / (1024 * 1024)
             raise IMAPError(f"File too large: {path.name} is {size_mb:.1f} MB (max 25 MB)")
-        resolved.append((path, size))
+        resolved.append((path, size, warning))
 
     result = []
-    for path, size in resolved:
+    for path, size, warning in resolved:
         try:
             data = path.read_bytes()
         except OSError as e:
@@ -792,7 +868,10 @@ def _attach_files(msg: email.message.EmailMessage, paths: list[str]) -> list[dic
         else:
             maintype, subtype = "application", "octet-stream"
         msg.add_attachment(data, maintype=maintype, subtype=subtype, filename=path.name)
-        result.append({"name": path.name, "size": size})
+        entry: dict = {"name": path.name, "size": size}
+        if warning:
+            entry["warning"] = warning
+        result.append(entry)
 
     return result
 
