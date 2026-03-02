@@ -1,6 +1,7 @@
 # Security Review: imap-stream-mcp
 
 **Date:** 2026-02-25
+**Updated:** 2026-03-02
 **Scope:** Full codebase (7 source files, 4 test files)
 **Commit:** HEAD on main
 
@@ -10,11 +11,11 @@ MCP plugin connecting an LLM agent to email via IMAP. Primary attack surface: **
 
 ## Findings
 
-### 1. Data Exfiltration via File Attachment (High)
+### 1. Data Exfiltration via File Attachment (High) — FIXED
 
-**File:** `imap_client.py:743-790` (`_attach_files`)
+**File:** `imap_client.py` (`_attach_files`, `_check_attachment_path`)
 
-`_attach_files()` reads any file the process user can access. Only validation: `is_absolute()` and `is_file()`.
+`_attach_files()` previously read any file the process user could access. Only validation was `is_absolute()` and `is_file()`.
 
 **Attack chain:**
 1. Malicious email contains prompt injection text
@@ -22,89 +23,56 @@ MCP plugin connecting an LLM agent to email via IMAP. Primary attack surface: **
 3. Injection instructs LLM to create draft: `draft` + `attachments: ["/Users/x/.ssh/id_rsa"]`
 4. Sensitive file saved as attachment in Drafts folder
 
-The untrusted content wrapper makes this harder but does not prevent it.
+**Fix applied** (`cd14f0d`): Blocklist + warning approach:
+- **Hard block**: `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.config`, `~/.kube`, `~/.docker`, `~/.env*`, `~/.npmrc`, `~/.pypirc`, `~/.netrc`, `~/.claude`, `~/.git-credentials`, all dotfiles/dotdirs in home, `/etc/shadow`, `/etc/passwd`, `/etc/ssl/private`
+- **Safe (no warning)**: `/tmp/`, `~/Downloads/`, `~/Desktop/`, `~/Documents/`
+- **Warning**: all other paths — warning string returned in attachment response so the LLM sees it
+- Path resolution via `Path.resolve()` prevents symlink bypass (e.g. macOS `/tmp` → `/private/tmp`)
 
-**Recommendation:** Whitelist-based path restriction (e.g. only `/tmp/streammail/`), or explicit user confirmation before file reads. Best option: MCP permission prompt before reading files for attachment.
+### 2. Prompt Injection Sanitization Gaps (High) — PARTIALLY FIXED
 
-### 2. Prompt Injection Sanitization Gaps (High)
-
-**File:** `imap_stream_mcp.py:88-110`
+**File:** `imap_stream_mcp.py`
 
 `_contains_injection_patterns()` checks only:
 - `<untrusted_` / `</untrusted_`
 - `<|` / `|>`
 
-Missing patterns:
+Missing patterns (not yet addressed):
 - `</tool_use>`, `</function_call>`, `<tool_result>` (MCP/Claude tool-use XML)
 - `<system>`, `</system>` (system prompt boundaries)
 - `Human:`, `Assistant:` (Claude conversation markers)
 
-**Bug:** Detection is case-insensitive (`.lower()`) but sanitization uses exact-case `replace()`:
+**Bug fixed** (`c091aeb`): Detection was case-insensitive (`.lower()`) but sanitization used exact-case `replace()`. Fixed with `re.sub(r"...", ..., flags=re.IGNORECASE)`.
 
-```python
-# Detection finds "<UNTRUSTED_" via .lower() check
-# But sanitization does not replace it:
-result = text.replace("</untrusted_", "&lt;/untrusted_")  # misses "</UNTRUSTED_"
-```
+**Remaining:** Pattern expansion (finding #6) not yet implemented.
 
-**Recommendation:** Use `re.sub` with `re.IGNORECASE` for sanitization. Add detection patterns for tool-use XML and conversation markers.
+### 3. modify_draft Performs EXPUNGE (Medium) — FIXED
 
-### 3. modify_draft Performs EXPUNGE (Medium)
+**File:** `imap_client.py` (`modify_draft`, `edit_draft`)
 
-**File:** `imap_client.py:1037-1038`
+`modify_draft` and `edit_draft` use delete+expunge to replace drafts. This is correct append-before-delete pattern, but previously:
+- Help text misleadingly stated "Safe: marks only, no expunge"
+- No validation that the message was actually a draft
 
-```python
-client.delete_messages([message_id])
-client.expunge()
-```
+**Fix applied** (`c091aeb`): Both functions now fetch `FLAGS` and verify `\Draft` flag is present before delete+expunge. Help text corrected.
 
-The tool help text states "Safe: marks only, no expunge" (`imap_stream_mcp.py:471`), but `edit` and `draft` (modify) actions permanently delete the old draft. This is a correct append-before-delete pattern, but:
-- Documentation is misleading
-- No validation that the target folder is actually a Drafts folder — operating on INBOX would permanently delete messages
+### 4. No Connection Timeout (Medium) — FIXED
 
-**Recommendation:** Validate folder has `\Draft` flag or matching name before allowing delete+expunge. Fix help text.
+**File:** `session.py`, `imap_client.py`
 
-### 4. No Connection Timeout (Medium)
+**Fix applied** (`c091aeb`): Added `timeout=30` to both `IMAPClient()` call sites.
 
-**File:** `session.py:91`
+### 5. Session Dict Not Thread-Safe (Medium) — FIXED
 
-```python
-client = IMAPClient(server, port=int(port), ssl=True)  # no timeout
-```
+**File:** `session.py`
 
-Network problems cause the MCP tool to block indefinitely. `IMAPClient` supports a `timeout` parameter.
+**Fix applied** (`c091aeb`): Added `_sessions_lock = threading.Lock()` wrapping all `_sessions` dict access (`get_session`, `invalidate_message_cache`, `update_cached_flags`).
 
-**Recommendation:** `IMAPClient(server, port=int(port), ssl=True, timeout=30)`
+### 6. Attachment Filename Collision (Medium) — FIXED
 
-### 5. Session Dict Not Thread-Safe (Medium)
+**File:** `imap_client.py`
 
-**File:** `session.py:17, 38-42`
-
-```python
-_sessions: dict[str, "AccountSession"] = {}
-
-def get_session(account):
-    if account not in _sessions:
-        _sessions[account] = AccountSession(account)  # race condition
-    return _sessions[account]
-```
-
-MCP server is async (FastMCP). `AccountSession` has an internal `RLock` but the module-level `_sessions` dict is unprotected.
-
-**Recommendation:** Add a module-level lock around `_sessions` dict access.
-
-### 6. Attachment Filename Collision (Medium)
-
-**File:** `imap_client.py:632-633`
-
-```python
-safe_filename = re.sub(r"[^\w\-_\.]", "_", filename)
-file_path = temp_dir / safe_filename  # silent overwrite
-```
-
-Two attachments with the same name overwrite each other without warning.
-
-**Recommendation:** Use `f"{message_id}_{attachment_index}_{safe_filename}"`.
+**Fix applied** (`c091aeb`): After sanitizing filename, check if file exists. If collision, append counter suffix (`file_1.pdf`, `file_2.pdf`, etc.).
 
 ### 7. Credential Env Var Fallback (Low)
 
@@ -132,15 +100,15 @@ Negative lookbehind only handles `href="` (double quotes). Single-quoted `href='
 
 ## Priority Matrix
 
-| # | Finding | Effort | Impact |
-|---|---------|--------|--------|
-| 1 | Sanitization case-insensitivity bug | Small | Fixes known bypass |
-| 2 | Connection timeout | Small | Prevents hang |
-| 3 | Filename collision | Small | Prevents data loss |
-| 4 | Session dict thread safety | Small | Prevents race condition |
-| 5 | modify_draft folder validation | Medium | Prevents accidental deletion |
-| 6 | Injection pattern expansion | Medium | Improves protection |
-| 7 | File attachment restriction | Large | Prevents exfiltration |
+| # | Finding | Effort | Impact | Status |
+|---|---------|--------|--------|--------|
+| 1 | Sanitization case-insensitivity bug | Small | Fixes known bypass | Fixed `c091aeb` |
+| 2 | Connection timeout | Small | Prevents hang | Fixed `c091aeb` |
+| 3 | Filename collision | Small | Prevents data loss | Fixed `c091aeb` |
+| 4 | Session dict thread safety | Small | Prevents race condition | Fixed `c091aeb` |
+| 5 | modify_draft draft flag guard | Medium | Prevents accidental deletion | Fixed `c091aeb` |
+| 6 | Injection pattern expansion | Medium | Improves protection | Open |
+| 7 | File attachment path guard | Large | Prevents exfiltration | Fixed `cd14f0d` |
 
 ## Test Coverage
 
