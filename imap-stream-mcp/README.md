@@ -10,9 +10,9 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 
 ## Features
 
-- **list** - List messages in any folder (`[att:N]` shows attachment count)
+- **list** - List messages in any folder (`[att:N]` attachment count, `preview` for body snippet)
 - **read** - Read message content with attachments
-- **search** - Search by sender, subject, date, or text (`[att:N]` shows attachment count)
+- **search** - Search by sender, subject, date, or text (`[att:N]` attachment count, `preview` for body snippet)
 - **draft** - Create/modify draft replies with file attachments
 - **edit** - Surgical draft text replacement (old→new) without full body rewrite
 - **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)
@@ -106,6 +106,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ```
 imap_stream_mcp.py   # MCP server entry point, action dispatcher
 imap_client.py       # IMAP operations (list, read, search, draft)
+bodystructure.py     # BODYSTRUCTURE parsing (attachments, snippets)
+session.py           # Connection management, caching, message fetch
 markdown_utils.py    # Markdown → HTML conversion for drafts
 setup.py             # Credential configuration utility
 debug_imap.py        # Connection troubleshooting utility
@@ -115,18 +117,18 @@ debug_imap.py        # Connection troubleshooting utility
 ## MCP API - Usage
 
 ```
-# List messages
-{action: "list", folder: "INBOX"}
-{action: "list", folder: "INBOX", limit: 50}
+# List messages (preview: true for body snippets, false for headers only)
+{action: "list", folder: "INBOX", preview: true}
+{action: "list", folder: "INBOX", preview: false, limit: 50}
 
 # Read message
 {action: "read", folder: "INBOX", payload: "12345"}
 {action: "read", folder: "INBOX", payload: "12345:full"}  # include full quoted tail
 
-# Search
-{action: "search", folder: "INBOX", payload: "from:boss@company.com"}
-{action: "search", folder: "INBOX", payload: "subject:urgent"}
-{action: "search", folder: "INBOX", payload: "since:2024-01-01"}
+# Search (preview: true for body snippets)
+{action: "search", folder: "INBOX", payload: "from:boss@company.com", preview: true}
+{action: "search", folder: "INBOX", payload: "subject:urgent", preview: false}
+{action: "search", folder: "INBOX", payload: "since:2024-01-01", preview: true}
 
 # Create draft
 {action: "draft", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"Thanks!","in_reply_to":"<msgid>"}'}
@@ -161,10 +163,10 @@ debug_imap.py        # Connection troubleshooting utility
 
 ```
 # Use default account
-{action: "list", folder: "INBOX"}
+{action: "list", folder: "INBOX", preview: true}
 
 # Use specific account
-{action: "list", folder: "INBOX", account: "work"}
+{action: "list", folder: "INBOX", account: "work", preview: false}
 ```
 
 ## License

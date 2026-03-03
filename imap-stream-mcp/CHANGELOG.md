@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.0] - 2026-03-03
+
+### Added
+- Body snippet preview in list/search results — first ~100 chars of message body shown as blockquote line
+- Mandatory `preview` parameter for list/search: `preview: true` fetches snippets, `preview: false` skips (0 extra IMAP roundtrips)
+- Two-step FETCH: BODYSTRUCTURE parsing identifies text/plain (or HTML fallback), then `BODY.PEEK[section]<0.600>` fetches partial body
+- Decoding pipeline: transfer encoding (7BIT/BASE64/QUOTED-PRINTABLE) → charset → HTML strip → whitespace collapse → word-boundary truncation
+- `get_body_peek()` consolidated in `bodystructure.py` with prefix-match key lookup (handles server response variants)
+- Prompt injection check on snippets via existing `_contains_injection_patterns()`
+
 ## [0.6.1] - 2026-02-25
 
 ### Added

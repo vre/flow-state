@@ -20,7 +20,7 @@ from pathlib import Path
 
 import html2text
 import keyring
-from bodystructure import count_attachments
+from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
 from markdown_utils import convert_body
 
@@ -320,13 +320,14 @@ def list_folders(account: str = None) -> list[dict]:
     return session.get_folders()
 
 
-def list_messages(folder: str, limit: int = 20, account: str = None) -> list[dict]:
+def list_messages(folder: str, limit: int = 20, account: str = None, preview: bool = False) -> list[dict]:
     """List messages in a folder.
 
     Args:
         folder: Folder path (e.g., 'INBOX' or 'INBOX/Subfolder')
         limit: Maximum messages to return (newest first)
         account: Account name. None uses default.
+        preview: Include body snippet (~100 chars) per message.
 
     Returns:
         List of message summaries
@@ -334,7 +335,7 @@ def list_messages(folder: str, limit: int = 20, account: str = None) -> list[dic
     from session import get_session
 
     session = get_session(account)
-    return session.get_messages(folder, limit)
+    return session.get_messages(folder, limit, preview=preview)
 
 
 def _is_quote_line(line: str) -> bool:
@@ -664,7 +665,7 @@ def cleanup_attachments() -> dict:
     return {"deleted": deleted, "freed_bytes": freed_bytes}
 
 
-def search_messages(folder: str, query: str, limit: int = 20, account: str = None) -> list[dict]:
+def search_messages(folder: str, query: str, limit: int = 20, account: str = None, preview: bool = False) -> list[dict]:
     """Search messages in a folder.
 
     Args:
@@ -679,6 +680,7 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
               Also: is:flagged, flagged:yes, flagged:no, starred, etc.
         limit: Maximum results
         account: Account name. None uses default.
+        preview: Include body snippet (~100 chars) per message.
 
     Returns:
         List of matching message summaries with id, subject, from, date, flags.
@@ -724,6 +726,44 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
         # Fetch summaries
         messages = client.fetch(selected_ids, ["ENVELOPE", "FLAGS", "BODYSTRUCTURE"])
 
+        snippets: dict[int, str] = {}
+        if preview:
+            try:
+                snippet_info: dict[int, tuple[str, bytes, bytes, bool]] = {}
+                for msg_id in selected_ids:
+                    msg_data = messages.get(msg_id)
+                    if not msg_data:
+                        continue
+                    bodystructure = msg_data.get(b"BODYSTRUCTURE")
+                    part = find_text_part(bodystructure)
+                    is_html = False
+                    if part is None:
+                        part = find_html_part(bodystructure)
+                        is_html = part is not None
+                    if part:
+                        section, charset, encoding = part
+                        snippet_info[msg_id] = (section, charset, encoding, is_html)
+
+                snippet_raw: dict[int, dict] = {}
+                section_groups: dict[str, list[int]] = {}
+                for msg_id, (section, _, _, _) in snippet_info.items():
+                    section_groups.setdefault(section, []).append(msg_id)
+
+                for section, group_ids in section_groups.items():
+                    try:
+                        group_data = client.fetch(group_ids, [f"BODY.PEEK[{section}]<0.600>"])
+                    except Exception:
+                        continue
+                    for msg_id, payload in group_data.items():
+                        if isinstance(payload, dict):
+                            snippet_raw[msg_id] = payload
+
+                for msg_id, (section, charset, encoding, is_html) in snippet_info.items():
+                    raw = get_body_peek(snippet_raw.get(msg_id, {}), section)
+                    snippets[msg_id] = extract_snippet(raw, charset, encoding, is_html) if raw else ""
+            except Exception:
+                snippets = {}
+
         results = []
         for msg_id, data in messages.items():
             envelope = data[b"ENVELOPE"]
@@ -738,6 +778,7 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
                     "date": str(envelope.date) if envelope.date else "",
                     "flags": flags,
                     "attachment_count": count_attachments(data.get(b"BODYSTRUCTURE")),
+                    "snippet": snippets.get(msg_id, ""),
                 }
             )
 

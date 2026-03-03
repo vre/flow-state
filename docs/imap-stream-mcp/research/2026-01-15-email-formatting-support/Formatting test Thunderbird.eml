@@ -1,12 +1,12 @@
 Content-Type: multipart/alternative;
  boundary="------------AzYDr023HWkP0Z0zWpLVrAqt"
-Message-ID: <55c9602c-84a2-4e03-8c8f-8c80b990a7de@test.example.com>
+Message-ID: <55c9602c-84a2-4e03-8c8f-8c80b990a7de@vre.iki.fi>
 Date: Fri, 16 Jan 2026 17:55:25 +0200
 MIME-Version: 1.0
 User-Agent: Mozilla Thunderbird
-From: Test User <xxx@xxx>
+From: Ville Reijonen <xxx@xxx>
 Subject: Formatting test Thunderbird
-To: Test User <test@test.example.com>
+To: Ville Reijonen <xxx@gmail.com>
 Content-Language: en-US
 
 This is a multi-part message in MIME format.

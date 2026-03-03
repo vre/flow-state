@@ -495,6 +495,79 @@ class TestListMessages:
         assert result[0]["attachment_count"] == 0
 
     @patch("session._create_connection")
+    def test_list_messages_includes_snippet(self, mock_create, sample_envelope):
+        """List results should include decoded snippet from BODY.PEEK fetch."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message(
+            "INBOX",
+            1,
+            sample_envelope,
+            snippet_body=b"This is the preview text used for list snippets in MCP output.",
+        )
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20, preview=True)
+
+        assert len(result) == 1
+        assert result[0]["snippet"].startswith("This is the preview text")
+
+    @patch("session._create_connection")
+    def test_list_messages_cache_hit_preserves_snippet(self, mock_create, sample_envelope):
+        """Cache hit should return previously cached snippet text."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 1, sample_envelope, snippet_body=b"First cached snippet.")
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        first = list_messages("INBOX", limit=20, preview=True)
+        mock_client.folders["INBOX"][0]["snippet_body"] = b"Changed snippet after cache."
+        second = list_messages("INBOX", limit=20, preview=True)
+
+        assert first[0]["snippet"] == "First cached snippet."
+        assert second[0]["snippet"] == "First cached snippet."
+
+    @patch("session._create_connection")
+    @pytest.mark.parametrize("key_variant", ["<0>", "<0.600>", "bare"])
+    def test_list_messages_handles_body_peek_key_variants(self, mock_create, sample_envelope, key_variant):
+        """List snippet extraction should support server BODY[] key variants."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 1, sample_envelope, snippet_body=b"Variant snippet text", snippet_key_variant=key_variant)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20, preview=True)
+
+        assert len(result) == 1
+        assert result[0]["snippet"] == "Variant snippet text"
+
+    @patch("session._create_connection")
+    def test_list_messages_empty_body_peek_returns_empty_snippet(self, mock_create, sample_envelope):
+        """Empty BODY.PEEK bytes should produce empty snippet."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 1, sample_envelope, snippet_body=b"")
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20, preview=True)
+
+        assert len(result) == 1
+        assert result[0]["snippet"] == ""
+
+    @patch("session._create_connection")
+    def test_list_messages_preview_false_skips_snippet_fetch(self, mock_create, sample_envelope):
+        """preview=False should not fetch snippets."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 1, sample_envelope, snippet_body=b"Should not appear.")
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = list_messages("INBOX", limit=20, preview=False)
+
+        assert len(result) == 1
+        assert result[0]["snippet"] == ""
+
+    @patch("session._create_connection")
     def test_list_messages_folder_not_found(self, mock_create):
         """Test listing non-existent folder."""
         mock_client = MockIMAPClient()
@@ -735,7 +808,7 @@ class TestReadMessage:
         """Localized Outlook headers without underscores should split."""
         body = (
             "Hei, tässä uusin viesti.\n\n"
-            "Lähettäjä: Test User <vreijone@gmail.com>\n"
+            "Lähettäjä: Ville Reijonen <vreijone@gmail.com>\n"
             "Lähetetty: keskiviikko 23. huhtikuuta 2025 15.40\n"
             "Vastaanottaja: Henna Hopia <henna.hopia@hopiasepat.fi>\n"
             "Kopio: Sami Hotakainen <sami.hotakainen@mpk.fi>\n"
@@ -747,7 +820,7 @@ class TestReadMessage:
 
         assert primary.strip() == "Hei, tässä uusin viesti."
         assert tail is not None
-        assert tail.startswith("Lähettäjä: Test User <vreijone@gmail.com>")
+        assert tail.startswith("Lähettäjä: Ville Reijonen <vreijone@gmail.com>")
         assert "Aihe: Re: KHRU-kerho suunnittelee drone-iltaa huhti-toukokuussa" in tail
         assert count >= 1
 
@@ -950,6 +1023,32 @@ class TestSearchMessages:
 
         assert len(result) == 1
         assert result[0]["attachment_count"] == 0
+
+    @patch("session._create_connection")
+    def test_search_messages_includes_snippet(self, mock_create, sample_envelope):
+        """Search results should include decoded snippet from BODY.PEEK fetch."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 33, sample_envelope, snippet_body=b"Search preview body content from body.peek.")
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = search_messages("INBOX", "anything", preview=True)
+
+        assert len(result) == 1
+        assert result[0]["snippet"].startswith("Search preview body")
+
+    @patch("session._create_connection")
+    def test_search_messages_empty_body_peek_returns_empty_snippet(self, mock_create, sample_envelope):
+        """Search snippet should be empty when BODY.PEEK payload is empty."""
+        mock_client = MockIMAPClient()
+        mock_client.add_message("INBOX", 44, sample_envelope, snippet_body=b"")
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = search_messages("INBOX", "anything", preview=True)
+
+        assert len(result) == 1
+        assert result[0]["snippet"] == ""
 
 
 class TestCreateDraft:

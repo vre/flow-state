@@ -41,7 +41,7 @@ from imap_client import (
 )
 from markdown_utils import convert_body
 from mcp.server.fastmcp import FastMCP
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 def _format_attachment_line(attachments: list[dict]) -> str:
@@ -208,6 +208,9 @@ class MailAction(BaseModel):
         description="Action data: read=msg_id[:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
+    preview: bool | None = Field(
+        default=None, description="Include body snippet (~100 chars) in list/search results. Required for list and search actions."
+    )
 
     @field_validator("action")
     @classmethod
@@ -218,6 +221,12 @@ class MailAction(BaseModel):
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
         return v_lower
 
+    @model_validator(mode="after")
+    def validate_preview_required(self) -> "MailAction":
+        if self.action in {"list", "search"} and self.preview is None:
+            raise ValueError("preview parameter required for list/search (true=include body snippets, false=headers only)")
+        return self
+
 
 # Help documentation - loaded only when needed
 HELP_TOPICS = {
@@ -226,9 +235,9 @@ HELP_TOPICS = {
 
 ## Actions
 
-- **list** - List messages in a folder (`[att:N]` shown when attachments exist)
+- **list** - List messages in a folder (`[att:N]` and snippet preview shown)
 - **read** - Read a specific message
-- **search** - Search messages (`[att:N]` shown when attachments exist)
+- **search** - Search messages (`[att:N]` and snippet preview shown)
 - **draft** - Create draft reply (saved to Drafts folder)
 - **edit** - Edit specific text in a draft (old→new replacement)
 - **flag** - Add or remove flags/labels on messages
@@ -240,9 +249,10 @@ HELP_TOPICS = {
 
 ## Quick Examples
 
-List inbox: {action: "list", folder: "INBOX"}
+List inbox: {action: "list", folder: "INBOX", preview: false}
+List with snippets: {action: "list", folder: "INBOX", preview: true}
 Read message: {action: "read", folder: "INBOX", payload: "123"}
-Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com"}
+Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com", preview: true}
 Create draft: {action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
 Edit draft: {action: "edit", folder: "Drafts", payload: '{"id":1253,"replacements":[{"old":"foo","new":"bar"}]}'}
 Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
@@ -251,16 +261,17 @@ Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 # list - List Messages
 
 Lists messages in a folder, newest first.
-Output includes `[att:N]` when a message has attachments.
+Output includes `[att:N]` when a message has attachments. Set `preview: true` to include `> ...` body snippet (~100 chars).
 
 ## Parameters
 - folder: Folder path (required)
+- preview: true/false (required) — include body snippet per message
 - limit: Max messages (default 20)
 
 ## Examples
-{action: "list", folder: "INBOX"}
-{action: "list", folder: "INBOX/Projects", limit: 50}
-{action: "list", folder: "imap://user@server/INBOX/Sub"}  # URL format extracts folder
+{action: "list", folder: "INBOX", preview: false}
+{action: "list", folder: "INBOX", preview: true}
+{action: "list", folder: "INBOX/Projects", limit: 50, preview: true}
 """,
     "read": """
 # read - Read Message
@@ -282,11 +293,12 @@ Full message with: subject, from, to, cc, date, body_text, body_html, message_id
 # search - Search Messages
 
 Search messages in a folder.
-Output includes `[att:N]` when a message has attachments.
+Output includes `[att:N]` when a message has attachments. Set `preview: true` to include `> ...` body snippet (~100 chars).
 
 ## Parameters
 - folder: Folder to search
 - payload: Search query
+- preview: true/false (required) — include body snippet per message
 - limit: Max results (default 20)
 
 ## Query Syntax
@@ -463,10 +475,11 @@ async def use_mail(params: MailAction) -> str:
     """IMAP email operations. Actions: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help.
 
     Examples:
-      {action:"list", folder:"INBOX"} - list messages
+      {action:"list", folder:"INBOX", preview:false} - list messages
+      {action:"list", folder:"INBOX", preview:true} - list with body snippets
       {action:"read", folder:"INBOX", payload:"123"} - read message (truncated quoted tail by default)
       {action:"read", folder:"INBOX", payload:"123:full"} - read full message without truncation
-      {action:"search", folder:"INBOX", payload:"from:x@y.com"}
+      {action:"search", folder:"INBOX", payload:"from:x@y.com", preview:true}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
       {action:"edit", folder:"Drafts", payload:'{"id":1253,"replacements":[{"old":"x","new":"y"}]}'}
       {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Marks only, no expunge
@@ -534,7 +547,7 @@ uv run --directory {plugin_dir} python setup.py
             if not folder:
                 return "Error: folder required. Example: {action:'list', folder:'INBOX'}"
 
-            messages = list_messages(folder, limit=params.limit)
+            messages = list_messages(folder, limit=params.limit, preview=params.preview or False)
 
             if not messages:
                 return f"No messages in '{folder}'"
@@ -548,6 +561,11 @@ uv run --directory {plugin_dir} python setup.py
                 lines.append(f"**[{msg['id']}]** {msg['subject']}")
                 suffix = f" {' '.join(suffix_parts)}" if suffix_parts else ""
                 lines.append(f"  From: {msg['from']} | {msg['date']}{suffix}")
+                snippet = msg.get("snippet", "")
+                if snippet:
+                    if _contains_injection_patterns(snippet):
+                        snippet = "[content hidden]"
+                    lines.append(f"  > {snippet}")
                 lines.append("")
 
             return "\n".join(lines)
@@ -651,7 +669,7 @@ uv run --directory {plugin_dir} python setup.py
             if not params.payload:
                 return "Error: payload (search query) required. Use 'help search' for syntax."
 
-            messages = search_messages(folder, params.payload, limit=params.limit)
+            messages = search_messages(folder, params.payload, limit=params.limit, preview=params.preview or False)
 
             if not messages:
                 return f"No messages matching '{params.payload}' in '{folder}'"
@@ -665,6 +683,11 @@ uv run --directory {plugin_dir} python setup.py
                 lines.append(f"**[{msg['id']}]** {msg['subject']}")
                 suffix = f" {' '.join(suffix_parts)}" if suffix_parts else ""
                 lines.append(f"  From: {msg['from']} | {msg['date']}{suffix}")
+                snippet = msg.get("snippet", "")
+                if snippet:
+                    if _contains_injection_patterns(snippet):
+                        snippet = "[content hidden]"
+                    lines.append(f"  > {snippet}")
                 lines.append("")
 
             return "\n".join(lines)

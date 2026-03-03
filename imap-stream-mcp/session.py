@@ -8,7 +8,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 
-from bodystructure import count_attachments
+from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
 from imapclient.exceptions import IMAPClientError
 
@@ -188,12 +188,13 @@ class AccountSession:
         )
         return self.folder_cache.folders
 
-    def get_messages(self, folder: str, limit: int = 20) -> list[dict]:
+    def get_messages(self, folder: str, limit: int = 20, preview: bool = False) -> list[dict]:
         """Get message list, validating cache with IMAP metadata.
 
         Args:
             folder: Folder path
             limit: Maximum messages to return
+            preview: Include body snippet (~100 chars) per message.
 
         Returns:
             List of message summaries (newest first)
@@ -234,6 +235,44 @@ class AccountSession:
 
         data = conn.fetch(selected_ids, ["ENVELOPE", "FLAGS", "RFC822.SIZE", "BODYSTRUCTURE"])
 
+        snippets: dict[int, str] = {}
+        if preview:
+            try:
+                snippet_info: dict[int, tuple[str, bytes, bytes, bool]] = {}
+                for msg_id in selected_ids:
+                    msg_data = data.get(msg_id)
+                    if not msg_data:
+                        continue
+                    bodystructure = msg_data.get(b"BODYSTRUCTURE")
+                    part = find_text_part(bodystructure)
+                    is_html = False
+                    if part is None:
+                        part = find_html_part(bodystructure)
+                        is_html = part is not None
+                    if part:
+                        section, charset, encoding = part
+                        snippet_info[msg_id] = (section, charset, encoding, is_html)
+
+                snippet_raw: dict[int, dict] = {}
+                section_groups: dict[str, list[int]] = {}
+                for msg_id, (section, _, _, _) in snippet_info.items():
+                    section_groups.setdefault(section, []).append(msg_id)
+
+                for section, group_ids in section_groups.items():
+                    try:
+                        group_data = conn.fetch(group_ids, [f"BODY.PEEK[{section}]<0.600>"])
+                    except Exception:
+                        continue
+                    for msg_id, payload in group_data.items():
+                        if isinstance(payload, dict):
+                            snippet_raw[msg_id] = payload
+
+                for msg_id, (section, charset, encoding, is_html) in snippet_info.items():
+                    raw = get_body_peek(snippet_raw.get(msg_id, {}), section)
+                    snippets[msg_id] = extract_snippet(raw, charset, encoding, is_html) if raw else ""
+            except Exception:
+                snippets = {}
+
         messages = []
         for msg_id in selected_ids:
             if msg_id not in data:
@@ -265,6 +304,7 @@ class AccountSession:
                     "size": msg_data.get(b"RFC822.SIZE", 0),
                     "flags": [_to_str(f).lstrip("\\") for f in msg_data.get(b"FLAGS", [])],
                     "attachment_count": count_attachments(bodystructure) if bodystructure is not None else 0,
+                    "snippet": snippets.get(msg_id, ""),
                 }
             )
 

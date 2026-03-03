@@ -12,6 +12,6 @@
 - [x] Support for Labels (v0.3.0, via keywords)
 - [x] Attachment upload to drafts (v0.5.0)
 - [x] Attachment indicator (`[att:N]`) in list/search (v0.6.0) — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
-- [ ] Snippet (~100 chars preview) in list/search — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md` (depends on attachment indicator)
+- [x] Snippet preview (`preview: true/false`) in list/search (v0.7.0) — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`
 - [x] Thread-aware read: truncate quoted replies to reduce token count (v0.6.1) — `docs/imap-stream-mcp/plans/2026-02-25-thread-aware-read.md`
 - [ ] Preserve `multipart/related` MIME structure in modify_draft (inline images lose `cid:` linkage)

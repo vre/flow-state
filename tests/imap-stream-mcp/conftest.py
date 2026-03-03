@@ -104,11 +104,42 @@ class MockIMAPClient:
 
         messages = self.folders.get(self.selected_folder, [])
         result = {}
+        body_peek_section = None
+        for selector in data:
+            selector_text = selector.decode() if isinstance(selector, bytes) else selector
+            if not selector_text.startswith("BODY.PEEK["):
+                continue
+            start = selector_text.find("[")
+            end = selector_text.find("]", start + 1)
+            if start != -1 and end != -1:
+                body_peek_section = selector_text[start + 1 : end]
+                break
 
         for msg_id in message_ids:
             for msg in messages:
                 if msg["id"] == msg_id:
-                    result[msg_id] = msg.get("data", {})
+                    if body_peek_section is not None:
+                        snippet_body = msg.get("snippet_body")
+                        snippet_section = msg.get("snippet_section", "1")
+                        if snippet_body is not None and snippet_section == body_peek_section:
+                            key_variant = msg.get("snippet_key_variant", "<0>")
+                            if key_variant == "<0.600>":
+                                response_key = f"BODY[{body_peek_section}]<0.600>"
+                            elif key_variant == "bare":
+                                response_key = f"BODY[{body_peek_section}]"
+                            else:
+                                response_key = f"BODY[{body_peek_section}]<0>"
+                            result[msg_id] = {response_key.encode(): snippet_body}
+                        else:
+                            result[msg_id] = {}
+                    else:
+                        msg_data = msg.get("data", {})
+                        filtered = {}
+                        for selector in data:
+                            selector_key = selector.encode() if isinstance(selector, str) else selector
+                            if selector_key in msg_data:
+                                filtered[selector_key] = msg_data[selector_key]
+                        result[msg_id] = filtered if filtered else msg_data
                     break
 
         return result
@@ -145,6 +176,9 @@ class MockIMAPClient:
         flags: list = None,
         raw_email: bytes = None,
         bodystructure: tuple | None = SIMPLE_TEXT_BODYSTRUCTURE,
+        snippet_body: bytes | str | None = None,
+        snippet_section: str = "1",
+        snippet_key_variant: str = "<0>",
     ):
         """Add a message to a folder for testing."""
         if folder not in self.folders:
@@ -162,7 +196,16 @@ class MockIMAPClient:
         if bodystructure is not None:
             data[b"BODYSTRUCTURE"] = bodystructure
 
-        self.folders[folder].append({"id": msg_id, "data": data})
+        normalized_snippet = snippet_body.encode() if isinstance(snippet_body, str) else snippet_body
+        self.folders[folder].append(
+            {
+                "id": msg_id,
+                "data": data,
+                "snippet_body": normalized_snippet,
+                "snippet_section": snippet_section,
+                "snippet_key_variant": snippet_key_variant,
+            }
+        )
 
 
 @pytest.fixture

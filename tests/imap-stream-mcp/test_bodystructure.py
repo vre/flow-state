@@ -1,9 +1,11 @@
 """Tests for BODYSTRUCTURE attachment counting."""
 
+import base64
 import logging
+import quopri
 
 import bodystructure
-from bodystructure import count_attachments
+from bodystructure import _extract_charset, _strip_html_tags, count_attachments, extract_snippet, find_html_part, find_text_part
 
 SIMPLE_TEXT = (
     b"TEXT",
@@ -224,6 +226,51 @@ SHORT_TEXT_NO_EXT = (
     1,
 )
 
+HTML_ONLY = (
+    b"TEXT",
+    b"HTML",
+    (b"CHARSET", b"utf-8"),
+    None,
+    None,
+    b"7BIT",
+    100,
+    5,
+    None,
+    None,
+    None,
+    None,
+)
+
+TEXT_ATTACHMENT = (
+    b"TEXT",
+    b"PLAIN",
+    (b"CHARSET", b"utf-8"),
+    None,
+    None,
+    b"7BIT",
+    100,
+    5,
+    None,
+    (b"attachment", (b"filename", b"note.txt")),
+    None,
+    None,
+)
+
+HTML_ATTACHMENT = (
+    b"TEXT",
+    b"HTML",
+    (b"CHARSET", b"utf-8"),
+    None,
+    None,
+    b"7BIT",
+    100,
+    5,
+    None,
+    (b"attachment", (b"filename", b"snippet.html")),
+    None,
+    None,
+)
+
 
 def test_simple_text_has_zero_attachments():
     """TEXT/PLAIN without disposition should count as zero."""
@@ -280,3 +327,148 @@ def test_short_tuple_returns_zero_and_logs_debug_once(caplog):
 
     debug_messages = [r.message for r in caplog.records if r.message.startswith("Short BODYSTRUCTURE tuple:")]
     assert len(debug_messages) == 1
+
+
+def test_find_text_part_none_returns_none():
+    """None BODYSTRUCTURE should return None."""
+    assert find_text_part(None) is None
+
+
+def test_find_html_part_none_returns_none():
+    """None BODYSTRUCTURE should return None."""
+    assert find_html_part(None) is None
+
+
+def test_find_text_part_simple_text():
+    """Simple text body should resolve to part 1."""
+    assert find_text_part(SIMPLE_TEXT) == ("1", b"utf-8", b"7BIT")
+
+
+def test_find_text_part_nested_multipart():
+    """Nested multipart should return text/plain at part 1.2."""
+    assert find_text_part(NESTED_MULTIPART) == ("1.2", b"utf-8", b"7BIT")
+
+
+def test_find_text_part_skips_text_attachment():
+    """text/plain attachment should not be used as snippet source."""
+    assert find_text_part(TEXT_ATTACHMENT) is None
+
+
+def test_find_text_part_html_only_returns_none():
+    """HTML-only body should not match text/plain lookup."""
+    assert find_text_part(HTML_ONLY) is None
+
+
+def test_find_html_part_html_only():
+    """HTML-only body should resolve to part 1."""
+    assert find_html_part(HTML_ONLY) == ("1", b"utf-8", b"7BIT")
+
+
+def test_find_html_part_nested_multipart():
+    """Nested multipart should return text/html at part 1.1."""
+    assert find_html_part(NESTED_MULTIPART) == ("1.1", b"utf-8", b"7BIT")
+
+
+def test_find_html_part_skips_html_attachment():
+    """text/html attachment should not be used as snippet source."""
+    assert find_html_part(HTML_ATTACHMENT) is None
+
+
+def test_extract_charset_with_params():
+    """Charset should be read from params tuple."""
+    assert _extract_charset(SIMPLE_TEXT) == b"utf-8"
+
+
+def test_extract_charset_without_params_defaults_utf8():
+    """Missing params should default to utf-8."""
+    no_params = (b"TEXT", b"PLAIN", None, None, None, b"7BIT")
+    assert _extract_charset(no_params) == b"utf-8"
+
+
+def test_extract_charset_non_tuple_params_defaults_utf8():
+    """Non-tuple params should default to utf-8."""
+    non_tuple_params = (b"TEXT", b"PLAIN", b"CHARSET", None, None, b"7BIT")
+    assert _extract_charset(non_tuple_params) == b"utf-8"
+
+
+def test_extract_charset_odd_params_tuple_defaults_utf8():
+    """Odd-length tuple should not raise and should default to utf-8."""
+    odd_params = (b"TEXT", b"PLAIN", (b"CHARSET",), None, None, b"7BIT")
+    assert _extract_charset(odd_params) == b"utf-8"
+
+
+def test_extract_snippet_invalid_charset_returns_empty():
+    """Invalid charset should fail gracefully."""
+    assert extract_snippet(b"hello", b"INVALID-XYZ", b"7BIT") == ""
+
+
+def test_extract_snippet_7bit_utf8_truncates():
+    """7BIT snippet should truncate and append ellipsis."""
+    raw = ("Lorem ipsum dolor sit amet consectetur adipiscing elit " * 6).encode("utf-8")
+    snippet = extract_snippet(raw, b"utf-8", b"7BIT")
+    assert snippet.endswith("...")
+    assert len(snippet) <= 103
+    assert "Lorem ipsum" in snippet
+
+
+def test_extract_snippet_truncates_on_word_boundary():
+    """Truncation should use previous whitespace instead of splitting words."""
+    snippet = extract_snippet(b"alpha beta gamma delta", b"utf-8", b"7BIT", max_chars=13)
+    assert snippet == "alpha beta..."
+
+
+def test_extract_snippet_base64_decodes_and_truncates():
+    """BASE64 snippet should decode before truncation."""
+    raw = base64.b64encode(("Base64 content line " * 20).encode("utf-8"))
+    snippet = extract_snippet(raw, b"utf-8", b"BASE64")
+    assert snippet.endswith("...")
+    assert "Base64 content line" in snippet
+
+
+def test_extract_snippet_quoted_printable_decodes_and_truncates():
+    """Quoted-printable snippet should decode before truncation."""
+    encoded = quopri.encodestring(("Quoted printable content " * 20).encode("utf-8"))
+    snippet = extract_snippet(encoded, b"utf-8", b"QUOTED-PRINTABLE")
+    assert snippet.endswith("...")
+    assert "Quoted printable content" in snippet
+
+
+def test_extract_snippet_html_strips_tags():
+    """HTML snippet should remove tags and collapse whitespace."""
+    raw = (
+        b"<html><body><h1>Title</h1><p>Hello <b>world</b> and <i>friends</i>.</p>"
+        b"<style>.x{color:red}</style><script>alert('x')</script></body></html>"
+    )
+    snippet = extract_snippet(raw, b"utf-8", b"7BIT", is_html=True, max_chars=200)
+    assert "Title" in snippet
+    assert "Hello world and friends." in snippet
+    assert "alert('x')" not in snippet
+    assert "color:red" not in snippet
+    assert "<h1>" not in snippet
+
+
+def test_extract_snippet_truncated_utf8_boundary_no_crash():
+    """Truncated multibyte UTF-8 should not raise."""
+    raw = "Price € per item".encode()[:-1]
+    snippet = extract_snippet(raw, b"utf-8", b"7BIT", max_chars=50)
+    assert isinstance(snippet, str)
+    assert "Price" in snippet
+
+
+def test_extract_snippet_unknown_encoding_returns_empty():
+    """Unknown transfer encoding should return empty string."""
+    assert extract_snippet(b"hello", b"utf-8", b"X-UNKNOWN") == ""
+
+
+def test_extract_snippet_empty_bytes_returns_empty():
+    """Empty raw bytes should return empty string."""
+    assert extract_snippet(b"", b"utf-8", b"7BIT") == ""
+
+
+def test_strip_html_tags_removes_style_and_script_content():
+    """_strip_html_tags should drop style/script content and tags."""
+    html = "<style>.hidden{display:none}</style><script>hack()</script><p>Hello &amp; welcome</p>"
+    text = _strip_html_tags(html)
+    assert ".hidden" not in text
+    assert "hack()" not in text
+    assert "Hello & welcome" in text
