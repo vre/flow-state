@@ -24,6 +24,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Untested assumption that proves wrong wastes the implementation cycle — test early, document results.
 - HC defines scope and problem — iterate understanding together before committing to plan.
 - Interface change → propose design exploration, iterate 3-5 designs with HC. Delegate to subagent: create mockups with realistic content.
+- Identify architectural decisions with meaningful tradeoffs — these become ADRs (`docs/<plugin/core>/adrs/<NNNN>-<title>.md`) during merge.
 
 2. PLANNING RULES:
 - DO NOT USE OR CHANGE TO AGENT PLAN MODE!
@@ -40,7 +41,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
 - Delegate plan review via `session-codex`: "Critically review the plan <path> for correctness, completeness, feasibility, testability, and scope control. Find what's missing."
 - Review iteration: fix all findings, no debt. `continue` with description of fixes. Iterate until reviewer passes. Disagreement → you decide with justification.
-- Delegate planning reflection via `session-codex` `continue`: reviewer writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md` — problems encountered, how resolved, what was learned about planning.
+- ORC writes planning reflection: `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md` — problems encountered, how resolved, what was learned about planning. ORC drove the planning; Codex only reviewed.
 - Ask HC to approve plan for Implementation Phase
 
 ### 2. Implementation Phase
@@ -53,7 +54,8 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
 
 2. IMPLEMENTATION RULES
-- NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness. Bug found → write failing test first, then fix.
+- NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness
+- When a bug is found: write a failing test first, then fix
 - Testability: Pure functions + thin `main()` glue. No DI frameworks.
 - Test manual cases with `claude -p` / `copilot -p` (-p = prompt), the plugins are installed locally for testing
 - Use `uv` for python development environment management
@@ -89,6 +91,8 @@ ORC informs HC what the next step is. Do not just say what you did.
 1. DOCUMENTATION
 - Delegate "## Reflection" to IMP via `session-codex` `continue`: what went well, what changed from plan, lessons learned. IMP writes to plan file.
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
+- If structure changed: update `ARCHITECTURE.md` to reflect actual code
+- If architectural decision with tradeoffs was made: write ADR in `docs/<plugin/core>/adrs/`
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 
 2. MERGE
