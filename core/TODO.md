@@ -9,7 +9,7 @@
 
 ## New Plugins
 
-- [/] `project-builder` — scaffolds new projects (worktree: `.worktrees/builders/`)
-- [/] `skill-builder` — scaffolds new skills (worktree: `.worktrees/builders/`)
-- [/] `mcp-builder` — scaffolds new MCP servers (worktree: `.worktrees/builders/`)
-- [/] `cli-tool-builder` — scaffolds new CLI tools (worktree: `.worktrees/builders/`)
+- [x] `project-builder` — scaffolds new projects (v1.0.0)
+- [x] `skill-builder` — scaffolds new skills (v1.0.0)
+- [x] `mcp-builder` — scaffolds new MCP servers (v1.0.0)
+- [x] `cli-tool-builder` — scaffolds new CLI tools (v1.0.0)
