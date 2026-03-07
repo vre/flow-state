@@ -40,7 +40,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - When "self-review" then do the following: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
 - Delegate plan review via `session-codex`: "Critically review the plan <path> for correctness, completeness, feasibility, testability, and scope control. Find what's missing."
 - Review iteration: fix all findings, no debt. `continue` with description of fixes. Iterate until reviewer passes. Disagreement → you decide with justification.
-- Write `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md` — problems encountered, how resolved, what was learned about planning.
+- Delegate planning reflection via `session-codex` `continue`: reviewer writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md` — problems encountered, how resolved, what was learned about planning.
 - Ask HC to approve plan for Implementation Phase
 
 ### 2. Implementation Phase
@@ -49,6 +49,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development.
 - Copy plan file to worktree, `rm` from main, commit in worktree — plan is a deliverable, must not remain untracked in main.
 - Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml
+- Codex sandbox git workaround: in worktree, `mv .git .git-codex-sandbox-workaround && printf 'gitdir: .git-codex-sandbox-workaround\n' > .git` — enables git inside Codex `workspace-write` sandbox. Reverse before rebase/merge: `rm .git && mv .git-codex-sandbox-workaround .git`. Only works when `.git` is a directory (not in git worktrees where `.git` is a file).
 - Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
 
 2. IMPLEMENTATION RULES
@@ -91,9 +92,9 @@ ORC informs HC what the next step is. Do not just say what you did.
 - For every release: update version numbers in '.claude-plugin/marketplace.json' (metadata and plugin version), '<plugin>/pyproject.toml', '<plugin>/CHANGELOG.md'
 
 2. MERGE
-- In worktree: `git pull --rebase origin main`. Test and validate after each rebase step. If conflicts: validate that existing functionality from main was not broken.
-- Ask HC permission → on main: `git merge --squash .worktrees/<name>`, Linux-style commit message. No co-authors.
-- Write `docs/<plugin/core>/reflections/<yyyy-mm-dd>-cycle-<short-name>.md` — plan→impl translation, review iterations and root causes, delegation effectiveness, process improvements.
+- In worktree: `git pull --rebase origin main`. Resolve all conflicts in worktree. Test and validate after each rebase step — merge step on main must be clean.
+- Ask HC permission → on main: `git merge --squash .worktrees/<name>`, Linux-style commit message. No co-authors. Run tests on main after merge, before commit.
+- Delegate cycle reflection to IMP via `session-codex` `continue`: IMP writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-cycle-<short-name>.md` — plan→impl translation, review iterations and root causes, delegation effectiveness, process improvements.
 - Ask HC for permission to clean up → `git worktree remove .worktrees/<name> && git branch -D <name>` (-D required after squash merge).
 
 ## Writing AGENTS.md / CLAUDE.md
