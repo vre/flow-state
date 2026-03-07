@@ -37,6 +37,7 @@ def get_transcript_work_files(base_name: str) -> list[str]:
         f"{base_name}_transcript_paragraphs.txt",
         f"{base_name}_transcript_paragraphs.md",
         f"{base_name}_transcript_cleaned.md",
+        f"{base_name}_headings.json",
         f"{base_name}_transcript.md",
     ]
 

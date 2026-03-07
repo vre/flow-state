@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.12.0] - 2026-03-07
+
+### Long Transcript Polish Fix
+- Fix polish pipeline failing on transcripts >80 KB (MAX_OUTPUT_TOKENS limit)
+- Step 2: chunk long transcripts into ~20-paragraph segments, clean with parallel Sonnet subagents, concatenate
+- Step 3: always generate AI headings via metadata JSON, insert with script (replaces full-rewrite approach)
+- New scripts: `33_split_for_cleaning.py`, `34_concat_cleaned.py`, `35_insert_headings_from_json.py`
+- Short transcripts (<80 KB) pass through without chunking
+- 11 new tests (80 total)
+
 ## [2.11.0] - 2026-02-25
 
 ### Watch Guide (Option B)
