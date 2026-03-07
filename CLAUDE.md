@@ -28,7 +28,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 
 2. PLANNING RULES:
 - DO NOT USE OR CHANGE TO AGENT PLAN MODE!
-- ALWAYS WRITE THE PLAN: 'docs/<plugin/core>/plans/<yyyy-mm-dd-short-description>.md'
+- ALWAYS WRITE THE PLAN: 'docs/<plugin/core>/plans/<yyyy-mm-dd-short-description>.md' — use templates from `docs/core/templates/` (plan-small.md or plan-standard.md)
 - Single source of truth: plans live only in `docs/<plugin/core>/plans/` — never create a separate plan file elsewhere like '.claude/plans/' or '.copilot/session-state/'
 - Define measurable and observable acceptance criteria with expected outputs, validation approach and thresholds when possible
 - Mission Command: include intent, goal, constraints, situational context and matching testing strategy (levels, tools, pass criteria).

@@ -3,7 +3,7 @@
 ## Process & Tooling
 
 - [-] `/design` skill — superseded by official `frontend-design` plugin and community alternatives (see `docs/core/research/2026-03-07-design-skill-survey.md`)
-- [ ] Plan templates — let plans accumulate organically, then derive small/standard templates from real patterns
+- [x] Plan templates — small + standard templates derived from 77 plans (see `docs/core/research/2026-03-07-plan-template-survey.md`)
 - [-] Review handoff automation — superseded by `session-codex` skill with `continue`
 - [-] Worktree setup script — CLAUDE.md instructions sufficient, Claude follows reliably
 
