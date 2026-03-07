@@ -53,7 +53,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
 
 2. IMPLEMENTATION RULES
-- NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness
+- NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness. Bug found → write failing test first, then fix.
 - Testability: Pure functions + thin `main()` glue. No DI frameworks.
 - Test manual cases with `claude -p` / `copilot -p` (-p = prompt), the plugins are installed locally for testing
 - Use `uv` for python development environment management
