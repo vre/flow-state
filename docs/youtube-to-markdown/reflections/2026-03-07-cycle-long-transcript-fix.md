@@ -15,6 +15,10 @@ Plan was detailed and accurate. All 8 tasks implemented exactly as specified. No
 - Codex for review: effective at finding real issues. Third round was overkill — the second round's findings were sufficient.
 - Parallel cleaning subagents: all 5 chunks completed successfully on both test transcripts. No retries needed.
 
+## Merge
+
+- `git pull --rebase origin main` in worktree failed: branch was forked from an old point, rebase attempted to replay 100+ already-applied commits, hit conflicts in CLAUDE.md, marketplace.json, LICENSE, and 4 other files. Aborted rebase, squash merged directly on main. Same class of issue as v0.7.0 (diverged roots).
+
 ## Process Improvements
 
 - Research-first approach paid off. Spending time on RQ1-RQ6 before planning meant zero rework during implementation.
