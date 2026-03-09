@@ -205,7 +205,7 @@ class MailAction(BaseModel):
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id[:more|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
@@ -280,14 +280,14 @@ Fetches message content by ID.
 
 ## Parameters
 - folder: Folder containing message
-- payload: Message ID (from list/search results), optionally with :more or :full
+- payload: Message ID (from list/search results), optionally with :N (depth) or :full
 
 ## Returns
 Full message with: subject, from, to, cc, date, body_text, body_html, message_id, in_reply_to
 
 ## Example
 {action: "read", folder: "INBOX", payload: "12345"}
-{action: "read", folder: "INBOX", payload: "12345:more"}
+{action: "read", folder: "INBOX", payload: "12345:1"}
 {action: "read", folder: "INBOX", payload: "12345:full"}
 """,
     "search": """
@@ -479,7 +479,7 @@ async def use_mail(params: MailAction) -> str:
       {action:"list", folder:"INBOX", preview:false} - list messages
       {action:"list", folder:"INBOX", preview:true} - list with body snippets
       {action:"read", folder:"INBOX", payload:"123"} - read message (truncated quoted tail by default)
-      {action:"read", folder:"INBOX", payload:"123:more"} - include previous quoted layer
+      {action:"read", folder:"INBOX", payload:"123:1"} - include previous quoted layer
       {action:"read", folder:"INBOX", payload:"123:full"} - read full message without truncation
       {action:"search", folder:"INBOX", payload:"from:x@y.com", preview:true}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
@@ -584,11 +584,13 @@ uv run --directory {plugin_dir} python setup.py
                 if modifier == "full":
                     full = True
                     depth = 0
-                elif modifier == "more":
+                elif modifier.isdigit():
                     full = False
-                    depth = 1
+                    depth = int(modifier)
                 else:
-                    return f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:more', or '{id_str}:full'"
+                    return (
+                        f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:1' (include previous message), or '{id_str}:full'"
+                    )
             else:
                 id_str = params.payload
                 full = False
@@ -641,16 +643,16 @@ uv run --directory {plugin_dir} python setup.py
                 count = msg.get("quoted_message_count", 0)
                 chars = msg.get("quoted_chars_truncated", 0)
                 chars_k = chars // 1000
-                if depth == 1:
+                next_depth = depth + 1
+                if depth >= 1:
                     truncation_notice = (
                         f"\n**Older reply chain omitted** (~{chars_k}k chars, estimated {count} messages). "
-                        f'Use read with payload: "{msg_id}:full" for complete chain.\n'
+                        f'Use ":{next_depth}" for next layer or ":full" for complete chain.\n'
                     )
                 else:
                     truncation_notice = (
                         f"\n**Quoted reply chain omitted** (~{chars_k}k chars, estimated {count} messages). "
-                        f'Use read with payload: "{msg_id}:more" for previous message with inline replies, '
-                        f'or "{msg_id}:full" for complete chain.\n'
+                        f'Use ":1" for previous message with inline replies, or ":full" for complete chain.\n'
                     )
 
             # Attachments info (safe metadata, outside wrapper)

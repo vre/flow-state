@@ -444,8 +444,8 @@ class TestReadActionWrapping:
         mock_read.assert_called_once_with("INBOX", 123, full=True, depth=0)
 
     @patch("imap_stream_mcp.read_message")
-    async def test_read_payload_more_modifier_calls_read_message_with_depth_one(self, mock_read):
-        """read with :more should call read_message(..., depth=1)."""
+    async def test_read_payload_numeric_modifier_calls_read_message_with_depth(self, mock_read):
+        """read with :1 should call read_message(..., depth=1)."""
         mock_read.return_value = {
             "subject": "Thread",
             "from": ["sender@example.com"],
@@ -463,7 +463,7 @@ class TestReadActionWrapping:
             "quoted_chars_truncated": 2048,
         }
 
-        await use_mail(MailAction(action="read", folder="INBOX", payload="123:more"))
+        await use_mail(MailAction(action="read", folder="INBOX", payload="123:1"))
 
         mock_read.assert_called_once_with("INBOX", 123, full=False, depth=1)
 
@@ -472,7 +472,7 @@ class TestReadActionWrapping:
         result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:foo"))
 
         assert "Error: unknown modifier 'foo'" in result
-        assert "123:more" in result
+        assert "123:1" in result
         assert "123:full" in result
 
     @patch("imap_stream_mcp.read_message")
@@ -505,12 +505,12 @@ class TestReadActionWrapping:
         assert attachments_pos != -1
         assert notice_pos > email_end
         assert attachments_pos > notice_pos
-        assert "123:more" in result
-        assert "123:full" in result
+        assert ":1" in result
+        assert ":full" in result
 
     @patch("imap_stream_mcp.read_message")
-    async def test_read_more_notice_recommends_full_only(self, mock_read):
-        """Depth-1 truncation notice should recommend only :full."""
+    async def test_read_depth_one_notice_recommends_next_and_full(self, mock_read):
+        """Depth-1 truncation notice should recommend :2 and :full."""
         mock_read.return_value = {
             "subject": "Threaded",
             "from": ["sender@example.com"],
@@ -528,11 +528,11 @@ class TestReadActionWrapping:
             "quoted_chars_truncated": 18765,
         }
 
-        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:more"))
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:1"))
 
         assert "**Older reply chain omitted**" in result
-        assert "123:full" in result
-        assert "123:more" not in result
+        assert ":2" in result
+        assert ":full" in result
 
     @patch("imap_stream_mcp.read_message")
     async def test_read_short_email_without_quotes_has_no_truncation_notice(self, mock_read):
@@ -559,8 +559,8 @@ class TestReadActionWrapping:
         assert "**Quoted reply chain omitted**" not in result
 
     @patch("imap_stream_mcp.read_message")
-    async def test_read_more_without_remaining_depth_has_no_truncation_notice(self, mock_read):
-        """When :more already returns full content, no truncation notice is shown."""
+    async def test_read_depth_one_without_remaining_has_no_truncation_notice(self, mock_read):
+        """When :1 already returns full content, no truncation notice is shown."""
         mock_read.return_value = {
             "subject": "Threaded",
             "from": ["sender@example.com"],
@@ -578,15 +578,15 @@ class TestReadActionWrapping:
             "quoted_chars_truncated": 0,
         }
 
-        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:more"))
+        result = await use_mail(MailAction(action="read", folder="INBOX", payload="123:1"))
 
         assert "**Older reply chain omitted**" not in result
         assert "**Quoted reply chain omitted**" not in result
 
-    async def test_help_read_mentions_more_and_full_modifiers(self):
-        """Help text for read should document :more and :full."""
+    async def test_help_read_mentions_depth_and_full_modifiers(self):
+        """Help text for read should document :1 and :full."""
         result = await use_mail(MailAction(action="help", payload="read"))
-        assert ":more" in result
+        assert ":1" in result
         assert ":full" in result
 
 
