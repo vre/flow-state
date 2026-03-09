@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.1] - 2026-03-09
+
+### Added
+- Depth-aware quote truncation: `read=67:1` returns depth 0+1 (inline replies), `read=67:2` for deeper, `read=67:full` for everything
+- `_find_all_boundaries()` detects all separator patterns in a message and returns sorted boundary indices
+- Truncation notices guide to next depth level (`:N+1`) and `:full`
+- Boundary precedence rules: Outlook wins over localized, minimum 3-line gap between boundaries
+
+### Changed
+- `split_quoted_tail()` accepts `depth` parameter, cuts at Nth boundary instead of always first
+- `read_message()` accepts `depth` parameter, passed through to `split_quoted_tail()`
+- Interleaved reply bypass removed — was returning full body (44k+), now returns depth 0 by default with deeper levels via `:N`
+
 ## [0.7.0] - 2026-03-03
 
 ### Added

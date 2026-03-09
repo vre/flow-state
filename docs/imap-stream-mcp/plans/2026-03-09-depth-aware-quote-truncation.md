@@ -13,10 +13,13 @@ Three-level progressive disclosure via payload modifiers:
 | Payload | Content | Token cost | Use case |
 |---------|---------|-----------|----------|
 | `"67"` | depth 0 only | minimal | default, quick scan |
-| `"67:more"` | depth 0+1 | moderate | inline answers, reply context |
+| `"67:1"` | depth 0+1 | moderate | inline answers, reply context |
+| `"67:2"` | depth 0+1+2 | more | deeper chain context |
 | `"67:full"` | all depths | maximum | composing reply with full chain |
 
-Truncation notice guides the LLM to request more when needed. Exactly three modes — no `depth=None` or arbitrary depth values.
+Truncation notice guides the LLM to request deeper levels. Numeric `:N` modifiers for any depth, `:full` for everything.
+
+> **Post-implementation note**: Originally planned as `:more` (fixed depth 1), changed to numeric `:N` during review for extensibility.
 
 ## Acceptance Criteria
 
@@ -127,8 +130,8 @@ Order: core logic → API contract → wiring → docs → tests → verify.
 - [x] 10. Update existing interleaved test (test_imap_client.py:875) to match new behavior
 - [x] 11. Add edge case tests: HTML-only + `:more`, boundary at line 0, localized header false positive guard, interleaved `>` with fallback-only boundary, min-gap boundary suppression (short gap = no false split, legitimate boundary with 4+ lines = kept)
 - [x] 12. Run full test suite (ran; 20 pre-existing draft-flag test failures outside this plan scope)
-- [ ] 13. Manual verification: `"67"`, `"67:more"`, `"67:full"` on Hotelli message (vre@mail.vre.iki.fi)
-- [ ] 14. Manual verification: `"35"`, `"35:more"` on single-separator message
+- [x] 13. Manual verification: `"67"`, `"67:1"`, `"67:full"` on Hotelli message (vre@mail.vre.iki.fi) — depth 0: 1690 chars, depth 1: 13326 chars with inline answers, full: 47376 chars
+- [x] 14. Manual verification: `"35"`, `"35:1"` on single-separator message — 9 boundaries found in long thread
 
 ## Reflection
 

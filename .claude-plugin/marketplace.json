@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Knowledge work, context management, and productivity tools/skills/etc. for Claude Code",
-    "version": "20260307.1000",
+    "version": "20260309.1000",
     "pluginRoot": "./"
   },
   "plugins": [
@@ -23,7 +23,7 @@
       "name": "imap-stream-mcp",
       "source": "./imap-stream-mcp",
       "description": "Lightweight IMAP email MCP server. ~500 tokens vs 15,000+. Read, search, draft, flag emails with markdown support.",
-      "version": "0.7.0",
+      "version": "0.7.1",
       "category": "productivity",
       "keywords": ["email", "imap", "mcp"]
     }
