@@ -205,7 +205,7 @@ class MailAction(BaseModel):
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id[:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:more|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
@@ -280,13 +280,14 @@ Fetches message content by ID.
 
 ## Parameters
 - folder: Folder containing message
-- payload: Message ID (from list/search results), optionally with :full
+- payload: Message ID (from list/search results), optionally with :more or :full
 
 ## Returns
 Full message with: subject, from, to, cc, date, body_text, body_html, message_id, in_reply_to
 
 ## Example
 {action: "read", folder: "INBOX", payload: "12345"}
+{action: "read", folder: "INBOX", payload: "12345:more"}
 {action: "read", folder: "INBOX", payload: "12345:full"}
 """,
     "search": """
@@ -478,6 +479,7 @@ async def use_mail(params: MailAction) -> str:
       {action:"list", folder:"INBOX", preview:false} - list messages
       {action:"list", folder:"INBOX", preview:true} - list with body snippets
       {action:"read", folder:"INBOX", payload:"123"} - read message (truncated quoted tail by default)
+      {action:"read", folder:"INBOX", payload:"123:more"} - include previous quoted layer
       {action:"read", folder:"INBOX", payload:"123:full"} - read full message without truncation
       {action:"search", folder:"INBOX", payload:"from:x@y.com", preview:true}
       {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
@@ -579,19 +581,25 @@ uv run --directory {plugin_dir} python setup.py
 
             if ":" in params.payload:
                 id_str, modifier = params.payload.split(":", 1)
-                if modifier != "full":
-                    return f"Error: unknown modifier '{modifier}'. Use '{id_str}' or '{id_str}:full'"
-                full = True
+                if modifier == "full":
+                    full = True
+                    depth = 0
+                elif modifier == "more":
+                    full = False
+                    depth = 1
+                else:
+                    return f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:more', or '{id_str}:full'"
             else:
                 id_str = params.payload
                 full = False
+                depth = 0
 
             try:
                 msg_id = int(id_str)
             except ValueError:
                 return f"Error: payload must be numeric message ID, got '{id_str}'"
 
-            msg = read_message(folder, msg_id, full=full)
+            msg = read_message(folder, msg_id, full=full, depth=depth)
 
             # Collect header info for wrapped email
             header_lines = [
@@ -632,11 +640,18 @@ uv run --directory {plugin_dir} python setup.py
             if msg.get("quoted_truncated"):
                 count = msg.get("quoted_message_count", 0)
                 chars = msg.get("quoted_chars_truncated", 0)
-                truncation_notice = (
-                    f"\n**Quoted reply tail omitted** (~{chars // 1000}k chars, estimated {count} messages). "
-                    f'Use read with payload: "{msg_id}:full" for complete message. '
-                    "Note: composing a reply that continues the full quote chain requires `:full`.\n"
-                )
+                chars_k = chars // 1000
+                if depth == 1:
+                    truncation_notice = (
+                        f"\n**Older reply chain omitted** (~{chars_k}k chars, estimated {count} messages). "
+                        f'Use read with payload: "{msg_id}:full" for complete chain.\n'
+                    )
+                else:
+                    truncation_notice = (
+                        f"\n**Quoted reply chain omitted** (~{chars_k}k chars, estimated {count} messages). "
+                        f'Use read with payload: "{msg_id}:more" for previous message with inline replies, '
+                        f'or "{msg_id}:full" for complete chain.\n'
+                    )
 
             # Attachments info (safe metadata, outside wrapper)
             attachments_info = ""

@@ -374,43 +374,73 @@ def _estimate_quoted_message_count(lines: list[str]) -> int:
     return 1
 
 
-def split_quoted_tail(body: str) -> tuple[str, str | None, int]:
-    """Separate primary content from quoted reply tail.
+def _find_next_non_blank_line(lines: list[str], start_idx: int) -> int | None:
+    """Find index of next non-empty line.
 
     Args:
-        body: Plain text email body.
+        lines: Message lines.
+        start_idx: Start index (inclusive).
 
     Returns:
-        Tuple of ``(primary_content, quoted_tail_or_none, estimated_message_count)``.
+        Index of next non-empty line, or None when not found.
     """
-    if not body:
-        return body, None, 0
+    idx = start_idx
+    while idx < len(lines):
+        if lines[idx].strip():
+            return idx
+        idx += 1
+    return None
 
-    lines = body.splitlines()
+
+def _find_tail_quote_boundary(lines: list[str]) -> int | None:
+    """Find quote boundary from trailing ``>`` block.
+
+    Args:
+        lines: Message lines.
+
+    Returns:
+        Boundary index or None when no trailing quote block exists.
+    """
+    idx = len(lines) - 1
+    while idx >= 0 and not lines[idx].strip():
+        idx -= 1
+
+    if idx < 0 or not _is_quote_line(lines[idx]):
+        return None
+
+    quote_start = idx
+    idx -= 1
+    while idx >= 0 and (_is_quote_line(lines[idx]) or not lines[idx].strip()):
+        if _is_quote_line(lines[idx]):
+            quote_start = idx
+        idx -= 1
+    if idx >= 0 and lines[idx].strip().endswith(":"):
+        return idx
+    return quote_start
+
+
+def _find_all_boundaries(lines: list[str]) -> list[int]:
+    """Find all forward-scan quote boundaries for depth-aware truncation.
+
+    Args:
+        lines: Message body lines.
+
+    Returns:
+        Sorted, deduplicated boundary indices. Falls back to one trailing
+        quote-block boundary when forward scan finds none.
+    """
     if not lines:
-        return body, None, 0
+        return []
 
-    # Interleaved replies are safer left intact.
-    non_blank_kinds = ["quote" if _is_quote_line(line) else "plain" for line in lines if line.strip()]
-    transitions = sum(1 for prev, cur in zip(non_blank_kinds, non_blank_kinds[1:], strict=False) if prev != cur)
-    if transitions >= 3 and "quote" in non_blank_kinds and "plain" in non_blank_kinds:
-        return body, None, 0
-
-    # Outlook-style separator with From: line is a high-confidence boundary.
-    outlook_start = None
+    outlook_candidates: list[int] = []
     for idx in range(len(lines) - 1):
         if not re.match(r"^_{30,}\s*$", lines[idx].strip()):
             continue
-        next_idx = idx + 1
-        while next_idx < len(lines) and not lines[next_idx].strip():
-            next_idx += 1
-        if next_idx < len(lines) and lines[next_idx].lstrip().startswith("From:"):
-            outlook_start = idx
-            break
+        next_idx = _find_next_non_blank_line(lines, idx + 1)
+        if next_idx is not None and lines[next_idx].lstrip().startswith("From:"):
+            outlook_candidates.append(idx)
 
-    # Localized Outlook header block without underscore separator:
-    # "<word(s)>: ... <email>" followed by at least two header-like lines.
-    localized_outlook_start = None
+    localized_candidates: list[int] = []
     localized_first_line = re.compile(r"^\w[\w\s]*:.*<[^>]+@[^>]+>")
     localized_header_line = re.compile(r"^\w[\w\s]*:.+")
     for idx, line in enumerate(lines):
@@ -427,31 +457,87 @@ def split_quoted_tail(body: str) -> tuple[str, str | None, int]:
             next_idx += 1
 
         if header_lines >= 3:
-            localized_outlook_start = idx
-            break
+            localized_candidates.append(idx)
 
-    quote_start = None
-    idx = len(lines) - 1
-    while idx >= 0 and not lines[idx].strip():
-        idx -= 1
+    classic_candidates: list[int] = []
+    classic_pattern = re.compile(r"^\s*On .+wrote:\s*$", flags=re.IGNORECASE)
+    for idx, line in enumerate(lines):
+        if not classic_pattern.match(line):
+            continue
+        next_idx = _find_next_non_blank_line(lines, idx + 1)
+        if next_idx is not None and _is_quote_line(lines[next_idx]):
+            classic_candidates.append(idx)
 
-    if idx >= 0 and _is_quote_line(lines[idx]):
-        quote_start = idx
-        idx -= 1
-        while idx >= 0 and (_is_quote_line(lines[idx]) or not lines[idx].strip()):
-            if _is_quote_line(lines[idx]):
-                quote_start = idx
-            idx -= 1
-        if idx >= 0 and lines[idx].strip().endswith(":"):
-            quote_start = idx
+    outlook_set = set(outlook_candidates)
+    precedence = {"classic": 0, "localized": 1, "outlook": 2}
+    candidates: list[tuple[int, str]] = [(idx, "outlook") for idx in outlook_candidates]
+    candidates.extend((idx, "localized") for idx in localized_candidates)
+    candidates.extend((idx, "classic") for idx in classic_candidates if idx + 1 not in outlook_set)
 
-    if outlook_start is not None:
-        tail_start = outlook_start
-    elif localized_outlook_start is not None:
-        tail_start = localized_outlook_start
-    else:
-        tail_start = quote_start
-    if tail_start is None or tail_start <= 0:
+    if candidates:
+        best_by_index: dict[int, str] = {}
+        for idx, kind in candidates:
+            existing = best_by_index.get(idx)
+            if existing is None or precedence[kind] > precedence[existing]:
+                best_by_index[idx] = kind
+
+        merged: list[tuple[int, str]] = []
+        for idx in sorted(best_by_index):
+            kind = best_by_index[idx]
+            if not merged:
+                merged.append((idx, kind))
+                continue
+            prev_idx, prev_kind = merged[-1]
+            if idx - prev_idx <= 1 and {prev_kind, kind} == {"outlook", "localized"}:
+                if precedence[kind] > precedence[prev_kind]:
+                    merged[-1] = (idx, kind)
+                continue
+            merged.append((idx, kind))
+
+        filtered: list[int] = []
+        for idx, _ in merged:
+            if not filtered:
+                filtered.append(idx)
+                continue
+            prev_idx = filtered[-1]
+            non_blank_gap = sum(1 for line in lines[prev_idx + 1 : idx] if line.strip())
+            if non_blank_gap >= 3:
+                filtered.append(idx)
+
+        return filtered
+
+    fallback = _find_tail_quote_boundary(lines)
+    if fallback is None:
+        return []
+    return [fallback]
+
+
+def split_quoted_tail(body: str, depth: int = 0) -> tuple[str, str | None, int]:
+    """Separate primary content from quoted reply tail.
+
+    Args:
+        body: Plain text email body.
+        depth: Quoted depth level to include (0=latest only, 1=latest+previous).
+
+    Returns:
+        Tuple of ``(primary_content, quoted_tail_or_none, estimated_message_count)``.
+    """
+    if not body:
+        return body, None, 0
+
+    lines = body.splitlines()
+    if not lines:
+        return body, None, 0
+
+    if depth < 0:
+        depth = 0
+
+    boundaries = _find_all_boundaries(lines)
+    if not boundaries or depth >= len(boundaries):
+        return body, None, 0
+
+    tail_start = boundaries[depth]
+    if tail_start <= 0:
         return body, None, 0
 
     primary = "\n".join(lines[:tail_start]).rstrip()
@@ -462,7 +548,7 @@ def split_quoted_tail(body: str) -> tuple[str, str | None, int]:
     return primary, quoted_tail, _estimate_quoted_message_count(quoted_tail.splitlines())
 
 
-def read_message(folder: str, message_id: int, account: str = None, full: bool = False) -> dict:
+def read_message(folder: str, message_id: int, account: str = None, full: bool = False, depth: int = 0) -> dict:
     """Read a specific message.
 
     Args:
@@ -470,6 +556,7 @@ def read_message(folder: str, message_id: int, account: str = None, full: bool =
         message_id: Message ID (UID)
         account: Account name. None uses default.
         full: When True, skip quote-tail truncation.
+        depth: Quoted depth level to include when ``full`` is False.
 
     Returns:
         Full message data including body
@@ -551,7 +638,7 @@ def read_message(folder: str, message_id: int, account: str = None, full: bool =
                 h.body_width = 0
                 body_text = h.handle(body_html)
 
-            primary, quoted_tail, estimated_count = split_quoted_tail(body_text)
+            primary, quoted_tail, estimated_count = split_quoted_tail(body_text, depth=depth)
             if quoted_tail is not None:
                 body_text = primary
                 quoted_truncated = True

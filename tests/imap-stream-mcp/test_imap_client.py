@@ -14,6 +14,7 @@ from conftest import MockAddress, MockEnvelope, MockIMAPClient
 from imap_client import (
     IMAPError,
     _attach_files,
+    _find_all_boundaries,
     create_draft,
     decode_header_value,
     download_attachment,
@@ -804,6 +805,79 @@ class TestReadMessage:
         assert tail.startswith("________________________________")
         assert "From: Alice <alice@example.com>" in tail
 
+    def test_find_all_boundaries_outlook_multiple_returns_all_depths(self):
+        """Boundary finder should return all Outlook depth boundaries."""
+        body = (
+            "Newest reply.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "Older message body from Alice.\n"
+            "________________________________\n"
+            "From: Bob <bob@example.com>\n"
+            "Sent: Sunday, February 23, 2026 9:00 AM\n"
+            "To: Alice <alice@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> Oldest quoted block"
+        )
+
+        boundaries = _find_all_boundaries(body.splitlines())
+
+        assert boundaries == [2, 9]
+
+    def test_split_quoted_tail_depth_one_keeps_first_quoted_layer(self):
+        """depth=1 should include depth 0+1 and truncate deeper chain."""
+        body = (
+            "Newest reply.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "Older message body from Alice.\n"
+            "________________________________\n"
+            "From: Bob <bob@example.com>\n"
+            "Sent: Sunday, February 23, 2026 9:00 AM\n"
+            "To: Alice <alice@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> Oldest quoted block"
+        )
+
+        primary, tail, count = split_quoted_tail(body, depth=1)
+
+        assert "Newest reply." in primary
+        assert "Older message body from Alice." in primary
+        assert "From: Bob <bob@example.com>" not in primary
+        assert tail is not None
+        assert tail.startswith("________________________________")
+        assert "From: Bob <bob@example.com>" in tail
+        assert count >= 1
+
+    def test_split_quoted_tail_depth_one_with_single_boundary_returns_full(self):
+        """depth=1 with only one boundary should return full body."""
+        body = (
+            "Latest reply line.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> older text"
+        )
+
+        primary, tail, count = split_quoted_tail(body, depth=1)
+
+        assert primary == body
+        assert tail is None
+        assert count == 0
+
     def test_split_quoted_tail_localized_outlook_headers_finnish(self):
         """Localized Outlook headers without underscores should split."""
         body = (
@@ -872,14 +946,74 @@ class TestReadMessage:
         assert tail is None
         assert count == 0
 
-    def test_split_quoted_tail_interleaved_kept_full(self):
-        """Interleaved quote/unquoted blocks should not be split."""
+    def test_split_quoted_tail_interleaved_truncates_last_quote_block_by_default(self):
+        """Interleaved quote/unquoted blocks should no longer bypass truncation."""
         body = "Answer 1\n> Question 1\nAnswer 2\n> Question 2\n"
+        primary, tail, count = split_quoted_tail(body)
+
+        assert primary == "Answer 1\n> Question 1\nAnswer 2"
+        assert tail == "> Question 2"
+        assert count == 1
+
+    def test_split_quoted_tail_interleaved_depth_one_returns_full(self):
+        """depth=1 should return full body when only one fallback boundary exists."""
+        body = "Answer 1\n> Question 1\nAnswer 2\n> Question 2\n"
+        primary, tail, count = split_quoted_tail(body, depth=1)
+
+        assert primary == body
+        assert tail is None
+        assert count == 0
+
+    def test_split_quoted_tail_boundary_at_line_zero_returns_full(self):
+        """Boundary at line 0 should not truncate because primary content is empty."""
+        body = (
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "Older content"
+        )
+
         primary, tail, count = split_quoted_tail(body)
 
         assert primary == body
         assert tail is None
         assert count == 0
+
+    def test_find_all_boundaries_min_gap_suppresses_close_candidates(self):
+        """Short-gap nested attribution candidates should collapse to one boundary."""
+        body = "Reply\n\nOn Tue, Alex wrote:\n> Question 1\nOn Mon, Bob wrote:\n> Question 2\n"
+
+        boundaries = _find_all_boundaries(body.splitlines())
+
+        assert boundaries == [2]
+
+    def test_find_all_boundaries_min_gap_keeps_candidates_with_large_gap(self):
+        """Boundaries with 4+ quoted lines between them should be kept."""
+        body = "Reply\n\nOn Tue, Alex wrote:\n> Q1\n> Q2\n> Q3\n> Q4\nOn Mon, Bob wrote:\n> Q5\n"
+
+        boundaries = _find_all_boundaries(body.splitlines())
+
+        assert boundaries == [2, 7]
+
+    def test_find_all_boundaries_ignores_close_localized_signature_like_block(self):
+        """Localized header-like block too close to prior boundary should be ignored."""
+        body = (
+            "Uusin viesti.\n\n"
+            "Lähettäjä: Ville Reijonen <vreijone@gmail.com>\n"
+            "Lähetetty: keskiviikko 23. huhtikuuta 2025 15.40\n"
+            "Vastaanottaja: Henna Hopia <henna.hopia@hopiasepat.fi>\n"
+            "\n"
+            "Lähettäjä: Team Support <support@example.com>\n"
+            "Rooli: Asiakaspalvelu\n"
+            "Puhelin: 010 1234567\n"
+        )
+
+        boundaries = _find_all_boundaries(body.splitlines())
+
+        assert boundaries == [2]
 
     def test_split_quoted_tail_reduces_more_than_80_percent_on_long_thread(self):
         """Long quoted thread fixture should shrink by >80%."""
@@ -937,6 +1071,46 @@ class TestReadMessage:
         assert result.get("quoted_message_count", 0) == 0
 
     @patch("session._create_connection")
+    def test_read_message_depth_one_keeps_previous_layer_and_truncates_older(self, mock_create):
+        """depth=1 should include first quoted layer but truncate deeper history."""
+        mock_client = MockIMAPClient()
+        body = (
+            "Newest reply.\n\n"
+            "________________________________\n"
+            "From: Alice <alice@example.com>\n"
+            "Sent: Monday, February 24, 2026 10:00 AM\n"
+            "To: Bob <bob@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "Older message body from Alice.\n"
+            "________________________________\n"
+            "From: Bob <bob@example.com>\n"
+            "Sent: Sunday, February 23, 2026 9:00 AM\n"
+            "To: Alice <alice@example.com>\n"
+            "Subject: Re: Status\n"
+            "\n"
+            "> Oldest quoted block\n"
+        )
+        raw = self._make_plain_message(body)
+        envelope = MockEnvelope(
+            subject=b"Threaded",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1, depth=1)
+
+        assert result["quoted_truncated"] is True
+        assert "Newest reply." in result["body_text"]
+        assert "Older message body from Alice." in result["body_text"]
+        assert "From: Bob <bob@example.com>" not in result["body_text"]
+        assert result["quoted_chars_truncated"] > 0
+        assert result["quoted_message_count"] >= 1
+
+    @patch("session._create_connection")
     def test_read_message_html_only_uses_html2text_for_split(self, mock_create):
         """HTML-only messages should split using html2text output."""
         mock_client = MockIMAPClient()
@@ -964,6 +1138,36 @@ class TestReadMessage:
         assert result["quoted_truncated"] is True
         assert "Top reply" in result["body_text"]
         assert "On Tue, Alice wrote:" not in result["body_text"]
+        assert result["body_html"] != ""
+
+    @patch("session._create_connection")
+    def test_read_message_html_only_depth_one_keeps_converted_body(self, mock_create):
+        """HTML-only message with depth=1 should keep full converted body."""
+        mock_client = MockIMAPClient()
+        raw = (
+            b"MIME-Version: 1.0\r\n"
+            b"From: sender@example.com\r\n"
+            b"To: recipient@example.com\r\n"
+            b"Subject: HTML only\r\n"
+            b"Content-Type: text/html; charset=utf-8\r\n"
+            b"\r\n"
+            b"<div>Top reply</div>"
+            b"<blockquote>On Tue, Alice wrote:<br>Older line</blockquote>"
+        )
+        envelope = MockEnvelope(
+            subject=b"HTML only",
+            from_=[MockAddress(mailbox=b"sender", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        mock_client.add_message("INBOX", 1, envelope, raw_email=raw)
+        mock_create.return_value = mock_client
+        session._sessions.clear()
+
+        result = read_message("INBOX", 1, depth=1)
+
+        assert result["quoted_truncated"] is False
+        assert "Top reply" in result["body_text"]
+        assert "On Tue, Alice wrote:" in result["body_text"]
         assert result["body_html"] != ""
 
 
