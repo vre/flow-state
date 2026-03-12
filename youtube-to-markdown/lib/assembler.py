@@ -1,7 +1,5 @@
 """Final assembly library for YouTube to Markdown conversion."""
 
-import re
-import sys
 from pathlib import Path
 
 from lib.intermediate_files import (
@@ -212,64 +210,6 @@ class Finalizer:
                 return match
         return None
 
-    @staticmethod
-    def _slugify_heading(heading: str) -> str:
-        """Convert heading text to a GitHub-style anchor slug."""
-        normalized = re.sub(r"\s+", " ", heading).strip().lower()
-        slug = re.sub(r"[^\w\s-]", "", normalized).strip().replace(" ", "-")
-        return slug or "section"
-
-    def _first_heading_slug_map(self, transcript_content: str) -> dict[str, str]:
-        """Build heading->first-slug map from transcript markdown headings."""
-        slug_counts: dict[str, int] = {}
-        first_by_heading: dict[str, str] = {}
-
-        for line in transcript_content.splitlines():
-            match = re.match(r"^#{3,6}\s+(.+?)\s*$", line)
-            if not match:
-                continue
-
-            heading = match.group(1).strip()
-            base_slug = self._slugify_heading(heading)
-            seen = slug_counts.get(base_slug, 0)
-            slug = base_slug if seen == 0 else f"{base_slug}-{seen}"
-            slug_counts[base_slug] = seen + 1
-
-            if heading not in first_by_heading:
-                first_by_heading[heading] = slug
-
-        return first_by_heading
-
-    def _replace_watch_guide_cross_links(
-        self,
-        watch_guide: str,
-        transcript_filename: str,
-        first_slug_by_heading: dict[str, str],
-    ) -> str:
-        """Replace cross-link markers with transcript links.
-
-        Cross-link markers use exact lines in form: `→ Heading Name`.
-        """
-        output_lines: list[str] = []
-        pattern = re.compile(r"^→ (.+)$")
-
-        for line in watch_guide.splitlines():
-            match = pattern.match(line)
-            if not match:
-                output_lines.append(line)
-                continue
-
-            heading = match.group(1).strip()
-            slug = first_slug_by_heading.get(heading)
-            if not slug:
-                print(f"WARNING: unresolved transcript heading in watch guide: {heading}", file=sys.stderr)
-                output_lines.append(line)
-                continue
-
-            output_lines.append(f"  Transcript: [{heading}]({transcript_filename}#{slug})")
-
-        return "\n".join(output_lines)
-
     def _save_watch_guide(
         self,
         base_name: str,
@@ -278,34 +218,15 @@ class Finalizer:
         cleaned_title: str | None,
         video_id: str,
         upload_date: str | None,
-        transcript_filename: str,
     ) -> Path | None:
-        """Save watch guide file when verdict is WATCH or SKIM."""
+        """Save watch guide file when intermediate content is non-empty."""
         watch_guide_path = output_dir / f"{base_name}_watch_guide.md"
         watch_guide = self.read_component_or_empty(watch_guide_path)
         if not watch_guide.strip():
             return None
 
-        lines = watch_guide.splitlines()
-        first_line = lines[0].strip() if lines else ""
-
-        if first_line.startswith("READ-ONLY:"):
-            return None
-        if not (first_line.startswith("WATCH:") or first_line.startswith("SKIM:")):
-            print("WARNING: unparseable watch guide verdict, skipping file creation", file=sys.stderr)
-            return None
-
-        transcript_path = output_dir / transcript_filename
-        transcript_content = self.read_component_or_empty(transcript_path)
-        first_slug_by_heading = self._first_heading_slug_map(transcript_content)
-        processed_watch_guide = self._replace_watch_guide_cross_links(
-            watch_guide,
-            transcript_filename,
-            first_slug_by_heading,
-        )
-
         template = self.read_template(template_dir, "watch_guide.md")
-        content = template.replace("{watch_guide}", processed_watch_guide.strip())
+        content = template.replace("{watch_guide}", watch_guide.strip())
 
         if cleaned_title:
             filename = self.build_filename(upload_date, cleaned_title, video_id, " - watch guide")
@@ -316,6 +237,16 @@ class Finalizer:
         self.fs.write_text(final_path, content)
         print(f"Created watch guide file: {filename}")
         return final_path
+
+    def cleanup_analysis_files(self, base_name: str, output_dir: Path) -> None:
+        """Remove chunk analysis files that are not covered by literal cleanup lists.
+
+        Args:
+            base_name: Base extraction prefix (e.g., ``youtube_<video_id>``).
+            output_dir: Directory containing intermediate files.
+        """
+        for analysis_file in self.fs.glob(f"{base_name}_chunk_*_analysis.md", output_dir):
+            self.fs.remove(analysis_file)
 
     def cleanup_work_files(self, work_files: list[str], output_dir: Path) -> None:
         """Remove intermediate work files."""
@@ -372,7 +303,17 @@ class Finalizer:
         self.fs.write_text(output_path, content)
         print(f"Created transcript file: {filename}")
 
+        self._save_watch_guide(
+            base_name=base_name,
+            output_dir=output_dir,
+            template_dir=template_dir,
+            cleaned_title=cleaned_title,
+            video_id=video_id,
+            upload_date=upload_date,
+        )
+
         if not debug:
+            self.cleanup_analysis_files(base_name, output_dir)
             self.cleanup_work_files(get_transcript_work_files(base_name), output_dir)
 
         return output_path
@@ -501,7 +442,6 @@ class Finalizer:
             cleaned_title=cleaned_title,
             video_id=video_id,
             upload_date=upload_date,
-            transcript_filename=transcript_filename,
         )
 
         comments_template = self.read_template(template_dir, "comments.md")
@@ -511,6 +451,7 @@ class Finalizer:
         print(f"Created comments file: {comments_filename}")
 
         if not debug:
+            self.cleanup_analysis_files(base_name, output_dir)
             self.cleanup_work_files(get_all_work_files(base_name), output_dir)
 
         return summary_path, transcript_path, comments_path

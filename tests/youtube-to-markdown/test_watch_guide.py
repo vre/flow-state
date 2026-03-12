@@ -16,23 +16,12 @@ def _write_templates(template_dir: Path) -> None:
     (template_dir / "watch_guide.md").write_text("## Watch Guide\n\n{watch_guide}\n")
 
 
-@pytest.mark.parametrize(
-    ("heading", "expected"),
-    [
-        ("What's Next?", "whats-next"),
-        ("Too   many   spaces", "too-many-spaces"),
-        ("", "section"),
-    ],
-)
-def test_slugify_heading_edge_cases(heading: str, expected: str) -> None:
-    """_slugify_heading handles punctuation, spacing, and empty headings."""
-    assert Finalizer._slugify_heading(heading) == expected
-
-
-def test_watch_guide_work_file_is_not_transcript_specific() -> None:
-    """Watch guide intermediate file belongs to all-work cleanup, not transcript-only cleanup."""
+def test_watch_guide_work_files_are_transcript_specific() -> None:
+    """Transcript cleanup includes watch guide marker and intermediate watch guide files."""
     base_name = "youtube_vid"
-    assert f"{base_name}_watch_guide.md" not in get_transcript_work_files(base_name)
+    transcript_files = get_transcript_work_files(base_name)
+    assert f"{base_name}_watch_guide.md" in transcript_files
+    assert f"{base_name}_watch_guide_requested.flag" in transcript_files
     assert f"{base_name}_watch_guide.md" in get_all_work_files(base_name)
 
 
@@ -110,28 +99,17 @@ def test_save_raw_transcript_prefers_dedup_file(tmp_path: Path) -> None:
     assert "[00:00:01.000] Dedup" in path.read_text()
 
 
-@pytest.mark.parametrize(
-    "verdict_line",
-    [
-        "WATCH: visual content",
-        "SKIM: partial visual content",
-    ],
-)
 def test_save_watch_guide_creates_file_and_links_first_duplicate(
     tmp_path: Path,
-    verdict_line: str,
 ) -> None:
-    """WATCH/SKIM verdicts create file and link first matching duplicate heading."""
+    """Non-empty plain markdown watch guide is saved to final output file."""
     finalizer = Finalizer()
     base_name = "youtube_vid"
     template_dir = tmp_path / "templates"
     _write_templates(template_dir)
 
-    transcript_filename = "2026-02-25 - youtube - Title - transcript (vid).md"
-    transcript_path = tmp_path / transcript_filename
-    transcript_path.write_text("## Transcription\n\n### Intro\n\n### Repeat\n\n### Repeat\n\n")
-
-    (tmp_path / f"{base_name}_watch_guide.md").write_text(f"{verdict_line}\n\nFocus section\n→ Repeat\nTypo section\n→ Repeet\n")
+    watch_guide_content = "## Watch Route\n\n- [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here"
+    (tmp_path / f"{base_name}_watch_guide.md").write_text(watch_guide_content)
 
     out = finalizer._save_watch_guide(
         base_name=base_name,
@@ -140,24 +118,54 @@ def test_save_watch_guide_creates_file_and_links_first_duplicate(
         cleaned_title="Title",
         video_id="vid",
         upload_date="2026-02-25",
-        transcript_filename=transcript_filename,
     )
 
     assert out is not None
     content = out.read_text()
-    assert "Transcript: [Repeat](2026-02-25 - youtube - Title - transcript (vid).md#repeat)" in content
-    # unresolved heading kept as plain text
-    assert "→ Repeet" in content
+    assert watch_guide_content in content
 
 
-def test_save_watch_guide_read_only_skips_file(tmp_path: Path) -> None:
-    """READ-ONLY verdict skips watch guide file creation."""
+def test_finalize_transcript_only_calls_save_watch_guide(monkeypatch, tmp_path: Path) -> None:
+    """finalize_transcript_only invokes _save_watch_guide."""
+    finalizer = Finalizer()
+    base_name = "youtube_vid"
+    template_dir = tmp_path / "templates"
+    _write_templates(template_dir)
+    (template_dir / "transcript.md").write_text("{description}\n{transcription}")
+
+    (tmp_path / f"{base_name}_title.txt").write_text("Title")
+    (tmp_path / f"{base_name}_upload_date.txt").write_text("2026-02-25")
+    (tmp_path / f"{base_name}_description.md").write_text("Desc")
+    (tmp_path / f"{base_name}_transcript.md").write_text("Transcript body")
+
+    captured: dict[str, bool] = {"called": False}
+
+    def _fake_save_watch_guide(
+        base_name: str,
+        output_dir: Path,
+        template_dir: Path,
+        cleaned_title: str | None,
+        video_id: str,
+        upload_date: str | None,
+    ) -> None:
+        captured["called"] = True
+
+    monkeypatch.setattr(finalizer, "_save_watch_guide", _fake_save_watch_guide)
+
+    output_path = finalizer.finalize_transcript_only(base_name, tmp_path, template_dir, debug=True)
+
+    assert output_path.name == "2026-02-25 - youtube - Title - transcript (vid).md"
+    assert captured["called"]
+
+
+def test_save_watch_guide_empty_file_skips_output(tmp_path: Path) -> None:
+    """Empty watch guide file skips final file creation."""
     finalizer = Finalizer()
     base_name = "youtube_vid"
     template_dir = tmp_path / "templates"
     _write_templates(template_dir)
 
-    (tmp_path / f"{base_name}_watch_guide.md").write_text("READ-ONLY: summary sufficient\n")
+    (tmp_path / f"{base_name}_watch_guide.md").write_text("  \n\n")
 
     out = finalizer._save_watch_guide(
         base_name=base_name,
@@ -166,21 +174,18 @@ def test_save_watch_guide_read_only_skips_file(tmp_path: Path) -> None:
         cleaned_title="Title",
         video_id="vid",
         upload_date="2026-02-25",
-        transcript_filename="2026-02-25 - youtube - Title - transcript (vid).md",
     )
 
     assert out is None
     assert not (tmp_path / "2026-02-25 - youtube - Title - watch guide (vid).md").exists()
 
 
-def test_save_watch_guide_unparseable_verdict_skips_file(tmp_path: Path) -> None:
-    """Unparseable first line is treated as READ-ONLY and skipped."""
+def test_save_watch_guide_missing_file_skips_output(tmp_path: Path) -> None:
+    """Missing watch guide file skips final file creation."""
     finalizer = Finalizer()
     base_name = "youtube_vid"
     template_dir = tmp_path / "templates"
     _write_templates(template_dir)
-
-    (tmp_path / f"{base_name}_watch_guide.md").write_text("MAYBE: undecided\n")
 
     out = finalizer._save_watch_guide(
         base_name=base_name,
@@ -189,7 +194,6 @@ def test_save_watch_guide_unparseable_verdict_skips_file(tmp_path: Path) -> None
         cleaned_title="Title",
         video_id="vid",
         upload_date="2026-02-25",
-        transcript_filename="2026-02-25 - youtube - Title - transcript (vid).md",
     )
 
     assert out is None
@@ -261,3 +265,26 @@ def test_prepare_update_includes_watch_guide_for_unavailable(monkeypatch, tmp_pa
 
     assert result["status"] == "UNAVAILABLE"
     assert result["existing_files"]["watch_guide"] == "watch.md"
+
+
+def test_cleanup_analysis_files_removes_only_chunk_analysis_files(tmp_path: Path) -> None:
+    """cleanup_analysis_files removes chunk analysis files and preserves other files."""
+    finalizer = Finalizer()
+    base_name = "youtube_vid"
+
+    removable_a = tmp_path / f"{base_name}_chunk_001_analysis.md"
+    removable_b = tmp_path / f"{base_name}_chunk_002_analysis.md"
+    keep_single = tmp_path / f"{base_name}_analysis.md"
+    keep_other = tmp_path / f"{base_name}_chunk_001_cleaned.md"
+
+    removable_a.write_text("a")
+    removable_b.write_text("b")
+    keep_single.write_text("single")
+    keep_other.write_text("cleaned")
+
+    finalizer.cleanup_analysis_files(base_name, tmp_path)
+
+    assert not removable_a.exists()
+    assert not removable_b.exists()
+    assert keep_single.exists()
+    assert keep_other.exists()

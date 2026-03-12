@@ -69,11 +69,14 @@ If `existing_files.watch_guide` exists:
 python3 ./scripts/40_backup.py backup "<existing_files.watch_guide>"
 rm "<existing_files.watch_guide>"
 ```
+Create marker so transcript polish synthesizes watch guide during re-extract:
+```bash
+printf '1\n' > "<output_directory>/${BASE_NAME}_watch_guide_requested.flag"
+```
 Run: transcript_extract.md → transcript_polish.md
 ```bash
 python3 ./scripts/50_assemble.py --transcript-only "${BASE_NAME}" "<output_directory>"
 ```
-Inform user: "Watch guide backed up. Full refresh needed to regenerate."
 DONE
 
 **If "Update metadata only":**

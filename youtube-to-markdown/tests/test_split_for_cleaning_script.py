@@ -62,7 +62,11 @@ def test_small_file_passthrough(tmp_path: Path, monkeypatch, capsys) -> None:
 
     result = _run_script(module, input_path, tmp_path, monkeypatch, capsys)
 
-    assert result["chunks"] == [str(input_path.resolve())]
+    chunks = result["chunks"]
+    assert len(chunks) == 1
+    assert chunks[0]["path"] == str(input_path.resolve())
+    assert chunks[0]["para_start"] == 1
+    assert chunks[0]["para_end"] == 5
     assert list(tmp_path.glob("*_chunk_*.md")) == []
 
 
@@ -74,7 +78,7 @@ def test_large_file_splits_into_chunk_files(tmp_path: Path, monkeypatch, capsys)
     assert input_path.stat().st_size > 80 * 1024
 
     result = _run_script(module, input_path, tmp_path, monkeypatch, capsys)
-    chunk_paths = [Path(path) for path in result["chunks"]]
+    chunk_paths = [Path(c["path"]) for c in result["chunks"]]
 
     assert len(chunk_paths) > 1
     assert all(path.is_absolute() for path in chunk_paths)
@@ -95,7 +99,7 @@ def test_split_preserves_paragraph_boundaries(tmp_path: Path, monkeypatch, capsy
     assert input_path.stat().st_size > 80 * 1024
 
     result = _run_script(module, input_path, tmp_path, monkeypatch, capsys)
-    chunk_paths = [Path(path) for path in result["chunks"]]
+    chunk_paths = [Path(c["path"]) for c in result["chunks"]]
 
     reconstructed = "\n\n".join(path.read_text() for path in chunk_paths)
     assert reconstructed == original
@@ -109,7 +113,7 @@ def test_chunk_size_cap_respected(tmp_path: Path, monkeypatch, capsys) -> None:
     assert input_path.stat().st_size > 80 * 1024
 
     result = _run_script(module, input_path, tmp_path, monkeypatch, capsys)
-    chunk_paths = [Path(path) for path in result["chunks"]]
+    chunk_paths = [Path(c["path"]) for c in result["chunks"]]
 
     assert len(chunk_paths) > 1
     assert all(path.stat().st_size <= 40 * 1024 for path in chunk_paths)

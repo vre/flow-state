@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.13.0] - 2026-03-12
+
+### Watch Guide Into Polish Pipeline
+- Watch guide integrated into transcript polish pipeline; `watch_guide.md` is no longer a separate subskill step
+- Heatmap extraction added from YouTube replay data (`yt-dlp` heatmap payload)
+- `33_split_for_cleaning.py` now outputs chunk analysis paragraph ranges for synthesis (`para_start`/`para_end`)
+- Assembler watch guide handling simplified: removed verdict parsing and transcript cross-link rewriting; saves plain markdown watch guide when non-empty
+
 ## [2.12.0] - 2026-03-07
 
 ### Long Transcript Polish Fix

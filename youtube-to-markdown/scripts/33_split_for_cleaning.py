@@ -10,10 +10,19 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from typing import TypedDict
 
 MAX_INPUT_BYTES = 80 * 1024
 MAX_CHUNK_BYTES = 40 * 1024
 TARGET_PARAGRAPHS = 20
+
+
+class ChunkRecord(TypedDict):
+    """Chunk path plus global paragraph boundaries."""
+
+    path: str
+    para_start: int
+    para_end: int
 
 
 def split_paragraphs(content: str) -> list[str]:
@@ -118,7 +127,34 @@ def write_chunks(chunk_groups: list[list[str]], output_dir: Path, base_name: str
     return chunk_paths
 
 
-def split_for_cleaning(input_path: Path, output_dir: Path) -> list[Path]:
+def build_chunk_records(chunk_paths: list[Path], chunk_groups: list[list[str]]) -> list[ChunkRecord]:
+    """Build chunk records with global paragraph offsets.
+
+    Args:
+        chunk_paths: Ordered paths to chunk files.
+        chunk_groups: Paragraph groups corresponding to ``chunk_paths``.
+
+    Returns:
+        Ordered chunk records with absolute path and global paragraph range.
+    """
+    records: list[ChunkRecord] = []
+    para_start = 1
+
+    for chunk_path, chunk_group in zip(chunk_paths, chunk_groups, strict=False):
+        para_end = para_start + len(chunk_group) - 1
+        records.append(
+            {
+                "path": str(chunk_path.resolve()),
+                "para_start": para_start,
+                "para_end": para_end,
+            }
+        )
+        para_start = para_end + 1
+
+    return records
+
+
+def split_for_cleaning(input_path: Path, output_dir: Path) -> list[ChunkRecord]:
     """Split transcript into chunk files when input exceeds threshold.
 
     Args:
@@ -126,16 +162,22 @@ def split_for_cleaning(input_path: Path, output_dir: Path) -> list[Path]:
         output_dir: Destination directory for chunk files.
 
     Returns:
-        Absolute paths to either original file (passthrough) or generated chunks.
+        Chunk records with absolute path and global paragraph boundaries.
     """
+    paragraphs = split_paragraphs(input_path.read_text())
     if input_path.stat().st_size <= MAX_INPUT_BYTES:
-        return [input_path.resolve()]
+        return [
+            {
+                "path": str(input_path.resolve()),
+                "para_start": 1,
+                "para_end": len(paragraphs),
+            }
+        ]
 
-    content = input_path.read_text()
-    paragraphs = split_paragraphs(content)
     chunk_groups = build_chunks(paragraphs)
     base_name = get_base_name(input_path)
-    return write_chunks(chunk_groups, output_dir, base_name)
+    chunk_paths = write_chunks(chunk_groups, output_dir, base_name)
+    return build_chunk_records(chunk_paths, chunk_groups)
 
 
 def main() -> None:
@@ -151,8 +193,8 @@ def main() -> None:
         print(f"ERROR: input file not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    chunk_paths = split_for_cleaning(input_path=input_path, output_dir=output_dir)
-    payload = {"chunks": [str(path) for path in chunk_paths]}
+    chunks = split_for_cleaning(input_path=input_path, output_dir=output_dir)
+    payload = {"chunks": chunks}
     print(json.dumps(payload))
 
 

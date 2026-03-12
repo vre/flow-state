@@ -20,18 +20,19 @@
   - [ ] Manual test: Bas Rutten demo (expect WATCH) + Nate B Jones talking head (expect SKIM/READ-ONLY)
   - [ ] Obsidian video embed syntax in watch guide
   - [ ] Chatter/banter summary section in watch guide
-  - [ ] Language preservation test (non-English watch guide)
+  - [x] Language preservation test (Finnish watch guides from Kiina/Saariluoma videos)
   - [ ] 150 KB guard test with real long transcript
-  - [ ] Gate evidence expansion (more signal types)
-- [ ] Long transcript chunking for polish pipeline — `docs/youtube-to-markdown/plans/2026-02-24-long-transcript-chunking.md`
+  - [x] Gate evidence expansion — heatmap + chunk analysis replace single-verdict gate
+  - [ ] Post-extract watch guide: fetch heatmap when transcript exists but was not polished (update_flow metadata-only path)
+- [x] Long transcript chunking for polish pipeline (v2.12.0) — `docs/youtube-to-markdown/plans/2026-02-24-long-transcript-chunking.md`
 - [ ] IMAP attachment indicator — `docs/imap-stream-mcp/plans/2026-02-24-attachment-indicator.md`
 - [ ] IMAP snippet preview — `docs/imap-stream-mcp/plans/2026-02-24-list-search-snippet.md`
 
 ## Maybe later
 
-- [ ] Watch guide: validate language preservation (guide matches transcript language) — needs test strategy
+- [x] Watch guide: validate language preservation — tested with Finnish videos in v2.13.0 iteration
 - [ ] Watch guide: test 150 KB transcript skip guard with real long transcript
-- [ ] Watch guide: expand gate evidence beyond 2 PoC videos — test with lectures, interviews, music, tutorials
+- [x] Watch guide: expand gate evidence — heatmap + chunk analysis replace verdict gate (v2.13.0)
 - [ ] Watch guide: embed YouTube video in Obsidian watch guide file (Obsidian media plugin)
 - [ ] Watch guide: summarize chatter/banter between substantive segments for WATCH/SKIM videos
 - [ ] What is comments are in multiple languages? Now hardcoded do not translate.

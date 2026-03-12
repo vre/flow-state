@@ -228,6 +228,26 @@ class YouTubeDataExtractor:
 
         return chapters_file
 
+    def create_heatmap_file(self, raw_data: dict, base_name: str, output_dir: Path) -> Path | None:
+        """Create heatmap JSON file from yt-dlp data.
+
+        Args:
+            raw_data: Raw yt-dlp JSON data
+            base_name: Base filename
+            output_dir: Output directory
+
+        Returns:
+            Path to created heatmap file, or None if no heatmap data
+        """
+        heatmap = raw_data.get("heatmap")
+        if not heatmap:
+            return None
+
+        heatmap_file = output_dir / f"{base_name}_heatmap.json"
+        self.fs.write_text(heatmap_file, json.dumps(heatmap, indent=2))
+        print(f"HEATMAP: {heatmap_file} ({len(heatmap)} segments)")
+        return heatmap_file
+
     def extract_all(self, video_url: str, output_dir: Path) -> tuple[Path, Path, Path]:
         """Extract all video data (metadata, description, chapters).
 
@@ -259,5 +279,6 @@ class YouTubeDataExtractor:
         metadata_file = self.create_metadata_file(metadata, base_name, output_dir)
         description_file = self.create_description_file(metadata, base_name, output_dir)
         chapters_file = self.create_chapters_file(metadata, base_name, output_dir)
+        self.create_heatmap_file(raw_data, base_name, output_dir)
 
         return metadata_file, description_file, chapters_file

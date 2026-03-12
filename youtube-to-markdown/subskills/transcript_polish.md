@@ -32,19 +32,36 @@ Your final message must be ONLY one of:
 python3 ./scripts/31_format_transcript.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
 ```
 
-## Step 2: Clean speech artifacts (chunked)
+## Step 2: Clean speech artifacts + write chunk analysis
 
 ```bash
 python3 ./scripts/33_split_for_cleaning.py "<output_directory>/${BASE_NAME}_transcript_paragraphs.md" "<output_directory>"
 ```
 
-Read stdout JSON. For each chunk path in `chunks` array, launch a parallel `task_tool`:
+Read stdout JSON.
+
+Expected schema:
+```json
+{
+  "chunks": [
+    {"path": "/abs/path/chunk_001.md", "para_start": 1, "para_end": 20},
+    {"path": "/abs/path/chunk_002.md", "para_start": 21, "para_end": 40}
+  ]
+}
+```
+
+For each chunk object in `chunks`, launch a parallel `task_tool`:
 - subagent_type: "general-purpose"
 - model: "sonnet"
 - run_in_background: true
 - prompt:
 ```
-Read {chunk_path} and clean speech artifacts.
+INPUT_CHUNK: {chunk_path}
+PARAGRAPH_RANGE: {para_start}-{para_end} (global paragraph numbers)
+OUTPUT_CLEANED: {chunk_path_cleaned}
+OUTPUT_ANALYSIS: {analysis_path}
+
+Read INPUT_CHUNK and clean speech artifacts.
 
 Tasks:
 - Remove fillers (um, uh, like, you know)
@@ -55,47 +72,142 @@ Tasks:
 - Keep timestamps at end of paragraphs
 - IMPORTANT: Do not merge, split, or reorder paragraphs. Preserve the exact paragraph count.
 
-ACTION REQUIRED: Use the Write tool NOW to save output to {chunk_path_cleaned}. Do not ask for confirmation.
+Also write chunk analysis in markdown:
+- Header: chunk identity + paragraph range + time range
+- Gate: WATCH | SKIM | READ-ONLY with 1-sentence rationale
+- Topics: include GLOBAL paragraph numbers from PARAGRAPH_RANGE context
+- Watch moments: timestamped moments where visual context matters
+- Skip: timestamp ranges with reason
+
+ACTION REQUIRED:
+1) Use Write tool NOW to save cleaned text to OUTPUT_CLEANED.
+2) Use Write tool NOW to save analysis markdown to OUTPUT_ANALYSIS.
+Do not ask for confirmation.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
-  clean: wrote {filename}
-  clean: FAIL - {what went wrong}
+  clean+analyze: wrote {cleaned_filename} and {analysis_filename}
+  clean+analyze: FAIL - {what went wrong}
 ```
 
-Wait for all cleaning subagents to complete. If a chunk fails, retry once.
+Analysis naming convention:
+- If chunk file matches `${BASE_NAME}_chunk_NNN.md`: analysis path is `${BASE_NAME}_chunk_NNN_analysis.md`
+- If chunk file is passthrough `${BASE_NAME}_transcript_paragraphs.md`: analysis path is `<output_directory>/${BASE_NAME}_analysis.md`
+
+Wait for all subagents. If a chunk fails, retry once.
 
 ```bash
 python3 ./scripts/34_concat_cleaned.py {chunk_1_cleaned} ... {chunk_N_cleaned} "<output_directory>/${BASE_NAME}_transcript_cleaned.md"
 ```
 
-## Step 3: Add AI topic headings
+## Step 3: Synthesize headings + optional watch guide
 
-Launch `task_tool`:
+Resolve summary file before synthesis:
+
+```bash
+python3 -c "
+from pathlib import Path
+import json, sys
+sys.path.insert(0, '.')
+from lib.assembler import Finalizer
+
+d = Path('<output_directory>')
+base = '${BASE_NAME}'
+tight = d / f'{base}_summary_tight.md'
+if tight.exists():
+    print(json.dumps({'summary': str(tight)}))
+    sys.exit(0)
+
+f = Finalizer()
+video_id = base.replace('youtube_', '', 1)
+existing = f.find_existing_summary(video_id, d)
+if existing:
+    print(json.dumps({'summary': str(existing)}))
+    sys.exit(0)
+
+print(json.dumps({'summary': None}))
+"
+```
+
+Collect analysis files:
+- Include `<output_directory>/${BASE_NAME}_analysis.md` if it exists
+- Include all `<output_directory>/${BASE_NAME}_chunk_*_analysis.md` files
+
+Check heatmap file:
+- `HEATMAP=<output_directory>/${BASE_NAME}_heatmap.json`
+- If it exists, include as input. If not, omit.
+
+Check flag file:
+- `FLAG=<output_directory>/${BASE_NAME}_watch_guide_requested.flag`
+
+If `FLAG` exists, launch synthesis `task_tool` (headings + watch guide):
 - subagent_type: "general-purpose"
 - model: "sonnet"
 - prompt:
 ```
-INPUT: <output_directory>/${BASE_NAME}_transcript_cleaned.md
-CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
-OUTPUT: <output_directory>/${BASE_NAME}_headings.json
+INPUT_ANALYSES: {analysis_file_list}
+INPUT_CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+INPUT_METADATA: <output_directory>/${BASE_NAME}_metadata.md
+INPUT_HEATMAP: {heatmap_path_or_none}
+INPUT_SUMMARY: {resolved_summary_or_none}
+VIDEO_ID: {video_id}
+OUTPUT_HEADINGS: <output_directory>/${BASE_NAME}_headings.json
+OUTPUT_WATCH_GUIDE: <output_directory>/${BASE_NAME}_watch_guide.md
 
-Read INPUT. Paragraphs are separated by blank lines. Number them starting from 1.
+Read all existing inputs.
 
-If CHAPTERS file exists and contains chapters, use them as context to anchor topic boundaries. Generate more granular headings than the chapter titles.
+Output 1: headings JSON
+- Format: [{"before_paragraph": <global int>, "heading": "### Topic"}, ...]
+- Use global paragraph numbers from analysis topics
 
-If no chapters, identify topic boundaries from content alone.
+Output 2: watch guide — curated viewing path
 
-Target: ~1 heading per 5-10 minutes of content. Use 3-6 word heading titles.
+Write in the same language as the source content. Never reference chunks or internal terms.
 
-Output ONLY a valid JSON array to OUTPUT:
-[{"before_paragraph": 1, "heading": "### Topic name"}, ...]
+Format: summary paragraphs alternating with video links.
+- Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
+- Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) MM:SS–MM:SS — Why watch: reason`
+- Calculate t=SECONDS: hours*3600 + minutes*60 + seconds. Over 1 hour use H:MM:SS.
+- Only link moments where WATCHING adds value over READING. Ask: "Does seeing this give something the text cannot?" Physical demo, humor timing, on-screen data, emotional reaction → yes. Expert analysis, verbal anecdote, facts → no, summarize instead. Zero links is fine for talking-head content.
+- Heatmap (if provided): {start_time, end_time, value 0-1} = viewer replay intensity. Use as tiebreaker, not primary signal — popular ≠ must-watch when the transcript exists.
 
-ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
+ACTION REQUIRED:
+1) Write valid JSON to OUTPUT_HEADINGS.
+2) Write markdown to OUTPUT_WATCH_GUIDE.
+Do not ask for confirmation.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
-  headings: wrote ${BASE_NAME}_headings.json
-  headings: FAIL - {what went wrong}
+  synthesize: wrote ${BASE_NAME}_headings.json and ${BASE_NAME}_watch_guide.md
+  synthesize: FAIL - {what went wrong}
 ```
+
+If `FLAG` does not exist, launch synthesis `task_tool` (headings only):
+- subagent_type: "general-purpose"
+- model: "sonnet"
+- prompt:
+```
+INPUT_ANALYSES: {analysis_file_list}
+INPUT_CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
+INPUT_METADATA: <output_directory>/${BASE_NAME}_metadata.md
+INPUT_HEATMAP: {heatmap_path_or_none}
+INPUT_SUMMARY: {resolved_summary_or_none}
+OUTPUT_HEADINGS: <output_directory>/${BASE_NAME}_headings.json
+
+Read all existing inputs.
+
+Output headings JSON:
+[{"before_paragraph": <global int>, "heading": "### Topic"}, ...]
+
+ACTION REQUIRED: Write valid JSON to OUTPUT_HEADINGS.
+Do not ask for confirmation.
+Do not output text during execution - only make tool calls.
+Your final message must be ONLY one of:
+  synthesize: wrote ${BASE_NAME}_headings.json
+  synthesize: FAIL - {what went wrong}
+```
+
+Then insert headings:
 
 ```bash
 python3 ./scripts/35_insert_headings_from_json.py "<output_directory>/${BASE_NAME}_transcript_cleaned.md" "<output_directory>/${BASE_NAME}_headings.json" "<output_directory>/${BASE_NAME}_transcript.md"
