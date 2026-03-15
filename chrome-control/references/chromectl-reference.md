@@ -4,8 +4,10 @@ Complete reference for the chromectl.py script used in Chrome debugging workflow
 
 ## Command Overview
 
-- `start` - Launch Chrome with remote debugging
-- `stop` - Stop all chromectl-managed Chrome instances
+- `start` - Launch Chrome with remote debugging (traditional mode)
+- `stop` - Stop daemon and/or chromectl-managed Chrome instances
+- `--auto-connect daemon` - Start background daemon on Unix socket
+- `send <cmd>` - Send command to running daemon
 - `list` - List all open tabs/targets
 - `open <url>` - Open a new tab and get its target ID
 - `eval --id <id> -e <expr>` - Execute JavaScript in a tab
@@ -52,18 +54,15 @@ Place global options BEFORE the command:
 ./chromectl.py start --port 9223 --user-data-dir ~/chromectl-test2
 ```
 
-## stop - Stop Chrome Instances
+## stop - Stop daemon and Chrome instances
 
 ```bash
 ./chromectl.py stop
 ```
 
-Finds and terminates all Chrome processes launched by chromectl (identified by chromectl profile directories).
+Stops the daemon (if socket exists) and terminates all Chrome processes launched by chromectl (identified by chromectl profile directories).
 
-**CRITICAL:** Always run `stop` when debugging session ends to:
-- Free up debugging ports
-- Allow normal Chrome to launch from Finder
-- Clean up background processes
+In traditional mode, run `stop` when the debugging session ends to free debugging ports, allow normal Chrome to launch from Finder, and clean up background processes.
 
 ## list - List Targets
 

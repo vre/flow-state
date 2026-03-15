@@ -178,7 +178,6 @@ class CDPConnection:
                 data = json.loads(msg.data)
                 if "id" in data:
                     fut = self._pending.pop(data["id"], None)
-                    pass
                     if fut and not fut.done():
                         fut.set_result(data)
                 elif "method" in data:
@@ -474,10 +473,29 @@ async def cmd_console_tail(args):
         await asyncio.sleep(duration)
 
 
+SOCKET_PATH = f"/tmp/chromectl-{os.getuid()}.sock"
+
+
 async def cmd_stop(args):
     import signal
     import subprocess
 
+    stopped_anything = False
+
+    # Stop daemon if running
+    if os.path.exists(SOCKET_PATH):
+        try:
+            reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+            writer.write(b'{"cmd":"quit"}\n')
+            await writer.drain()
+            await asyncio.wait_for(reader.readline(), timeout=5)
+            writer.close()
+            print("Daemon stopped")
+            stopped_anything = True
+        except Exception:
+            pass
+
+    # Kill chromectl-launched Chrome instances
     try:
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)
 
@@ -492,10 +510,6 @@ async def cmd_stop(args):
                     except ValueError:
                         continue
 
-        if not pids_to_kill:
-            print("No chromectl Chrome instances found running")
-            return
-
         for pid, _line in pids_to_kill:
             print(f"Stopping Chrome instance (PID: {pid})")
             try:
@@ -508,12 +522,13 @@ async def cmd_stop(args):
         if pids_to_kill:
             time.sleep(1)
             print(f"Stopped {len(pids_to_kill)} Chrome instance(s)")
+            stopped_anything = True
     except Exception as e:
         print(f"Error stopping Chrome: {e}", file=sys.stderr)
         sys.exit(1)
 
-
-SOCKET_PATH = f"/tmp/chromectl-{os.getuid()}.sock"
+    if not stopped_anything:
+        print("Nothing to stop (no daemon, no chromectl Chrome instances)")
 
 
 class Dispatcher:
@@ -536,6 +551,7 @@ class Dispatcher:
         self._user_data_dir = user_data_dir
         self._connected = bc is not None
         self._last_success = time.time()
+        self._dead = False  # set when CDP connection is permanently lost
 
     async def _reconnect(self) -> bool:
         """Reconnect to Chrome by re-reading DevToolsActivePort or fallback."""
@@ -593,7 +609,10 @@ class Dispatcher:
                         self._last_success = time.time()
                         return result
                     except Exception as e2:
+                        self._dead = True
                         return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
+                else:
+                    self._dead = True
             return {"error": f"{err_type}: {e}"}
 
     async def dispatch(self, req: dict) -> dict:
@@ -830,15 +849,31 @@ async def cmd_daemon(args):
     print(f"chromectl daemon listening on {SOCKET_PATH} (PID {os.getpid()})", flush=True)
     print(f'Usage: echo \'{{"cmd":"list"}}\' | nc -U {SOCKET_PATH}', flush=True)
 
-    # Idle shutdown: check every 60s, stop if no command in IDLE_TIMEOUT
+    # Watchdog: shutdown if CDP connection is dead OR idle too long
     async def idle_watchdog():
+        liveness_counter = 0
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(5)
+            if dispatcher._dead:
+                print("CDP connection lost, shutting down", flush=True)
+                server.close()
+                return
             idle = time.time() - dispatcher._last_success
             if idle > dispatcher.IDLE_TIMEOUT:
                 print(f"idle {idle:.0f}s > {dispatcher.IDLE_TIMEOUT}s, shutting down", flush=True)
                 server.close()
                 return
+            # Proactive liveness probe every 30s when idle, to detect dead CDP
+            # connections before the next client request arrives.
+            liveness_counter += 1
+            if liveness_counter >= 6 and idle > 10 and dispatcher.bc:
+                liveness_counter = 0
+                try:
+                    await asyncio.wait_for(dispatcher.bc.list_targets(), timeout=5)
+                except Exception as e:
+                    print(f"liveness probe failed: {type(e).__name__}: {e}, shutting down", flush=True)
+                    server.close()
+                    return
 
     watchdog = asyncio.create_task(idle_watchdog())
 
@@ -854,18 +889,6 @@ async def cmd_daemon(args):
             await bc.__aexit__(None, None, None)
         print("daemon stopped", flush=True)
 
-
-async def cmd_daemon_stop(args):
-    """Send quit to running daemon."""
-    if not os.path.exists(SOCKET_PATH):
-        print(f"No daemon socket at {SOCKET_PATH}", file=sys.stderr)
-        sys.exit(1)
-    reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
-    writer.write(b'{"cmd":"quit"}\n')
-    await writer.drain()
-    resp = await reader.readline()
-    print(resp.decode().strip())
-    writer.close()
 
 
 async def cmd_send(args):
@@ -913,7 +936,7 @@ def build_parser():
     sp.add_argument("--headless", action="store_true", help="Launch with --headless=new")
     sp.set_defaults(func=cmd_start)
 
-    sp = sub.add_parser("stop", help="Stop all chromectl-managed Chrome instances")
+    sp = sub.add_parser("stop", help="Stop daemon and/or chromectl-managed Chrome instances")
     sp.set_defaults(func=cmd_stop)
 
     sp = sub.add_parser("list", help="List open tabs/targets")
@@ -941,9 +964,6 @@ def build_parser():
 
     sp = sub.add_parser("daemon", help="Start background daemon on Unix socket")
     sp.set_defaults(func=cmd_daemon)
-
-    sp = sub.add_parser("daemon-stop", help="Stop running daemon")
-    sp.set_defaults(func=cmd_daemon_stop)
 
     sp = sub.add_parser("send", help="Send command to running daemon")
     sp.add_argument("send_cmd", metavar="CMD", help="Command: list, eval, screenshot, open, console-tail")

@@ -1,371 +1,174 @@
-# Chrome Debug Skill for Claude Code
+# chromectl — Chrome DevTools Protocol CLI
 
-A **Claude Code skill** and **standalone CLI tool** for controlling Chrome via the Chrome DevTools Protocol (CDP). Enables automated web app debugging, console monitoring, and screenshot capture.
+A single-file Python CLI for controlling Chrome via the Chrome DevTools Protocol (CDP). Works with **Chrome M144+** where traditional `--remote-debugging-port` on the default profile is blocked.
 
-Built as a single-file Python script using **uv inline dependencies** — no `requirements.txt`, no manual venv, no setup required.
+Built for two audiences:
+- **Claude Code skill** — Claude automatically debugs web apps through your real browser session
+- **Standalone CLI** — command-line Chrome automation via `chromectl.py`
 
-**Use it as:**
-- 🤖 **Claude Code Skill** - Claude automatically debugs your web apps
-- 🛠️ **Standalone Tool** - Command-line Chrome automation via `chromectl.py`
+## Why this exists
 
-## Features
+Chrome 136–146 progressively locked down remote debugging on the default profile to prevent cookie theft. The traditional approach — launching Chrome with `--remote-debugging-port` and a separate `--user-data-dir` — still works but requires a separate profile (no cookies, no logins, no extensions).
 
-- **Zero-setup**: Just run the script, uv handles all dependencies automatically
-- **Browser automation**: Open tabs, evaluate JavaScript, capture screenshots
-- **Console monitoring**: Stream live console messages from any tab
-- **Full-page screenshots**: Capture entire pages, not just the viewport
-- **Headless support**: Run Chrome in the background without a visible window
+Chrome M144 introduced an alternative: enable remote debugging from inside a running browser via `chrome://inspect/#remote-debugging`. This enables CDP access to **your existing session** — all profiles, all cookies, all logged-in sites. The tradeoff: each new WebSocket connection triggers a permission dialog.
 
-## Install as Claude Code Skill
+chromectl handles both modes:
+- **Auto-connect** (M144+): connects to your running Chrome via `DevToolsActivePort`, daemon keeps one connection alive to avoid repeated permission prompts
+- **Traditional**: launches a separate Chrome instance with `--remote-debugging-port` (full CDP, separate profile)
 
-**Want Claude to help debug your web apps automatically?** Install this as a skill for [Claude Code](https://claude.com/claude-code).
+## Quick start: auto-connect to your Chrome
 
-### Quick Install
+### 1. Enable remote debugging in Chrome
+
+Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles. Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
+
+### 2. Start the daemon
+
+```bash
+scripts/chromectl.py --auto-connect daemon
+```
+
+Chrome will show a permission dialog — click Allow. The daemon keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
+
+### 3. Use it
+
+```bash
+# List all open tabs
+scripts/chromectl.py send list
+
+# Run JavaScript in a tab
+scripts/chromectl.py send eval --id <target-id> -e "document.title"
+
+# Take a screenshot
+scripts/chromectl.py send screenshot --id <target-id> -o page.png
+
+# Or use netcat directly
+echo '{"cmd":"list"}' | nc -U /tmp/chromectl-501.sock
+```
+
+### 4. Stop
+
+```bash
+scripts/chromectl.py stop
+```
+
+## Quick start: traditional mode (separate profile)
+
+If you need full CDP access (HTTP discovery, direct page WebSocket, worker attachment) or don't want to touch your default Chrome:
+
+```bash
+# Launch Chrome with a separate profile
+scripts/chromectl.py start --headless
+
+# Use commands directly (no daemon needed)
+TARGET=$(scripts/chromectl.py open https://example.com | jq -r .id)
+scripts/chromectl.py eval --id $TARGET -e "document.title"
+scripts/chromectl.py screenshot --id $TARGET -o page.png
+
+scripts/chromectl.py stop
+```
+
+## Install as Claude Code skill
 
 ```bash
 cd ~/.claude/skills
-git clone https://github.com/pengelbrecht/chrome-debug-skill.git chrome-debug
+git clone https://github.com/<you>/chromectl.git chrome-debug
 ```
 
-Then **restart Claude Code**.
+Restart Claude Code. The skill activates when you ask Claude to debug web apps, take screenshots, or inspect console output.
 
-### What does the skill do?
+## What you can do through the daemon
 
-Once installed, Claude will automatically use this skill when you ask for help with:
-- "Debug why this page isn't loading correctly"
-- "Take a screenshot of https://example.com"
-- "Check the console for errors on my webapp"
-- "Monitor console output while I test my app"
+Once connected to your running Chrome:
 
-The skill enables **collaborative debugging** where Claude can:
-- Launch Chrome in visible mode (so you can interact with the page)
-- Monitor console errors in real-time
-- Capture screenshots to identify visual issues
-- Execute JavaScript to inspect page state
-- All while you navigate and test your application
+- **List tabs** across all windows and profiles
+- **Run JavaScript** in any tab (inspect DOM, call functions, read page state)
+- **Take screenshots** (viewport or full-page)
+- **Monitor console** output (errors, warnings, logs) for a duration
+- **Open new tabs** with a URL
+- **Raw CDP commands** for anything not covered above
 
-See [SKILL.md](SKILL.md) for complete skill documentation and workflows.
+## What you can't do (M144+ limitations)
 
----
+- **No HTTP discovery API** — `/json`, `/json/version` return 404. The daemon uses `Target.getTargets()` over WebSocket instead.
+- **No direct page WebSocket** — `ws://.../devtools/page/<id>` returns 403. All page interaction goes through flat sessions multiplexed over the browser WebSocket.
+- **Permission dialog on reconnect** — if the daemon's connection drops (Chrome restart, sleep/wake), reconnecting requires a new manual approval in Chrome.
+- **Worker attachment unstable** — attaching to service worker targets can crash the WebSocket connection. This is a [known Chrome bug](https://github.com/nicedoc/chrome-devtools-mcp/issues/1173), not intentional.
 
-## Standalone Installation (Without Claude Code)
-
-Clone the repository and use the script directly:
-
-```bash
-git clone https://github.com/pengelbrecht/chrome-debug-skill.git
-cd chrome-debug-skill
-chmod +x scripts/chromectl.py
-```
-
-That's it! On first run, `uv` will automatically install the required dependency (`aiohttp`).
-
-## Quick Start
-
-1. **Launch Chrome with remote debugging:**
-   ```bash
-   scripts/chromectl.py start --headless
-   ```
-
-2. **List all open tabs:**
-   ```bash
-   scripts/chromectl.py list
-   ```
-
-3. **Open a new tab:**
-   ```bash
-   scripts/chromectl.py open https://example.com
-   # Output: {"id":"ABC123...","url":"https://example.com"}
-   ```
-
-4. **Run JavaScript:**
-   ```bash
-   scripts/chromectl.py eval --id ABC123 -e "document.title"
-   # Output: "Example Domain"
-   ```
-
-5. **Stop Chrome when done (important!):**
-   ```bash
-   scripts/chromectl.py stop
-   ```
-
-   **⚠️ Always run `stop` when finished** to clean up Chrome processes and allow normal Chrome to launch from Finder.
+Traditional mode (`start`/`stop`) has none of these limitations — it uses a separate profile with full CDP access.
 
 ## Commands
 
-### `start` - Launch Chrome with debugging enabled
+| Command | Mode | Description |
+|---------|------|-------------|
+| `--auto-connect daemon` | auto | Start daemon, connect to running Chrome |
+| `send <cmd> [opts]` | auto | Send one command to running daemon |
+| `start [--headless]` | trad | Launch Chrome with separate profile |
+| `stop` | both | Stop daemon (if running) and chromectl Chrome instances |
+| `list` | both | List open tabs/targets |
+| `open <url>` | both | Open a new tab |
+| `eval --id <id> -e <expr>` | both | Run JavaScript in a tab |
+| `screenshot --id <id> [-o file]` | both | Capture PNG screenshot |
+| `console-tail --id <id> [--for N]` | both | Stream console messages |
+
+### Daemon socket protocol
+
+The daemon accepts JSON commands over its Unix socket, one per line:
 
 ```bash
-scripts/chromectl.py start [--headless] [--port PORT] [--chrome-app NAME] [--user-data-dir PATH]
+echo '{"cmd":"list"}' | nc -U /tmp/chromectl-501.sock
+echo '{"cmd":"eval","id":"TARGET_ID","expr":"document.title"}' | nc -U /tmp/chromectl-501.sock
+echo '{"cmd":"screenshot","id":"TARGET_ID","output":"shot.png"}' | nc -U /tmp/chromectl-501.sock
+echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-501.sock
 ```
 
-**Options:**
-- `--headless` - Run Chrome in headless mode (no visible window)
-- `--port` - Remote debugging port (default: 9222)
-- `--chrome-app` - macOS app name (default: "Google Chrome")
-- `--user-data-dir` - Custom profile directory (default: ~/chromectl-profile)
+### chromectl_daemon.py — Python library
 
-**Important:** Each debugging instance uses a separate profile directory, allowing you to run multiple instances simultaneously without closing your regular Chrome browser.
+For scripts that need daemon access programmatically:
 
-**Examples:**
-```bash
-# Headless mode (recommended for automation)
-scripts/chromectl.py start --headless
+```python
+from chromectl_daemon import daemon_context, send_command
 
-# Visible Chrome window
-scripts/chromectl.py start
-
-# Use Chrome Canary
-scripts/chromectl.py start --chrome-app "Google Chrome Canary"
+# Context manager: starts daemon if needed, stops on exit
+async with daemon_context() as socket_path:
+    result = await send_command({"cmd": "list"}, socket_path)
+    for tab in result["targets"]:
+        print(tab["title"])
 ```
 
----
+## How it works
 
-### `stop` - Stop all chromectl-managed Chrome instances
-
-```bash
-scripts/chromectl.py stop
+```
+                  ┌─────────────────────────────┐
+                  │  Chrome (user's session)     │
+                  │  chrome://inspect enabled    │
+                  └──────────┬──────────────────┘
+                             │ WebSocket (one persistent connection)
+                  ┌──────────┴──────────────────┐
+                  │  chromectl daemon            │
+                  │  PID file + Unix socket      │
+                  │  auto-reconnect on WS drop   │
+                  │  idle shutdown after 5 min   │
+                  └──────────┬──────────────────┘
+                             │ JSON line protocol
+              ┌──────────────┼──────────────────┐
+              │              │                   │
+          nc -U sock    chromectl send      Python script
+                                          (chromectl_daemon.py)
 ```
 
-Finds and stops all Chrome instances launched by chromectl (identifies them by the chromectl profile directories).
-
-**Why use this:**
-- Cleans up background Chrome processes
-- Frees up debugging ports (9222, etc.)
-- Allows you to launch regular Chrome from macOS Finder
-- Prevents interference with your normal Chrome usage
-
-**Output:**
-```
-Stopping Chrome instance (PID: 5595)
-Stopping Chrome instance (PID: 5602)
-...
-Stopped 8 Chrome instance(s)
-```
-
-**Important:** Always run `stop` when you're done debugging. Headless Chrome instances run invisibly in the background and can prevent normal Chrome from launching properly.
-
----
-
-### `list` - List all open tabs/targets
-
-```bash
-scripts/chromectl.py list
-```
-
-Shows all available targets (tabs, extensions, service workers) with their IDs, URLs, and titles.
-
-**Output format:** One JSON object per line
-```json
-{"id": "ABC123...", "type": "page", "title": "Example", "url": "https://example.com", "attached": null}
-```
-
----
-
-### `open` - Open a new tab
-
-```bash
-scripts/chromectl.py open <url>
-```
-
-Opens a new tab at the specified URL and returns its target ID.
-
-**Examples:**
-```bash
-# Open a website
-scripts/chromectl.py open https://github.com
-
-# Open a data URL with inline HTML/JS
-scripts/chromectl.py open "data:text/html,<h1>Hello</h1>"
-```
-
-**Tip:** Save the target ID for use with other commands:
-```bash
-TARGET=$(scripts/chromectl.py open https://example.com | jq -r .id)
-scripts/chromectl.py eval --id $TARGET -e "document.title"
-```
-
----
-
-### `eval` - Evaluate JavaScript
-
-```bash
-scripts/chromectl.py eval --id <target-id> -e <expression>
-```
-
-Executes JavaScript in the specified tab and returns the result.
-
-**Features:**
-- Automatically awaits promises (`awaitPromise: true`)
-- Returns JSON-serialized values
-- REPL mode enabled for cleaner output
-
-**Examples:**
-```bash
-# Get page title
-scripts/chromectl.py eval --id ABC123 -e "document.title"
-
-# Get current URL
-scripts/chromectl.py eval --id ABC123 -e "window.location.href"
-
-# Return an object
-scripts/chromectl.py eval --id ABC123 -e "({title: document.title, url: location.href})"
-
-# Async operations work automatically
-scripts/chromectl.py eval --id ABC123 -e "fetch('https://api.github.com').then(r => r.json())"
-
-# DOM manipulation
-scripts/chromectl.py eval --id ABC123 -e "document.querySelector('h1').innerText"
-```
-
----
-
-### `screenshot` - Capture a PNG screenshot
-
-```bash
-scripts/chromectl.py screenshot --id <target-id> [-o output.png] [--full-page]
-```
-
-**Options:**
-- `-o, --output` - Output file path (default: `screenshot_<id>.png`)
-- `--full-page` - Capture entire page by resizing viewport to content height
-
-**Examples:**
-```bash
-# Viewport screenshot (visible area only)
-scripts/chromectl.py screenshot --id ABC123 -o page.png
-
-# Full-page screenshot (entire scrollable content)
-scripts/chromectl.py screenshot --id ABC123 -o fullpage.png --full-page
-```
-
-**Output:** Prints the filename when complete
-```
-page.png
-```
-
----
-
-### `console-tail` - Stream console messages
-
-```bash
-scripts/chromectl.py console-tail --id <target-id> [--for SECONDS]
-```
-
-Streams console output from the specified tab in real-time.
-
-**Options:**
-- `--for` - Duration in seconds to stream (default: 10)
-
-**Important:** Only captures messages logged **after** the command starts. Historical console messages are not shown.
-
-**Output format:** One JSON object per line
-```json
-{"t": "+2.011s", "console": "log", "args": ["Test message"]}
-{"t": "+2.015s", "console": "warning", "args": ["Warning text"]}
-{"t": "+2.020s", "console": "error", "args": ["Error message"]}
-```
-
-**Usage pattern:**
-```bash
-# Start tailing in the background
-scripts/chromectl.py console-tail --id ABC123 --for 30 &
-
-# Then interact with the page
-scripts/chromectl.py eval --id ABC123 -e "console.log('Hello from eval')"
-```
-
-**Example:** Monitor a page with active logging
-```bash
-# Open a page that logs continuously
-scripts/chromectl.py open "data:text/html,<script>setInterval(() => console.log('tick', Date.now()), 1000)</script>"
-
-# Start monitoring (captures new messages for 10 seconds)
-scripts/chromectl.py console-tail --id <target-id> --for 10
-```
-
----
-
-## How It Works
-
-- **Shebang magic**: `#!/usr/bin/env -S uv run` tells your shell to execute via `uv run`
-- **Inline dependencies**: The `# /// script` block (PEP 723) embeds dependency info directly in the file
-- **Auto-caching**: On first run, uv resolves and caches `aiohttp` (~17ms after initial install)
-- **Chrome DevTools Protocol**: Communicates with Chrome over HTTP and WebSocket on port 9222
-
-## Tips & Tricks
-
-### Run multiple debugging instances
-You can run multiple Chrome instances simultaneously without closing your regular browser:
-```bash
-# Instance 1 on port 9222
-scripts/chromectl.py start --headless
-
-# Instance 2 on port 9223 (doesn't interfere with your regular Chrome)
-scripts/chromectl.py start --headless --port 9223 --user-data-dir ~/chromectl-test
-
-# Use the second instance
-scripts/chromectl.py --port 9223 list
-```
-
-### Closing Chrome cleanly
-```bash
-# Use the built-in stop command (recommended)
-scripts/chromectl.py stop
-
-# Or manually close all Chrome instances
-killall "Google Chrome"
-
-# Or find and kill specific debugging instance by PID
-ps aux | grep chromectl-profile
-kill <PID>
-```
-
-### Chain commands with jq
-```bash
-# Open, capture ID, and screenshot in one go
-TARGET=$(scripts/chromectl.py open https://github.com | jq -r .id)
-scripts/chromectl.py screenshot --id $TARGET -o github.png
-```
-
-### Monitor console while running tests
-```bash
-# Terminal 1: Start console monitoring
-scripts/chromectl.py console-tail --id ABC123 --for 60
-
-# Terminal 2: Run your automation
-scripts/chromectl.py eval --id ABC123 -e "runTests()"
-```
-
-### Debug connection issues
-```bash
-# Check if Chrome is listening on the debug port
-lsof -i :9222
-
-# Test HTTP endpoint directly
-curl http://localhost:9222/json | jq .
-```
-
-## Troubleshooting
-
-**"Cannot connect to host 127.0.0.1:9222"**
-- No Chrome instance with remote debugging is running on that port
-- Start one with: `./chromectl.py start --headless`
-- If port is taken, use a different port: `./chromectl.py start --headless --port 9223`
-
-**"Target not found"**
-- The tab was closed or the ID is incorrect
-- Run `./chromectl.py list` to get current target IDs
-
-**Port already in use**
-- Another Chrome instance is using port 9222
-- Use `--port 9223` to specify a different port
+**Flat sessions**: Chrome M144+ blocks direct page WebSocket URLs. The daemon maintains a single browser-level WebSocket and multiplexes page sessions using `Target.attachToTarget` with `flatten=true`. Each page gets a `sessionId`; CDP commands and events are routed by this ID over the shared connection.
 
 ## Requirements
 
-- **macOS** (uses `open -a` to launch Chrome; Linux/Windows need different launch commands)
-- **uv** ([Install here](https://github.com/astral-sh/uv))
-- **Google Chrome** installed in `/Applications/`
+- **Python 3.11+**
+- **[uv](https://github.com/astral-sh/uv)** (the script's shebang uses `uv run`)
+- **Google Chrome** (M144+ for auto-connect, any version for traditional mode)
+- **macOS** for `start`/`stop` commands (auto-connect mode works on any platform)
+
+## Fork history
+
+Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill). Additions: M144+ auto-connect, daemon mode, flat session multiplexing, reconnect handling, liveness probes.
 
 ## License
 
