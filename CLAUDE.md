@@ -27,7 +27,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Identify architectural decisions with meaningful tradeoffs — these become ADRs (`docs/<plugin/core>/adrs/<NNNN>-<title>.md`) during merge.
 
 2. PLANNING RULES:
-- DO NOT USE OR CHANGE TO AGENT PLAN MODE!
+- DO NOT USE OR CHANGE TO AGENT PLAN MODE — write plans to `docs/<plugin/core>/plans/` files instead
 - ALWAYS WRITE THE PLAN: 'docs/<plugin/core>/plans/<yyyy-mm-dd-short-description>.md' — use templates from `docs/templates/` (plan-small.md or plan-standard.md)
 - Single source of truth: plans live only in `docs/<plugin/core>/plans/` — never create a separate plan file elsewhere like '.claude/plans/' or '.copilot/session-state/'
 - Define measurable and observable acceptance criteria with expected outputs, validation approach and thresholds when possible
@@ -51,9 +51,13 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Copy plan file to worktree, `rm` from main, commit in worktree — plan is a deliverable, must not remain untracked in main.
 - Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml
 - Codex sandbox git workaround: in worktree, `mv .git .git-codex-sandbox-workaround && printf 'gitdir: .git-codex-sandbox-workaround\n' > .git` — enables git inside Codex `workspace-write` sandbox. Reverse before rebase/merge: `rm .git && mv .git-codex-sandbox-workaround .git`. Only works when `.git` is a directory (not in git worktrees where `.git` is a file).
-- Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
+- Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase (pre-implementation gate through implementation end). Returns at IMPLEMENTATION END.
 
-2. IMPLEMENTATION RULES
+2. PRE-IMPLEMENTATION GATE
+- STOP and evaluate: does the plan fit the existing architecture cleanly? Do not patch around friction — fix the friction.
+- If architecture fights the plan: propose to ORC before writing code — refactor first / change approach / return to Plan Phase. Do not start implementing on a bad foundation.
+
+3. IMPLEMENTATION RULES
 - NO CODE before tests + YAGNI + KISS + DRY + avoid Wordiness
 - When a bug is found: write a failing test first, then fix
 - Testability: Pure functions + thin `main()` glue. No DI frameworks.
@@ -63,12 +67,10 @@ ORC informs HC what the next step is. Do not just say what you did.
 - Google style docstrings
 - NOT writing documentation or a book — concise everywhere, including Merge Phase docs.
 
-3. IMPLEMENTATION START
-- Evaluate existing architecture against the plan. Refactor if needed — even small friction points. Propose changes to ORC: amend plan & implement / back to Plan Phase with total architecture planning.
-
 4. IMPLEMENTATION LOOP
 - Implement ONLY what is explicitly requested. No unrequested additions. New idea → new plan. Bug or omission → this plan.
 - Problem found: investigate. STOP if not solved by 3 rounds → IMP alerts ORC, ORC alerts HC. Within plan scope → document in plan and continue. Changes plan → Plan Phase amendment in worktree.
+- Repeated friction or workarounds = wrong direction. STOP, evaluate if a different approach would be better — do not keep patching.
 - Document surprises and decisions - the plan is a living document during implementation
 - Update plan task and acceptance criteria status as you progress: `[/]` in progress `[x]` done `[+]` discovered and done `[-]` cancelled - why? `[>]` deferred - why?
 - For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
@@ -103,6 +105,8 @@ ORC informs HC what the next step is. Do not just say what you did.
 
 ## Writing AGENTS.md / CLAUDE.md
 
+Deep rationale: `docs/Designing AGENTS.md.md` · LLM guide: `docs/writing-claude-agents-md.md`
+
 Budget: <2000 tokens (~100 lines)
 
 Role/persona:
@@ -125,28 +129,9 @@ Task instructions:
 - Bullets over tables - tables require parsing
 - No code style rules - use linters instead
 
-## Writing Skills (SKILL.md)
+## Writing Skills / MCPs / CLI
 
-- Budget: <500 tokens (~50 lines)
-- Description: "<Use when trigger>. <What it produces>."
-- Minimize skill, maximize script - no logic duplication
-- Define variables once: `${BASE_NAME}`, not `${X}`
-- Explicit outputs: "Creates: <file1>, <file2>" - enables failure detection
-- Flow: `→` sequential, `(A | B)` parallel, Mermaid for complex
-- Stop conditions explicit: "If X: `STOP`"
-- Subagent prompts: `INPUT:`/`OUTPUT:` first - highest value, read first
-
-## Writing MCPs
-
-- One tool per domain, route via action parameter - 70% token savings
-- Documentation in `help` action, minimal docstring
-- Parse liberally: "from:x" and "from x" both work
-- Error → suggest fix: `"Try: {action: 'list'}"`
-- Log unknown queries, expand parser when patterns emerge
-
-## Writing CLI Scripts
-
-- Unix/POSIX conventions: `-v` verbose, `-q` quiet, `-o` output, `--format json`
-- Errors MUST suggest fix: `"File not found. Did you mean 'config.json'?"`
-- Exit codes: 0=success, 1=error, 2=usage error
-- Self-documenting: validate args, print usage on wrong count
+- Creating/modifying skills → invoke `building-skills` or read `docs/writing-skills.md`
+- Creating/modifying MCP servers → invoke `mcp-builder` or read `docs/Designing MCP Servers.md`
+- Creating/modifying CLI tools → invoke `cli-tool-builder` or read `docs/Designing CLI Tools.md`
+- Deep rationale in `docs/Designing *.md` files, LLM-optimized guides in `docs/writing-*.md`
