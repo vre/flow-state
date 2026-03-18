@@ -1,5 +1,7 @@
 # Writing CLAUDE.md and AGENTS.md
 
+> **LLM-optimized guide.** Condensed principles for writing CLAUDE.md/AGENTS.md files. For the deep rationale with full references, see [`Designing AGENTS.md.md`](Designing%20AGENTS.md.md).
+
 This document explains principles for writing project-level LLM instruction files, with rationale for each practice.
 
 ## Context Window Economics
@@ -23,6 +25,7 @@ Key research findings:
 - Larger models show linear decay in instruction-following quality
 - Instructions at the beginning of a prompt receive stronger attention
 - As context fills up during a conversation, the "end" of your instructions moves further from attention - the beginning remains stable
+- Newer model generations show improved instruction-following capacity — the effective limit grows with each generation, but so does the temptation to add more rules
 
 This is why critical rules should be placed at the beginning of your file.
 
@@ -32,12 +35,39 @@ Before adding any instruction, ask yourself: does Claude actually need to be tol
 
 LLMs have been trained on vast amounts of text - most of Western literature, programming documentation, style guides, best practices. But there's a critical distinction: LLMs KNOW things but BEHAVE as they were trained to behave. Knowledge and behavior are not the same.
 
-Claude knows what clean code looks like. But telling Claude "write clean code" doesn't change its behavior - it already tries to do this based on training. Instructions only help when they:
+Claude knows what clean code looks like. But telling Claude "write clean code" doesn't change its behavior - it already tries to do this based on training.
+
+There is a critical distinction between knowledge and behavior. Claude KNOWS what YAGNI, KISS, and DRY mean. But knowledge does not equal behavior — Claude will still over-engineer, add unnecessary abstractions, and duplicate patterns unless explicitly instructed not to. Instructions that activate known-but-unfollowed practices are not wasted tokens. "YAGNI + KISS + DRY" as a CLAUDE.md rule is not teaching Claude what these mean — it is activating behavior that training alone does not reliably produce.
+
+Instructions help when they:
+- Activate behavior that Claude knows but doesn't reliably follow
 - Override default trained behavior
 - Specify project-specific conventions
 - Provide information Claude couldn't infer
 
-For example, "write clean code" is wasted tokens. But "use uv instead of pip for Python" is valuable because it's project-specific and overrides what Claude might otherwise choose.
+"Write clean code" is wasted tokens — it matches Claude's default behavior. "YAGNI + KISS + DRY" is valuable — Claude knows these but routinely violates them. "Use uv instead of pip" is valuable — it's project-specific and overrides what Claude might otherwise choose.
+
+### LLMs Think Inside the Box
+
+LLMs are incremental thinkers. When given a problem, they fix what's in front of them — patching, extending, adding layers on top of existing structure. They do not spontaneously step back and ask "would a different approach serve the whole better?"
+
+This is not a knowledge problem. Claude can explain when refactoring is preferable to patching. But in practice, it will keep adding complexity to a bad foundation rather than proposing to tear it down. It adjusts within the current frame — it does not change the frame.
+
+This has concrete consequences:
+- Architecture that should be replaced gets patched until it collapses
+- A wrong early design decision propagates through the entire implementation
+- Alternatives are not considered unless explicitly requested
+- Self-review checks correctness within the chosen approach, not whether the approach itself is right
+
+Knowing this, you cannot fix it with a knowledge instruction ("consider alternatives"). You need a **process gate** — a mandatory step in the workflow where the LLM must evaluate whether the current direction is right before continuing. Without a process gate, the behavior will not occur regardless of how many times the instruction says "consider alternatives."
+
+Example process gate in CLAUDE.md:
+```
+IMPLEMENTATION START:
+- Evaluate existing architecture against the plan.
+- If the plan doesn't fit cleanly: STOP. Propose to ORC: refactor first / change approach / return to Plan Phase.
+- Do not patch around architectural friction — fix the friction.
+```
 
 ## Two Types of Content
 
@@ -171,6 +201,10 @@ If you need context-dependent behavior, be explicit about when each mode applies
 ### Auto-generated Content
 
 The `/init` command creates generic CLAUDE.md content. This is a starting point, not a finished product. Replace generic content with project-specific instructions that actually add value.
+
+## Writing Skills
+
+For detailed skill design principles, categories, gotchas patterns, distribution strategies, and references, see `docs/Designing Skills.md` (sections 1–15). The CLAUDE.md "Writing Skills" section is a distillation of that document for in-context use.
 
 ## References
 
