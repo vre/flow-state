@@ -254,7 +254,42 @@ Host (vre)                    Bare repo                     Sandbox (sandvault-v
 
 Both users can read/write the bare repo. The sandbox user works on a full clone in its own writable space — no `.git/` write-access patches needed on the host repo.
 
-## 8. Observations
+## 8. Claude Code Authentication in Sandbox
+
+Claude Code stores auth tokens in the macOS login keychain. The sandvault user has its own keychain, separate from the host user.
+
+### Problem: Keychain Auto-Lock
+
+The login keychain locks automatically after sleep or inactivity timeout. When locked, Claude Code cannot read the auth token → "Not logged in · Please run /login". The keychain dialog asks for the sandvault user's password, which may be unknown.
+
+### Fix (tested 2026-03-18)
+
+```bash
+# 1. Reset keychain with empty password (from sv shell)
+security delete-keychain ~/Library/Keychains/login.keychain-db
+security create-keychain -p "" login.keychain-db
+security default-keychain -s ~/Library/Keychains/login.keychain-db
+
+# 2. Disable auto-lock (no -t flag = no timeout)
+security set-keychain-settings ~/Library/Keychains/login.keychain-db
+
+# 3. Login once
+claude
+/login
+```
+
+**Status**: Testing whether auth persists across days. If keychain still locks, fallback is `ANTHROPIC_API_KEY` env var in sandvault user's `.zshrc`.
+
+### Brew Upgrade Breaks buildhome Script
+
+When `brew upgrade` bumps sandvault version (e.g. 1.1.27 → 1.1.28), the `/var/sandvault/buildhome-sandvault-vre` script retains hardcoded paths to the old Cellar version. `sv shell` fails with:
+```
+ERROR: '/opt/homebrew/Cellar/sandvault/1.1.27/guest/home' directory not found
+```
+
+**Fix**: `sv -r shell` (rebuild) regenerates the script with the correct version path. Requires sudo.
+
+## 9. Observations
 
 1. **sandbox-exec is not deprecated in practice** — Apple deprecated the API but hasn't removed it. Both Sandvault and Claude Code rely on it (macOS).
 2. **Two-layer model is sound** — user isolation catches what sandbox-exec misses (e.g., credential separation). sandbox-exec catches what user isolation misses (e.g., world-writable paths).
