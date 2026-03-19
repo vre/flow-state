@@ -91,7 +91,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 ### 4. Merge Phase
 
 1. DOCUMENTATION
-- Delegate "## Reflection" to IMP via `session-codex` `continue`: what went well, what changed from plan, lessons learned. IMP writes to plan file.
+- Delegate implementation reflection to IMP via `session-codex` `continue`: IMP writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-impl-<short-name>.md` — what went well, what changed from plan, lessons learned.
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - If structure changed: update `ARCHITECTURE.md` to reflect actual code
 - If architectural decision with tradeoffs was made: write ADR in `docs/<plugin/core>/adrs/`
@@ -100,7 +100,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 2. MERGE
 - In worktree: `git pull --rebase origin main`. Resolve all conflicts in worktree. Test and validate after each rebase step — merge step on main must be clean.
 - Ask HC permission → on main: `git merge --squash .worktrees/<name>`, Linux-style commit message. No co-authors. Run tests on main after merge, before commit.
-- Delegate cycle reflection to IMP via `session-codex` `continue`: IMP writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-cycle-<short-name>.md` — plan→impl translation, review iterations and root causes, delegation effectiveness, process improvements.
+- ORC writes cycle reflection: `docs/<plugin/core>/reflections/<yyyy-mm-dd>-cycle-<short-name>.md` — plan→impl translation, review iterations and root causes, delegation effectiveness, process improvements. Only ORC has cross-phase context (planning + review + merge).
 - Ask HC for permission to clean up → `git worktree remove .worktrees/<name> && git branch -D <name>` (-D required after squash merge).
 
 ## Writing AGENTS.md / CLAUDE.md

@@ -212,7 +212,7 @@ Evidence quality markers:
 
 ## Line 41: "With clear mind take role of a skeptic"
 
-**[founding]** Present from second commit `80209e6` (2024-11-14) as "3. With clear mind validate."
+**[founding]** Present from second commit `80209e6` (2025-11-14) as "3. With clear mind validate."
 
 **Why "clear mind":** Found online as a prompt technique. Helps the model think as a third party while retaining its knowledge of the work. Partially removes contextual bias — the model has just created the plan and is biased toward defending it. This is a cheap and effective first content review.
 
@@ -403,7 +403,12 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 **[git → incident]** Introduced `215c27b` (2026-02-25). Ownership refined `42e2832` (2026-03-07): IMP writes, ORC delegates.
 
-**Why IMP writes:** HC feedback: the implementing agent has the most accurate knowledge of what happened during implementation. ORC delegates, does not write either reflection type.
+**Three reflection types with different authors:**
+- **Planning reflection** (line 44): ORC writes — only ORC has the full planning dialogue with HC
+- **Implementation reflection** (line 93): IMP writes to plan file — what went well, what changed, lessons learned from implementation
+- **Cycle reflection** (line 103): ORC writes — only ORC has the full picture across planning, review, and merge. IMP doesn't know how planning went or what HC decided.
+
+ORC delegates implementation reflection to IMP (who has the implementation experience). ORC writes both planning and cycle reflections (who has the cross-phase context).
 
 **Why the reflection exists:** The process improvement plan `docs/core/plans/2026-03-07-process-improvements-from-reflections.md` was itself driven by reflection evidence from two cycles — demonstrating the feedback loop works. The MathTrainer comparison (2026-03-06) explicitly noted that the competing approach had "Reflections: None."
 
