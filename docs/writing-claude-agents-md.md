@@ -1,8 +1,8 @@
 # Writing CLAUDE.md and AGENTS.md
 
-> **LLM-optimized guide.** Condensed principles for writing CLAUDE.md/AGENTS.md files. For the deep rationale with full references, see [`Designing AGENTS.md.md`](Designing%20AGENTS.md.md).
+> **LLM-optimized guide.** Condensed instructions for writing CLAUDE.md/AGENTS.md files. No references here — references and deep rationale belong in [`Designing AGENTS.md.md`](Designing%20AGENTS.md.md) which is written for humans.
 
-This document explains principles for writing project-level LLM instruction files, with rationale for each practice.
+This document is consumed by LLMs. Keep it concise, actionable, and free of citations.
 
 ## Context Window Economics
 
@@ -205,9 +205,3 @@ The `/init` command creates generic CLAUDE.md content. This is a starting point,
 ## Writing Skills
 
 For detailed skill design principles, categories, gotchas patterns, distribution strategies, and references, see `docs/Designing Skills.md` (sections 1–15). The condensed LLM guide is `docs/writing-skills.md`. CLAUDE.md contains trigger lines that point to builder skills (`building-skills`, `mcp-builder`, `cli-tool-builder`) and these guide files.
-
-## References
-
-- [Writing a good CLAUDE.md | HumanLayer](https://www.humanlayer.dev/blog/writing-a-good-claude-md) - Detailed analysis of instruction limits and best practices
-- [Keep Claude in character | Anthropic](https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/keep-claude-in-character) - Official guidance on role prompting
-- [Role Prompting | LearnPrompting](https://learnprompting.org/docs/advanced/zero_shot/role_prompting) - Research on persona effectiveness

@@ -1,5 +1,7 @@
 # MCP Design Principles for LLM Consumption
 
+> **LLM-optimized guide.** Design principles for APIs consumed by LLMs. No references here — references and deep rationale belong in [`Designing MCP Servers.md`](Designing%20MCP%20Servers.md) which is written for humans.
+
 LLM APIs differ fundamentally from traditional APIs. This document describes design principles that work when the consumer is a language model.
 
 ## Background: Why Traditional API Principles Fail

@@ -1,8 +1,8 @@
 # Writing Skills (SKILL.md)
 
-> **LLM-optimized guide.** Condensed principles for writing SKILL.md files. For the deep rationale with full references, see [`Designing Skills.md`](Designing%20Skills.md).
+> **LLM-optimized guide.** Condensed instructions for writing SKILL.md files. No references here — references and deep rationale belong in [`Designing Skills.md`](Designing%20Skills.md) which is written for humans.
 
-This document explains principles for writing task-specific skill files, with rationale for each practice.
+This document is consumed by LLMs. Keep it concise, actionable, and free of citations.
 
 ## What Skills Are
 
@@ -127,7 +127,7 @@ Why INPUT/OUTPUT first: Subagents start fresh without your context. They need to
 
 ### Constrain subagent output
 
-TaskOutput returns the agent's final text message to the coordinator's context [1]. Without constraints, agents produce verbose final messages ("I've analyzed the transcript and written a comprehensive summary covering...") that inflate coordinator context by ~30K chars per call [2] — causing compaction every 2-3 subagent dispatches.
+TaskOutput returns the agent's final text message to the coordinator's context. Without constraints, agents produce verbose final messages ("I've analyzed the transcript and written a comprehensive summary covering...") that inflate coordinator context by ~30K chars per call — causing compaction every 2-3 subagent dispatches.
 
 Always end subagent prompts with:
 
@@ -138,13 +138,13 @@ Your final message must be ONLY one of:
   {step}: FAIL - {what went wrong}
 ```
 
-This reduces TaskOutput from ~30K to ~40-130 chars [3]. The subagent still writes full output to files — only the status message is constrained.
+This reduces TaskOutput from ~30K to ~40-130 chars. The subagent still writes full output to files — only the status message is constrained.
 
 See `docs/writing-model-specific-prompts.md` for model-specific formatting differences (Haiku copies instruction format literally).
 
 ### Background agents cannot use Write
 
-Background Tasks (`run_in_background: true`) cannot prompt for tool permissions [4]. The Write tool is auto-denied with "prompts unavailable". Use blocking Tasks when subagents need to write files. Background Tasks can use Bash for file writes, but this is fragile for large or complex content.
+Background Tasks (`run_in_background: true`) cannot prompt for tool permissions. The Write tool is auto-denied with "prompts unavailable". Use blocking Tasks when subagents need to write files. Background Tasks can use Bash for file writes, but this is fragile for large or complex content.
 
 ## Skill Is a Folder
 
@@ -179,7 +179,7 @@ Skills can register session-scoped hooks via frontmatter. Use for opinionated gu
 
 ## Simple Markdown
 
-Skills are for LLM consumption [5]. Use simple markdown:
+Skills are for LLM consumption. Use simple markdown:
 - Plain headers and bullets
 - No emojis or visual formatting tricks
 - No complex table layouts
@@ -222,11 +222,3 @@ If a step produces files but doesn't list them, Claude can't detect failures. Al
 ### Overly Complex Single Steps
 
 If one step has many sub-parts, split it into multiple steps. Each step should do one thing and produce clear outputs.
-
-## References
-
-[1]: https://github.com/anthropics/claude-code/issues/16789 "TaskOutput returns final result text"
-[2]: https://www.richsnapp.com/article/2025/10-05-context-management-with-subagents-in-claude-code "Context management with subagents"
-[3]: Empirical finding, youtube-to-markdown context analysis, session f3ce1cae, 2026-02-15
-[4]: https://apidog.com/blog/claude-code-background-tasks/ "Background tasks limitations"
-[5]: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices "Skill authoring best practices"
