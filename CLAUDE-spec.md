@@ -379,11 +379,17 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 ---
 
-## Lines 84-85: Review Phase — cross-check with living plan
+## Lines 82-89: Review Phase
 
 **[git]** Introduced `215c27b` (2026-02-25).
 
+### Code Review — cross-check with living plan
+
 **Why "living plan":** The plan is updated during implementation (tasks marked `[x]`, `[+]`, `[-]`, `[>]`). Review must compare against the evolved plan, not the original. The plan captures decisions and surprises that occurred during implementation.
+
+### Acceptance Testing
+
+**[inferred]** ORC tests the feature or asks HC. Defects go back to IMP for fixing via `session-codex` `continue`, then re-verified. The iteration continues until clean. HC confirms before proceeding to Merge Phase — another gate preventing premature completion.
 
 ---
 
@@ -401,20 +407,35 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 ## Line 103: Cycle reflection
 
-**[git → incident]** Introduced `215c27b` (2026-02-25). Ownership refined `42e2832` (2026-03-07): IMP writes, ORC delegates.
+**[git → incident → HC rationale]** Introduced `215c27b` (2026-02-25). Ownership refined `42e2832` (2026-03-07) and `4a42ea5` (2026-03-19).
 
-**Three reflection types with different authors:**
-- **Planning reflection** (line 44): ORC writes — only ORC has the full planning dialogue with HC
-- **Implementation reflection** (line 93): IMP writes to plan file — what went well, what changed, lessons learned from implementation
-- **Cycle reflection** (line 103): ORC writes — only ORC has the full picture across planning, review, and merge. IMP doesn't know how planning went or what HC decided.
+**Three reflection types, three authors, three reasons:**
 
-ORC delegates implementation reflection to IMP (who has the implementation experience). ORC writes both planning and cycle reflections (who has the cross-phase context).
+| Reflection | File pattern | Author | Why this author |
+|---|---|---|---|
+| Planning | `*-planning-*.md` | ORC | Only ORC has the HC dialogue and Codex review context |
+| Implementation | `*-impl-*.md` | IMP | Only IMP has the hands-on implementation experience |
+| Cycle | `*-cycle-*.md` | ORC | Only ORC has the cross-phase picture (planning → review → merge) |
 
-**Why the reflection exists:** The process improvement plan `docs/core/plans/2026-03-07-process-improvements-from-reflections.md` was itself driven by reflection evidence from two cycles — demonstrating the feedback loop works. The MathTrainer comparison (2026-03-06) explicitly noted that the competing approach had "Reflections: None."
+ORC delegates implementation reflection writing to IMP. ORC writes planning and cycle reflections directly.
+
+**Evolution:** Originally (pre-2026-03-19) implementation reflection was written as a `## Reflection` section inside the plan file. Changed to a separate file following the same pattern as other reflections — consistency and independent discoverability.
+
+**Why reflections exist:** The process improvement plan `docs/core/plans/2026-03-07-process-improvements-from-reflections.md` was itself driven by reflection evidence from two cycles — demonstrating the feedback loop works. The MathTrainer comparison (2026-03-06) explicitly noted that the competing approach had "Reflections: None."
 
 ---
 
-## Lines 108-128: Writing AGENTS.md / CLAUDE.md
+## Lines 93-98: Merge Phase — Documentation
+
+**[git]** Introduced `215c27b` (2026-02-25).
+
+**Line 93 — Implementation reflection:** Delegated to IMP via `session-codex`. Originally written as `## Reflection` inside the plan file. Changed to separate `*-impl-*.md` file (2026-03-19) for consistency with planning and cycle reflections. See Line 103 for full reflection ownership model.
+
+**Lines 95-98 — Documentation updates:** Checklist of files to update on every release. Explicit list prevents the LLM from forgetting documentation that isn't in the diff. ADR creation gated on "architectural decision with tradeoffs" — not every change needs one.
+
+---
+
+## Lines 106-128: Writing AGENTS.md / CLAUDE.md
 
 **[git]** Entire section introduced `cbc34af` (2026-01-31). Source: `docs/Designing AGENTS.md.md` (164 lines), distilled into CLAUDE.md. The Designing doc was written post-hoc to document existing practices — it is not the original source of the rules.
 
@@ -434,26 +455,21 @@ ORC delegates implementation reflection to IMP (who has the implementation exper
 
 ---
 
-## Lines 130-139: Writing Skills
+## Lines 132-137: Writing Skills / MCPs / CLI (trigger lines)
 
-**[git]** Source: `docs/Designing Skills.md` (478 lines), distilled `cbc34af` (2026-01-31).
+**[git → refactored 2026-03-19]** Originally three separate inline sections (~30 lines) with condensed rules for writing skills, MCPs, and CLI tools. Replaced with 4 trigger lines pointing to builder skills and guide files.
 
-**Line 134 — "Minimize skill, maximize script":** Skills consume context tokens on every invocation. Scripts run externally at zero token cost. Logic in skills = duplicated cost per call. Logic in scripts = one-time execution.
+**Why replaced:** Progressive disclosure — these rules consumed context on every session but were only needed when actually writing skills/MCPs/CLI tools. The builder skills (`building-skills`, `mcp-builder`, `cli-tool-builder`) already exist and contain the workflow. The guide files (`docs/writing-skills.md`, `docs/Designing MCP Servers.md`, `docs/Designing CLI Tools.md`) contain the principles.
 
----
+**Document hierarchy:** `Designing *.md` (deep rationale, references) → `writing-*.md` (LLM-optimized condensed guide) → `builder-*/SKILL.md` (generator skill) → CLAUDE.md (trigger lines). This project dogfoods its own builder skills — changes to guides must propagate to builders and vice versa.
 
-## Lines 141-147: Writing MCPs
+**Previous inline content preserved in:**
+- Skills rules → `docs/writing-skills.md` (all rules present, expanded with Thariq [15] insights from Anthropic's internal use)
+- MCP rules → `docs/Designing MCP Servers.md` sections 4-5 (patterns), 8 (stdio vs HTTP), 9.4 (deferred loading)
+- CLI rules → `docs/Designing CLI Tools.md` section 2 (conventions)
 
-**[git]** Source: `docs/Designing MCP Servers.md` (279 lines), distilled `cbc34af` (2026-01-31).
-
-**Line 143 — "One tool per domain, 70% token savings":** Measured from imap-stream-mcp. 8 separate tools × ~400 tokens = 3,200 tokens at startup. 1 tool with action routing × ~200 tokens = 200 tokens. Actual saving depends on tool count, but the pattern is validated by the project's own MCP (`use_mail` with 8 actions).
-
-**Line 147 — "Log unknown queries":** From operational experience with `imap-stream-mcp`. The parser encounters unexpected LLM query patterns. Logging these reveals what syntax to support next. Without logging, parser gaps are invisible.
-
----
-
-## Lines 149-154: Writing CLI Scripts
-
-**[git]** Source: `docs/Designing CLI Tools.md` (501 lines), distilled `cbc34af` (2026-01-31).
-
-**Line 152 — "Errors MUST suggest fix":** Same principle as MCP error messages (`docs/mcp-design-principles.md`). An LLM encountering an error cannot re-read documentation mid-operation. The error message must contain the recovery path.
+**Known gaps (from skeptic review 2026-03-19):**
+- `writing-skills.md` covers only 4/14 anti-patterns from `Designing Skills.md` — condensed version incomplete
+- `writing-skills.md` lacks token budget numbers (<500 tokens, <150 words for frequently-loaded)
+- `builder-mcp` asks about HTTP transport and defer_loading but subskills only implement stdio
+- `mcp-design-principles.md` role unclear relative to `Designing MCP Servers.md` — partial overlap, partially orphaned
