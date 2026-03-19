@@ -1,5 +1,7 @@
 # Designing CLI Tools: Good Practices (2026)
 
+> **Deep reference.** This document explains the *why* behind CLI tool design decisions with full rationale and references. For the condensed instruction set, see the "Writing CLI Scripts" section in `CLAUDE.md`.
+
 This document outlines principles for building command-line tools optimized for both human users and LLM agents.
 
 ---

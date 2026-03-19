@@ -1,5 +1,7 @@
 # Designing AGENTS.md: Good Practices (2026)
 
+> **Deep reference.** This document explains the *why* behind AGENTS.md/CLAUDE.md design decisions with full rationale and references. For the condensed, LLM-optimized instruction set, see [`writing-claude-agents-md.md`](writing-claude-agents-md.md).
+
 This document is a good practices guide for designing **behavioral configuration** files for AI agents. It synthesizes industry standards, token economics, and psychological research into a practical blueprint.
 
 ---

@@ -1,5 +1,7 @@
 # Designing MCP Servers: Good Practices (2026)
 
+> **Deep reference.** This document explains the *why* behind MCP server design decisions with full rationale and references. For the condensed instruction set, see the "Writing MCPs" section in `CLAUDE.md`.
+
 This document outlines the architectural principles for building Model Context Protocol (MCP) servers optimized for consumption by Large Language Models (LLMs).
 
 ---
@@ -214,19 +216,79 @@ def wrap_untrusted(content: str) -> str:
 - **Error messages:** User-friendly without exposing internals or stack traces
 - **Scope limitation:** Request minimum necessary permissions
 
-## 8. Emerging Capabilities (2026)
+## 8. stdio vs HTTP: Two Different Architectures
 
-### 8.1 MCP Apps (UI Rendering)
+The "MCP vs CLI" debate [19] misses a critical distinction: **stdio MCP and HTTP MCP solve different problems**.
+
+### stdio MCP (Local)
+
+Local subprocess communication. Tool definitions load into the agent's context. Functionally similar to a well-documented CLI tool — the agent calls a local process and reads the output. Main advantage over CLI: standardized schema discovery and structured I/O.
+
+**Use when:** The agent runs locally, tools are simple, no shared state needed. If a shell alias or `gh`/`git`/`curl` would suffice, prefer those — zero startup token cost.
+
+### HTTP MCP (Remote)
+
+Centralized server accessible from any environment (CI, multiple developers, ephemeral containers). This fundamentally changes the architecture:
+
+- **Centralized auth:** OAuth 2.1 on the server. Developers don't need API keys locally — the MCP server handles secrets. Enables audit trails and revocation [19].
+- **Observability:** Server emits OpenTelemetry metrics from one place. Distributed CLI tools require reimplementing telemetry in each tool [19].
+- **Shared state:** Postgres, graph databases, caches — accessible from ephemeral environments like GitHub Actions without local installation.
+- **Dynamic content:** MCP `prompts` and `resources` (see 8.3) enable server-delivered skills and documentation that update without client changes.
+
+**Use when:** Multiple consumers, sensitive credentials, need for audit/observability, or dynamic content delivery across teams.
+
+### The Decision
+
+| Factor | CLI / stdio MCP | HTTP MCP |
+|--------|----------------|----------|
+| Single developer, local | Preferred | Overkill |
+| Team, shared credentials | Fragile (keys everywhere) | Preferred (centralized auth) |
+| CI/CD pipelines | Requires setup per runner | One endpoint |
+| Observability needs | Manual per tool | Built-in |
+| Dynamic documentation | Manual updates | Auto-sync |
+
+## 9. Emerging Capabilities (2026)
+
+### 9.1 MCP Apps (UI Rendering)
 Modern clients (Cursor, Claude Desktop) can render interactive components.
 - **Pattern:** Instead of a Markdown table, return a JSON structure tagged for UI rendering.
 - **Benefit:** Allows user interaction (sort/filter) without LLM regeneration.
 
-### 8.2 Streamable HTTP (Long-running Tasks)
+### 9.2 Streamable HTTP (Long-running Tasks)
 For slow tasks (e.g., "Scan Database"), avoid timeouts.
 - **Pattern:** Return a `job_id` and an SSE (Server-Sent Events) stream URL.
 - **Benefit:** Prevents "silence timeouts" and shows progress.
 
-## 9. Anti-Patterns
+### 9.3 MCP Prompts and Resources
+
+Lesser-known MCP capabilities beyond tools [19]:
+
+- **Prompts:** Server-delivered skill templates. The MCP server defines reusable prompt templates that clients can invoke. Enables dynamically generated instructions that update without client changes — the server controls the content.
+- **Resources:** Server-delivered documentation and data. The MCP server exposes files, configs, or documentation as readable resources. Enables auto-synchronized team knowledge without manual distribution.
+
+**Use case:** An HTTP MCP server delivers organization-wide coding standards as resources and review workflows as prompts. When standards change, the server updates — all clients get the new version automatically.
+
+### 9.4 Deferred Tool Loading (Claude Code)
+
+Claude Code now supports deferred tool loading via `ToolSearch` [20]. Tools marked for deferred loading are discoverable but don't consume context tokens at startup. The agent searches for and loads tool schemas on-demand.
+
+**Measured impact [20]:**
+- 85% token reduction at startup while maintaining full tool access
+- Accuracy improvement: Opus 4 from 49% → 74%, Opus 4.5 from 79.5% → 88.1%
+
+This significantly reduces the "Too Many Tools" anti-pattern. With deferred loading, the tool count concern shifts from "how many tools load" to "how well tools are described for search discovery."
+
+**Implication for design:** Tool descriptions become even more critical — they must be searchable and precise, since the agent finds tools by searching descriptions rather than scanning a full list.
+
+### 9.5 MCP as CLI Frontend
+
+The MCP-vs-CLI debate is a false dichotomy. IBM's `mcp-cli` [21] demonstrates MCP servers consumed through a CLI interface — the CLI is the frontend, MCP servers are the backend. This enables:
+- Local-first operation with Ollama (no API keys)
+- DAG-based execution plans with parallel tool calls
+- Virtual memory for context management
+- Multi-provider support through a single interface
+
+## 10. Anti-Patterns
 - **❌ Response Dumping:** Returning a full DB row when only `id` was asked.
 - **❌ State Assumption:** Assuming the LLM remembers the previous `page_id`. Always be stateless.
 - **❌ Cryptic Errors:** `Error 500`. Always explain *why* and *how to fix*.
@@ -236,10 +298,10 @@ For slow tasks (e.g., "Scan Database"), avoid timeouts.
 - **❌ Blocking I/O:** Sync operations block the event loop. Use async patterns, background workers for heavy tasks.
 - **❌ Global Variables:** Tools are called by different users. State must be request-scoped or externalized.
 - **❌ Treating Tools as APIs:** MCP tools need model-aware validation, retries, and guardrails—not just schema enforcement [15].
-- **❌ Always-on MCP servers:** MCP servers consume context tokens even when idle—tool definitions load at session start. Prefer CLI tools (`gh`, `git`) when they suffice. Only add MCP servers that provide clear value over built-in alternatives.
+- **❌ Always-on MCP servers:** MCP servers consume context tokens even when idle—tool definitions load at session start. Prefer CLI tools (`gh`, `git`) when they suffice. Only add MCP servers that provide clear value over built-in alternatives. **Mitigated by** deferred tool loading (9.4) — but still applies to servers with no deferred loading support.
 - **❌ Ignoring Context Poisoning:** External content without sanitization/wrapping allows prompt injection.
 
-## 10. Do You Need an MCP?
+## 11. Do You Need an MCP?
 
 Before building, check if simpler alternatives exist:
 
@@ -258,7 +320,7 @@ Before building, check if simpler alternatives exist:
 
 # Part IV: Reference
 
-## 11. References
+## 12. References
 - [1] Jesse Vincent (2025): [When it comes to MCPs, everything we know about API design is wrong](https://blog.fsck.com/2025/10/19/mcps-are-not-like-other-apis/)
 - [2] [Model Context Protocol Specification](https://modelcontextprotocol.io/specification/) - Pagination, Output Schemas (June 2025), Streamable HTTP (March 2025)
 - [3] [MCP Transport Future](http://blog.modelcontextprotocol.io/posts/2025-12-19-mcp-transport-future/) - Roadmap for stateless protocol evolution
@@ -277,3 +339,6 @@ Before building, check if simpler alternatives exist:
 - [16] [Anthropic Skills: mcp-builder best practices](https://github.com/anthropics/skills/blob/main/skills/mcp-builder/reference/mcp_best_practices.md) - Tool annotations, naming conventions, dual format
 - [17] [Cloudflare: Streamable HTTP + Python MCP](https://blog.cloudflare.com/streamable-http-mcp-servers-python/) - Transport selection, Python deployment
 - [18] [FastMCP Documentation](https://gofastmcp.com/) - Python MCP framework, transport options
+- [19] Charles Chen (2026-03): [MCP is Dead; Long Live MCP!](https://chrlschn.dev/blog/2026/03/mcp-is-dead-long-live-mcp/) - stdio vs HTTP MCP, centralized auth/observability, prompts/resources for dynamic content
+- [20] [Claude Code Issue #12836](https://github.com/anthropics/claude-code/issues/12836) - Tool Search and deferred loading: 85% token reduction, implemented in Claude Code
+- [21] [IBM mcp-cli](https://github.com/IBM/mcp-cli) - MCP client as CLI frontend, DAG execution plans, virtual memory for context management

@@ -1,5 +1,7 @@
 # Designing Skills: Good Practices (2026)
 
+> **Deep reference.** This document explains the *why* behind skill design decisions with full rationale and references. For the condensed, LLM-optimized instruction set, see [`writing-skills.md`](writing-skills.md).
+
 This document outlines principles for writing effective skill definitions (SKILL.md) for AI agents.
 
 Skills follow the [Agent Skills](https://agentskills.io) open standard, adopted by Claude Code, GitHub Copilot, OpenAI Codex, Cursor, and others [1].
@@ -460,7 +462,55 @@ Skills load instructions into the agent's context. Malicious or poorly-written s
 
 Test with `claude -p` for manual verification.
 
-## 14. References
+## 14. Lessons from Anthropic's Internal Skill Usage
+
+Based on cataloging hundreds of skills in active use at Anthropic [15]:
+
+### Skill Categories
+
+Skills cluster into recurring types. Knowing these helps identify gaps in your organization:
+
+- **Library & API reference** — internal library edge cases, footguns, usage patterns
+- **Product verification** — test/verify with external tools (Playwright, tmux), record video of output
+- **Data fetching & analysis** — connect to monitoring/data stacks with credentials and query patterns
+- **Business process automation** — aggregate ticket tracker + GitHub + Slack into formatted output
+- **Code scaffolding** — generate boilerplate with natural language requirements
+- **Code quality & review** — deterministic review scripts, adversarial subagent review
+- **CI/CD & deployment** — monitor PRs, retry flaky CI, gradual traffic rollout
+- **Runbooks** — symptom → investigation → structured report
+- **Infrastructure operations** — routine maintenance with guardrails for destructive actions
+
+### Description Is a Trigger, Not a Summary
+
+When Claude Code starts a session, it builds a listing of every skill with its description. This listing is what Claude scans to decide if a skill matches. The description is not a summary — it describes when to trigger [15].
+
+### Don't State the Obvious
+
+If a skill is primarily about knowledge, focus on what pushes Claude out of its default behavior — internal conventions, project-specific patterns, known gotchas. Don't repeat what Claude would do anyway [15].
+
+### Gotchas as Team Scaling Mechanism
+
+For self-authored skills, gotchas are a design smell — fix the skill instead. For shared/team skills, gotchas are a low-barrier amendment zone: a team member adds a gotcha line without understanding the core flow. This is a fast way to fix recurring problems without refactoring [15]. But it is a patch — if the same gotcha keeps being needed, the skill's design should be fixed.
+
+### Don't Railroad
+
+Skills are reusable across many situations. Being too specific prevents Claude from adapting. Give information, not rigid steps [15].
+
+### Setup and Persistent Data
+
+- Store user-specific config in `config.json` in the skill directory. If missing, instruct Claude to ask and create it.
+- Use `${CLAUDE_PLUGIN_DATA}` for persistent data that survives skill upgrades (unlike data in the skill directory itself).
+- Skills can maintain state across invocations: append-only logs, cached results, accumulated context.
+
+### On-Demand Hooks
+
+Skills can register hooks via frontmatter that are only active during the session. Use for opinionated guards that would be too restrictive as permanent hooks [15].
+
+### Distribution
+
+Two paths: repo-checked (`.claude/skills/`) for small teams, or plugin marketplace for scale. Curate before publishing — bad or redundant skills are easy to create. Let skills prove value organically before promoting [15].
+
+## 15. References
 
 - [1] [Agent Skills Specification](https://agentskills.io/specification) - Open standard for portable skills
 - [2] [Claude Code Skills Documentation](https://code.claude.com/docs/en/skills) - Official Anthropic guidance, commands/skills merge
@@ -476,3 +526,4 @@ Test with `claude -p` for manual verification.
 - [12] Lasso Security (2025): [Detecting Indirect Prompt Injection in Claude Code](https://www.lasso.security/blog/the-hidden-backdoor-in-claude-coding-assistant) - Attack vectors
 - [13] PromptArmor (2025): [Claude Cowork Exfiltrates Files](https://www.promptarmor.com/resources/claude-cowork-exfiltrates-files) - Data exfiltration risks
 - [14] [Claude Code Security Documentation](https://code.claude.com/docs/en/security) - Official security guidance
+- [15] Thariq (2026-03-17): [Lessons from Building Claude Code: How We Use Skills](https://x.com/trq212/status/2033949937936085378) - Anthropic's internal skill patterns, categories, and best practices

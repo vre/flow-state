@@ -1,5 +1,7 @@
 # Designing Hooks: Good Practices (2026)
 
+> **Deep reference.** This document explains the *why* behind hook design decisions with full rationale and references. No separate condensed guide exists — hooks are configured in `settings.json`, not in CLAUDE.md.
+
 This document outlines principles for designing lifecycle hooks in AI coding agents.
 
 Hooks are user-defined commands that execute automatically at specific points in an agent's lifecycle. They're supported across major platforms: Claude Code [1], GitHub Copilot [2], Cursor [3], OpenCode [4], and others.

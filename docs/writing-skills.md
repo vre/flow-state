@@ -1,5 +1,7 @@
 # Writing Skills (SKILL.md)
 
+> **LLM-optimized guide.** Condensed principles for writing SKILL.md files. For the deep rationale with full references, see [`Designing Skills.md`](Designing%20Skills.md).
+
 This document explains principles for writing task-specific skill files, with rationale for each practice.
 
 ## What Skills Are
@@ -143,6 +145,37 @@ See `docs/writing-model-specific-prompts.md` for model-specific formatting diffe
 ### Background agents cannot use Write
 
 Background Tasks (`run_in_background: true`) cannot prompt for tool permissions [4]. The Write tool is auto-denied with "prompts unavailable". Use blocking Tasks when subagents need to write files. Background Tasks can use Bash for file writes, but this is fragile for large or complex content.
+
+## Skill Is a Folder
+
+A skill is a folder, not just a markdown file. Use the file system for progressive disclosure — tell Claude what files exist, it reads them when needed:
+
+- `references/api.md` — detailed function signatures
+- `assets/template.md` — output templates to copy
+- `scripts/` — helper scripts Claude executes
+- `config.json` — user-specific configuration (see Setup below)
+
+## Don't State the Obvious
+
+Focus on what pushes Claude out of its default behavior — internal conventions, project-specific patterns, known failure points. Don't repeat what Claude would do anyway.
+
+## Don't Railroad
+
+Skills are reusable across many situations. Give information, not rigid steps. Let Claude adapt to the situation. Too-specific instructions prevent adaptation.
+
+## Setup and Configuration
+
+Some skills need user-specific setup. Store this in `config.json` in the skill directory. If missing, instruct Claude to ask the user and create it. Subsequent runs read the config without asking.
+
+## Persistent Data
+
+Use `${CLAUDE_PLUGIN_DATA}` for data that must survive skill upgrades. The skill directory itself may be replaced on upgrade — `${CLAUDE_PLUGIN_DATA}` is stable.
+
+Examples: append-only logs of previous runs, cached results, accumulated context.
+
+## On-Demand Hooks
+
+Skills can register session-scoped hooks via frontmatter. Use for opinionated guards that would be too restrictive as permanent hooks (e.g., block destructive commands only when touching production).
 
 ## Simple Markdown
 
