@@ -253,6 +253,8 @@ getSuppliers(), getCarriers(), getDeliverySlots(), getAlerts()
 
 **Fix**: Group by domain: `orders()`, `customers()`, `inventory()`, `warehouses()`, `logistics()`
 
+**Note**: Claude Code now supports deferred tool loading — tools can be discoverable without consuming context tokens at startup (85% reduction measured). This mitigates the token cost of many tools, but the cognitive cost (model confusion in tool selection) remains. Grouping by domain is still the primary fix.
+
 ### ❌ Strict Validation Without Guidance
 
 ```python
