@@ -2,6 +2,8 @@
 
 If no scripts needed, use `./subskills/skill_only.md` instead. STOP.
 
+Flow: Gather → Structure → Tests → Implement → Write SKILL.md → Validate → Smoke Test
+
 ## Step 1: Gather Requirements
 
 AskUserQuestion (all at once):

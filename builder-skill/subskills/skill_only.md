@@ -1,5 +1,7 @@
 # Skill Only: Create Minimal SKILL.md
 
+Flow: Gather → Generate → Enhance → Validate → Semantic Check
+
 ## Step 1: Gather Requirements
 
 AskUserQuestion (all 4 at once):
