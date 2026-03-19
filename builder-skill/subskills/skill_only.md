@@ -28,6 +28,15 @@ Read the generated skeleton. Add:
 - Stop conditions: `If X: STOP`
 - If modifying existing skill → "Use editing-skills instead", STOP.
 
+Apply writing-skills.md principles:
+- Skill = folder: add `references/`, `assets/`, `scripts/` dirs if needed for progressive disclosure
+- Description is a trigger, not a summary — describe WHEN to activate
+- Don't state the obvious — only what pushes Claude out of default behavior
+- Don't railroad — give information, let Claude adapt
+- If skill needs user config → add `config.json` pattern (ask if missing, read if present)
+- If skill stores data across runs → use `${CLAUDE_PLUGIN_DATA}` (survives upgrades)
+- If skill needs opinionated guards → register on-demand hooks via frontmatter
+
 Keep under 300 tokens (`len(text)/4`).
 
 ## Step 4: Validate

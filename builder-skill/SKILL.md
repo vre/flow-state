@@ -12,18 +12,22 @@ allowed-tools:
 
 # Building Skills
 
-## Step 0: Gate
+## Step 0: Read guidelines
+
+Read `docs/writing-skills.md` — apply its principles throughout.
+
+## Step 1: Gate
 
 Single command ≤2 flags, no pipes → "Could be: `{cmd}`. Need a skill?" If no → STOP.
 
-## Step 1: Route
+## Step 2: Route
 
 - New skill → Read and follow `./subskills/skill_only.md`
 - Builder skill (scripts/templates/tests) → `./subskills/builder_skill.md`
 - Bottling session → Document workflow first, then `./subskills/skill_only.md`
 - From historian → Needs `mcp__claude-historian-mcp__*`. Missing → STOP.
 
-## Step 2: Validate
+## Step 3: Validate
 
 ```bash
 python3 ./scripts/validate_structure.py <SKILL.md path>

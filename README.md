@@ -63,8 +63,21 @@ As you don't have any configured yet, it will show you how to set up.
 
 ## Documentation
 
+### Plugins
 - [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
 - [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
+
+### Design Guides (deep rationale, references)
+- [Designing AGENTS.md](docs/Designing%20AGENTS.md.md) - Behavioral configuration for AI agents
+- [Designing Skills](docs/Designing%20Skills.md) - Skill architecture, categories, distribution
+- [Designing MCP Servers](docs/Designing%20MCP%20Servers.md) - MCP server design for LLM consumption
+- [Designing CLI Tools](docs/Designing%20CLI%20Tools.md) - CLI tools for humans and LLMs
+- [Designing Hooks](docs/Designing%20Hooks.md) - Lifecycle hooks for AI coding agents
+
+### Writing Guides (LLM-optimized, condensed)
+- [Writing CLAUDE.md](docs/writing-claude-agents-md.md) - Condensed CLAUDE.md/AGENTS.md principles
+- [Writing Skills](docs/writing-skills.md) - Condensed SKILL.md principles
+- [MCP Design Principles](docs/mcp-design-principles.md) - API design for LLM consumers
 
 ## Examples of Youtube to Markdown Output
 

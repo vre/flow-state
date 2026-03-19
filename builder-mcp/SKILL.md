@@ -10,7 +10,9 @@ allowed-tools:
 
 # MCP Builder
 
-Python only. stdio transport only. Single tool + action dispatcher default. Do not create your own templates.
+Python only. Single tool + action dispatcher default. Do not create your own templates.
+
+Read `docs/Designing MCP Servers.md` sections 4-5 (patterns) and 8 (stdio vs HTTP) before proceeding.
 
 ## Step 0: Threshold check
 
@@ -33,8 +35,10 @@ AskUserQuestion:
 
 Then ask:
 - Domain name (e.g., "weather", "calendar", "jira")
+- Transport? (stdio for local, streamable-http for remote/shared/CI)
 - What actions? (list, get, create, update, delete, search, etc.)
-- Auth method? (none, env_var, keyring)
+- Auth method? (none, env_var, keyring, oauth — oauth preferred for HTTP transport)
+- Deferred loading? (mark tools with `defer_loading: true` if not needed every session)
 
 Set `${DOMAIN}` from answers.
 
@@ -58,5 +62,10 @@ If FAIL: fix issues. If WARN: review, fix if appropriate.
 cd ${DOMAIN}-mcp && uv sync && uv run ${DOMAIN}-mcp &
 # Should start without error. Kill after verification.
 ```
+
+Apply design principles:
+- Tool descriptions must be search-optimized — deferred tools are found by description, not by scanning a list
+- If HTTP transport: consider MCP prompts (server-delivered skill templates) and resources (server-delivered docs)
+- Error messages suggest fix: `"Try: {action: 'list'}"`
 
 Report created files and validation results.
