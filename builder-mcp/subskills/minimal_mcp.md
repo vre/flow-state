@@ -1,11 +1,11 @@
-# Minimal MCP (stdio, single-tool)
+# Minimal MCP (single-tool)
 
 Generates a basic MCP server with action dispatcher. No external API client.
 
 ## Step 1: Generate server
 
 ```bash
-python3 ./scripts/generate_mcp.py '{"domain":"${DOMAIN}","actions":${ACTIONS_JSON},"description":"${DESCRIPTION}","auth_method":"${AUTH_METHOD}","has_external_api":false}'
+python3 ./scripts/generate_mcp.py '{"domain":"${DOMAIN}","actions":${ACTIONS_JSON},"description":"${DESCRIPTION}","instructions":"${INSTRUCTIONS}","transport":"${TRANSPORT}","auth_method":"${AUTH_METHOD}","has_external_api":false}'
 ```
 
 Creates: `${DOMAIN}_mcp.py`
@@ -13,7 +13,7 @@ Creates: `${DOMAIN}_mcp.py`
 ## Step 2: Generate pyproject.toml
 
 ```bash
-python3 ./scripts/generate_pyproject.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}"}'
+python3 ./scripts/generate_pyproject.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","transport":"${TRANSPORT}"}'
 ```
 
 Creates: `pyproject.toml`
@@ -21,7 +21,7 @@ Creates: `pyproject.toml`
 ## Step 3: Generate packaging
 
 ```bash
-python3 ./scripts/generate_packaging.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","actions":${ACTIONS_JSON}}'
+python3 ./scripts/generate_packaging.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","actions":${ACTIONS_JSON},"transport":"${TRANSPORT}"}'
 ```
 
 Creates: `.mcp.json`, `README.md`

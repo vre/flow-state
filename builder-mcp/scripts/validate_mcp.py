@@ -13,6 +13,12 @@ import sys
 from pathlib import Path
 
 
+def _tool_docstrings(code: str) -> list[str]:
+    """Extract tool docstrings from async handlers."""
+    matches = re.finditer(r'async def [^(]+\([^)]*\)\s*->\s*[^:]+:\n\s+"""(.*?)"""', code, re.DOTALL)
+    return [match.group(1).strip() for match in matches]
+
+
 def validate(code: str) -> list[str]:
     """Run deterministic checks on MCP server code.
 
@@ -49,6 +55,9 @@ def validate(code: str) -> list[str]:
 
     # --- Warning checks ---
 
+    if "FastMCP(" in code and "instructions=" not in code:
+        issues.append("WARN: Missing FastMCP instructions - add server-level guidance for discoverability")
+
     # Tool annotations
     if "readOnlyHint" not in code:
         issues.append("WARN: Missing tool annotations (readOnlyHint, destructiveHint)")
@@ -63,11 +72,12 @@ def validate(code: str) -> list[str]:
         issues.append("WARN: No Pydantic model for input validation")
 
     # Tool description length
-    docstrings = re.findall(r'"""(.*?)"""', code, re.DOTALL)
-    for ds in docstrings:
-        # Check tool docstrings (ones right after async def)
-        first_line = ds.strip().split("\n")[0]
+    for ds in _tool_docstrings(code):
+        first_line = ds.split("\n")[0].strip()
         words = first_line.split()
+        if len(words) < 5:
+            issues.append(f"WARN: Tool description <5 words ({len(words)} words)")
+            break
         if len(words) > 50:
             issues.append(f"WARN: Tool description >50 words ({len(words)} words)")
             break
@@ -75,6 +85,9 @@ def validate(code: str) -> list[str]:
     # Async handler
     if "async def use_" not in code and "async def " not in code:
         issues.append("WARN: No async handler - FastMCP expects async def")
+
+    if 'transport="streamable-http"' in code and "health" not in code.lower():
+        issues.append("WARN: HTTP transport without health-related helper or docs")
 
     return issues
 

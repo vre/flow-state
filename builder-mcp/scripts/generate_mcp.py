@@ -19,6 +19,8 @@ class McpConfig(TypedDict, total=False):
     domain: str  # Required: domain name (e.g., "weather")
     actions: list[str]  # Required: action names (e.g., ["get", "forecast"])
     description: str  # Optional: tool description
+    instructions: str  # Optional: server-level guidance for tool discovery
+    transport: str  # Optional: "stdio" | "streamable-http"
     auth_method: str  # Optional: "none" | "env_var" | "keyring"
     has_external_api: bool  # Optional: whether tool calls external APIs
 
@@ -135,6 +137,8 @@ def generate_server(config: McpConfig) -> str:
     domain = config["domain"]
     actions = config["actions"]
     description = config.get("description", f"{domain.title()} operations")
+    instructions = config.get("instructions")
+    transport = config.get("transport", "stdio")
     auth_method = config.get("auth_method", "none")
     has_external_api = config.get("has_external_api", False)
 
@@ -147,6 +151,12 @@ def generate_server(config: McpConfig) -> str:
     auth_block = auth_block.replace("${domain}", domain)
 
     model_name = f"{domain.title()}Action"
+    server_name = json.dumps(f"{domain}_mcp")
+    if instructions:
+        fastmcp_init = f"mcp = FastMCP({server_name}, instructions={json.dumps(instructions)})"
+    else:
+        fastmcp_init = f"mcp = FastMCP({server_name})"
+    run_call = 'mcp.run(transport="streamable-http")' if transport == "streamable-http" else "mcp.run()"
 
     # Only include imports that are actually used
     stdlib_imports = []
@@ -180,7 +190,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 ''',
         auth_block,
         f'''
-mcp = FastMCP("{domain}_mcp")
+{fastmcp_init}
 
 
 {generate_pydantic_model(domain, actions)}
@@ -221,7 +231,7 @@ async def use_{domain}(params: {model_name}) -> str:
 
 def main():
     """Entry point for the MCP server."""
-    mcp.run()
+    {run_call}
 
 
 if __name__ == "__main__":
@@ -238,7 +248,8 @@ def main() -> None:
         print(
             "Usage: python3 generate_mcp.py '<json_config>'\n"
             'Example: \'{"domain":"weather","actions":["get","forecast"],'
-            '"description":"Weather data","auth_method":"env_var",'
+            '"description":"Weather data","instructions":"Use for weather data",'
+            '"transport":"stdio","auth_method":"env_var",'
             '"has_external_api":true}\'',
             file=sys.stderr,
         )

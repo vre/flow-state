@@ -465,11 +465,11 @@ ORC delegates implementation reflection writing to IMP. ORC writes planning and 
 
 **Previous inline content preserved in:**
 - Skills rules → `docs/writing-skills.md` (all rules present, expanded with Thariq [15] insights from Anthropic's internal use)
-- MCP rules → `docs/Designing MCP Servers.md` sections 4-5 (patterns), 8 (stdio vs HTTP), 9.4 (deferred loading)
+- MCP rules → `docs/Designing MCP Servers.md` sections 4-5 (patterns), 8 (stdio vs HTTP), 9.4 (client-side deferred loading and discoverability)
 - CLI rules → `docs/Designing CLI Tools.md` section 2 (conventions)
 
 **Known gaps (from skeptic review 2026-03-19):**
 - `writing-skills.md` covers only 4/14 anti-patterns from `Designing Skills.md` — condensed version incomplete
 - `writing-skills.md` lacks token budget numbers (<500 tokens, <150 words for frequently-loaded)
-- `builder-mcp` asks about HTTP transport and defer_loading but subskills only implement stdio
+- `builder-mcp` previously asked about `defer_loading`, but that is client-side only and should not be generated into server code
 - `mcp-design-principles.md` role unclear relative to `Designing MCP Servers.md` — partial overlap, partially orphaned

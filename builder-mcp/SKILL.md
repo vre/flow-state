@@ -1,6 +1,10 @@
 ---
 name: mcp-builder
-description: Use when building MCP servers to integrate external APIs or services. Produces a complete Python MCP server package with single-tool action dispatcher.
+description: Use when building Python MCP servers. Produces a single-tool action-dispatcher package.
+keywords:
+  - mcp
+  - fastmcp
+  - http
 allowed-tools:
   - Bash
   - Read
@@ -10,20 +14,17 @@ allowed-tools:
 
 # MCP Builder
 
-Python only. Single tool + action dispatcher default. Do not create your own templates.
+Python only. Use repo scripts, not custom templates.
 
-Read `docs/Designing MCP Servers.md` sections 4-5 (patterns) and 8 (stdio vs HTTP) before proceeding.
+Read `docs/Designing MCP Servers.md` sections 4-5 and 8 first.
 
-## Step 0: Threshold check
+## Step 0: Threshold
 
-Before building, verify MCP is warranted:
-- Single CLI command? → "Could be: `curl ... | jq` or a shell alias"
-- Existing tool covers it? → "Could be: `gh`, `git`, `docker`, `kubectl`"
-- One-off data fetch? → "Could be: an ad-hoc script"
+- Single CLI command? STOP. Use `curl`, `jq`, or a shell alias.
+- Existing tool covers it? STOP. Use `gh`, `git`, `docker`, or `kubectl`.
+- One-off data fetch? STOP. Use a script.
 
-If unclear, ask user. If CLI suffices: `STOP`.
-
-## Step 1: Gather requirements
+## Step 1: Gather
 
 AskUserQuestion:
 - question: "What domain does this MCP serve?"
@@ -34,38 +35,42 @@ AskUserQuestion:
   C. "Integration" - Bridges two systems
 
 Then ask:
-- Domain name (e.g., "weather", "calendar", "jira")
-- Transport? (stdio for local, streamable-http for remote/shared/CI)
-- What actions? (list, get, create, update, delete, search, etc.)
-- Auth method? (none, env_var, keyring, oauth — oauth preferred for HTTP transport)
-- Deferred loading? (mark tools with `defer_loading: true` if not needed every session)
+- Domain name
+- Transport: `stdio` or `streamable-http`
+- Actions
+- Auth: `none` | `env_var` | `keyring` | `oauth`
+- Server instructions: one sentence on when to use this server
 
-Set `${DOMAIN}` from answers.
+Set `${DOMAIN}`, `${TRANSPORT}`, `${ACTIONS_JSON}`, `${AUTH_METHOD}`, `${INSTRUCTIONS}` from answers.
 
 ## Step 2: Generate
 
-If answer was A (API wrapper): Read and follow `./subskills/with_api.md`
+- API wrapper → `./subskills/with_api.md`
+- Otherwise → `./subskills/minimal_mcp.md`
+- Transport is a generator parameter, not a transport-specific subskill.
 
-Otherwise: Read and follow `./subskills/minimal_mcp.md`
+## Step 3: HTTP extras
 
-## Step 3: Validate
+If `${TRANSPORT}` is `streamable-http`:
+- Create `.env.example` with `HOST=127.0.0.1`, `PORT=8000`, `STREAMABLE_HTTP_PATH=/mcp`
+- Add auth env vars if the upstream API needs them
+- Ask if a Dockerfile is needed; create it only if requested
+
+Do not add `defer_loading` to server code. It is client-side only. Use `instructions=` and search-optimized descriptions instead.
+
+## Step 4: Validate
 
 ```bash
 python3 ./scripts/validate_mcp.py "${DOMAIN}_mcp.py"
 ```
 
-If FAIL: fix issues. If WARN: review, fix if appropriate.
+Fix FAIL. Review WARN.
 
-## Step 4: Verify
+## Step 5: Verify
 
 ```bash
 cd ${DOMAIN}-mcp && uv sync && uv run ${DOMAIN}-mcp &
-# Should start without error. Kill after verification.
 ```
 
-Apply design principles:
-- Tool descriptions must be search-optimized — deferred tools are found by description, not by scanning a list
-- If HTTP transport: consider MCP prompts (server-delivered skill templates) and resources (server-delivered docs)
-- Error messages suggest fix: `"Try: {action: 'list'}"`
-
+HTTP default: `http://127.0.0.1:8000/mcp`.
 Report created files and validation results.

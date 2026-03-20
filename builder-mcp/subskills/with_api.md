@@ -5,7 +5,7 @@ Extends minimal MCP with an httpx API client. Separates domain logic from MCP pr
 ## Step 1: Generate server
 
 ```bash
-python3 ./scripts/generate_mcp.py '{"domain":"${DOMAIN}","actions":${ACTIONS_JSON},"description":"${DESCRIPTION}","auth_method":"${AUTH_METHOD}","has_external_api":true}'
+python3 ./scripts/generate_mcp.py '{"domain":"${DOMAIN}","actions":${ACTIONS_JSON},"description":"${DESCRIPTION}","instructions":"${INSTRUCTIONS}","transport":"${TRANSPORT}","auth_method":"${AUTH_METHOD}","has_external_api":true}'
 ```
 
 Creates: `${DOMAIN}_mcp.py`
@@ -34,7 +34,7 @@ One function per action. Pure async. No MCP imports.
 ## Step 3: Generate pyproject.toml
 
 ```bash
-python3 ./scripts/generate_pyproject.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","dependencies":["httpx>=0.27.0"]}'
+python3 ./scripts/generate_pyproject.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","transport":"${TRANSPORT}","dependencies":["httpx>=0.27.0"]}'
 ```
 
 Creates: `pyproject.toml`
@@ -42,7 +42,7 @@ Creates: `pyproject.toml`
 ## Step 4: Generate packaging
 
 ```bash
-python3 ./scripts/generate_packaging.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","actions":${ACTIONS_JSON}}'
+python3 ./scripts/generate_packaging.py '{"domain":"${DOMAIN}","description":"${DESCRIPTION}","actions":${ACTIONS_JSON},"transport":"${TRANSPORT}"}'
 ```
 
 Creates: `.mcp.json`, `README.md`

@@ -268,9 +268,9 @@ Lesser-known MCP capabilities beyond tools [19]:
 
 **Use case:** An HTTP MCP server delivers organization-wide coding standards as resources and review workflows as prompts. When standards change, the server updates — all clients get the new version automatically.
 
-### 9.4 Deferred Tool Loading (Claude Code)
+### 9.4 Deferred Tool Loading (Client-Side, Claude Code)
 
-Claude Code now supports deferred tool loading via `ToolSearch` [20]. Tools marked for deferred loading are discoverable but don't consume context tokens at startup. The agent searches for and loads tool schemas on-demand.
+Claude Code now supports deferred tool loading via `ToolSearch` [20]. This is a **client-side behavior**, not an MCP protocol field and not a FastMCP server option. Servers cannot mark tools as deferred. The client decides whether tool search exists and when schemas load.
 
 **Measured impact [20]:**
 - 85% token reduction at startup while maintaining full tool access
@@ -278,7 +278,12 @@ Claude Code now supports deferred tool loading via `ToolSearch` [20]. Tools mark
 
 This significantly reduces the "Too Many Tools" anti-pattern. With deferred loading, the tool count concern shifts from "how many tools load" to "how well tools are described for search discovery."
 
-**Implication for design:** Tool descriptions become even more critical — they must be searchable and precise, since the agent finds tools by searching descriptions rather than scanning a full list.
+**Server-side implication:** Focus on the levers the server actually controls:
+- `FastMCP(..., instructions=...)` for server-level guidance
+- Searchable tool descriptions
+- Prompt and resource design for deeper guidance
+
+**Client-side implication:** Do not generate `defer_loading` flags in MCP server code. Some clients support deferred loading, others do not.
 
 ### 9.5 MCP as CLI Frontend
 

@@ -17,7 +17,11 @@ def generate_pyproject(config: dict) -> str:
     domain = config["domain"]
     description = config.get("description", f"{domain.title()} MCP server")
     version = config.get("version", "0.1.0")
-    extra_deps = config.get("dependencies", [])
+    extra_deps = list(config.get("dependencies", []))
+    transport = config.get("transport", "stdio")
+
+    if transport == "streamable-http" and "uvicorn>=0.30.0" not in extra_deps:
+        extra_deps.append("uvicorn>=0.30.0")
 
     # Core MCP deps always included
     deps = [
@@ -59,7 +63,8 @@ def main() -> None:
     """CLI entry point."""
     if len(sys.argv) != 2:
         print(
-            'Usage: python3 generate_pyproject.py \'<json_config>\'\nExample: \'{"domain":"weather","description":"Weather data"}\'',
+            "Usage: python3 generate_pyproject.py '<json_config>'\n"
+            'Example: \'{"domain":"weather","description":"Weather data","transport":"stdio"}\'',
             file=sys.stderr,
         )
         sys.exit(2)

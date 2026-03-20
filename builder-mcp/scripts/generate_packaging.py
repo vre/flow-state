@@ -12,30 +12,48 @@ import sys
 from pathlib import Path
 
 
-def generate_mcp_json(domain: str) -> str:
+def generate_mcp_json(domain: str, transport: str = "stdio") -> str:
     """Generate .mcp.json for Claude plugin install."""
     entry_point = f"{domain}-mcp"
-    config = {
-        entry_point: {
-            "command": "uv",
-            "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}", "run", entry_point],
+    if transport == "streamable-http":
+        config = {
+            entry_point: {
+                "type": "http",
+                "url": "http://localhost:${PORT}/mcp",
+            }
         }
-    }
+    else:
+        config = {
+            entry_point: {
+                "command": "uv",
+                "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}", "run", entry_point],
+            }
+        }
     return json.dumps(config, indent=2) + "\n"
 
 
-def generate_readme(domain: str, description: str, actions: list[str]) -> str:
+def generate_readme(domain: str, description: str, actions: list[str], transport: str = "stdio") -> str:
     """Generate minimal README.md."""
     actions_list = "\n".join(f"- `{a}` - TODO: describe" for a in actions)
+    install_block = f"""```bash
+claude mcp add {domain}-mcp -- uv --directory /path/to/{domain}-mcp run {domain}-mcp
+```"""
+    if transport == "streamable-http":
+        install_block = f"""```json
+{{
+  "{domain}-mcp": {{
+    "type": "http",
+    "url": "http://localhost:${{PORT}}/mcp"
+  }}
+}}
+```"""
     return f"""# {domain}-mcp
 
 {description}. MCP server for Claude Desktop/Code.
 
 ## Install
 
-```bash
-claude mcp add {domain}-mcp -- uv --directory /path/to/{domain}-mcp run {domain}-mcp
-```
+{install_block}
 
 ## Actions
 
@@ -81,11 +99,12 @@ def main() -> None:
     domain = config["domain"]
     description = config.get("description", f"{domain.title()} operations")
     actions = config.get("actions", [])
+    transport = config.get("transport", "stdio")
 
-    mcp_json = generate_mcp_json(domain)
+    mcp_json = generate_mcp_json(domain, transport=transport)
     Path(".mcp.json").write_text(mcp_json)
 
-    readme = generate_readme(domain, description, actions)
+    readme = generate_readme(domain, description, actions, transport=transport)
     Path("README.md").write_text(readme)
 
     print(json.dumps({"created": [".mcp.json", "README.md"], "domain": domain}))
