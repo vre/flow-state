@@ -195,6 +195,25 @@ myctl --socket /tmp/myctl.sock query  # Fast IPC, session maintained
 myctl daemon stop
 ```
 
+**When daemon is essential:**
+- Underlying connection has high setup cost (auth dialogs, handshakes, OAuth flows)
+- Connection must stay alive across many short-lived commands
+- Protocol requires persistent session (WebSocket, authenticated TCP)
+
+**Daemon design principles:**
+- **Protocol:** JSON line in → JSON line out → disconnect. netcat-compatible: `echo '{"cmd":"list"}' | nc -U /tmp/myctl.sock`
+- **Socket:** `/tmp/<tool>-<uid>.sock` with `0600` permissions
+- **CLI wrapper:** `myctl send <cmd>` translates argparse → JSON → socket → stdout
+- **Reconnect:** detect connection loss → re-establish → clear stale caches → retry original command
+- **Status:** `myctl send status` returns connection state, session count, PID
+
+```bash
+# Three equivalent ways to use a daemon:
+echo '{"cmd":"list"}' | nc -U /tmp/myctl-501.sock     # netcat
+myctl send list                                        # CLI wrapper
+python3: asyncio.open_unix_connection(sock_path)       # scripting
+```
+
 **Trade-offs:**
 
 | Strategy | Startup | Parallelism | Complexity |
@@ -208,6 +227,8 @@ myctl daemon stop
 For network-dependent tools:
 
 - **Retry with backoff.** Don't fail on first timeout.
+- **Reconnect on failure.** Re-read config (ports, tokens may change), rebuild sessions, retry command.
+- **Timeout every command.** Wrap dispatch in `asyncio.wait_for()` — stale connections hang forever without timeouts.
 - **Checkpoint long operations.** Resume from last successful point.
 - **Offline mode.** Queue operations when disconnected.
 
@@ -324,15 +345,47 @@ def dispatch(action: str, **kwargs) -> Result:
 
 **When to use:** Tools with 5+ operations, or tools that will also serve as MCP servers.
 
-## 9. Pipeline Integration
+## 9. CLI Over MCP for Data Pipelines
 
-### 9.1 Unix Philosophy
+When an LLM consumes data rather than orchestrating actions, CLI tools with Unix pipes outperform MCP servers:
+
+| Aspect | MCP | CLI + Pipes |
+| :--- | :--- | :--- |
+| Data path | Source → MCP → LLM context → LLM processes | Source → script → file/stdout → LLM reads |
+| Token cost | Every byte passes through context | LLM sees only final output |
+| Composability | Limited to tool parameters | Full Unix pipeline |
+| Processing | LLM transforms data (slow, expensive) | Scripts transform (fast, free) |
+
+**Pattern:** Scripts extract and transform independently. LLM invokes via Bash tool and reads the result.
+
+```bash
+# LLM runs this — data never enters LLM context until final output
+extract-events.py | grep "keyword"
+
+# vs. MCP approach — LLM processes every event in context
+mcp_call("calendar", action="list") → LLM filters in context
+```
+
+**When to use CLI over MCP:**
+- Data extraction (scraping, API polling, log parsing)
+- Data transformation (filtering, aggregating, reformatting)
+- Scheduled/batch operations
+- When output format is well-defined
+
+**When MCP is still better:**
+- LLM needs to make decisions mid-operation (explore → decide → act)
+- Interactive workflows requiring LLM judgment per step
+- Tool discovery — LLM doesn't know which script to call
+
+## 10. Pipeline Integration
+
+### 10.1 Unix Philosophy
 
 - **Do one thing well.** Compose with other tools.
 - **Text streams as interface.** stdin/stdout/stderr.
 - **No side effects on read.** `list` and `get` are safe to run.
 
-### 9.2 Streaming Support
+### 10.2 Streaming Support
 
 For large outputs:
 
@@ -347,11 +400,11 @@ Stream JSON Lines (JSONL) for parseable streaming:
 myctl export --format jsonl | jq -c 'select(.status == "active")'
 ```
 
-## 10. Security
+## 11. Security
 
 CLI tools execute with user privileges and may handle sensitive data. Design defensively.
 
-### 10.1 Credential Handling
+### 11.1 Credential Handling
 
 ```bash
 # WRONG - credentials in command history
@@ -371,7 +424,7 @@ myctl login  # prompts for password, stores in keyring
 3. Config file with restricted permissions (`chmod 600`)
 4. Never: command-line arguments (visible in `ps`, shell history)
 
-### 10.2 Path Validation
+### 11.2 Path Validation
 
 For tools that accept file paths, prevent directory traversal attacks:
 
@@ -389,7 +442,7 @@ def safe_path(user_input: str, base_dir: Path) -> Path:
     return resolved
 ```
 
-### 10.3 Command Whitelisting (for CLI wrappers)
+### 11.3 Command Whitelisting (for CLI wrappers)
 
 When building tools that execute other commands (e.g., wrapping `git` or `gh`), use explicit whitelists:
 
@@ -417,7 +470,7 @@ def execute_safe(cmd: str) -> str:
 - `ALLOWED_DIR=/path/to/workspace` - restrict file operations
 - `COMMAND_TIMEOUT=30` - prevent hangs
 
-### 10.4 Destructive Operations
+### 11.4 Destructive Operations
 
 Require explicit confirmation for operations that can't be undone:
 
@@ -432,9 +485,9 @@ myctl delete user 123
 
 Document destructive operations clearly in `--help` output.
 
-## 11. Dependency Management
+## 12. Dependency Management
 
-### 11.1 Minimal Dependencies
+### 12.1 Minimal Dependencies
 
 Every dependency is a security risk and maintenance burden. Prefer standard library:
 
@@ -452,7 +505,7 @@ Every dependency is a security risk and maintenance burden. Prefer standard libr
 - Validation: `pydantic` (if already using for MCP)
 - Keyring: `keyring` (for credential storage)
 
-### 11.2 Supply Chain Security
+### 12.2 Supply Chain Security
 
 - **Audit dependencies.** Know what you're installing.
 - **Pin versions.** Use `uv.lock` or `requirements.txt` with hashes.
@@ -461,7 +514,7 @@ Every dependency is a security risk and maintenance burden. Prefer standard libr
 
 Python stdlib + minimal vetted deps > npm-style dependency trees.
 
-## 12. Anti-Patterns
+## 13. Anti-Patterns
 
 - **❌ Interactive-only commands.** Always support non-interactive mode.
 - **❌ Unparseable output.** Mixing formats, inconsistent structure.
@@ -482,14 +535,14 @@ Python stdlib + minimal vetted deps > npm-style dependency trees.
 
 # Part IV: Reference
 
-## 13. CLI Standards and Conventions
+## 14. CLI Standards and Conventions
 
 - **POSIX conventions:** Short flags (`-v`), long flags (`--verbose`), `--` to end flags.
 - **GNU conventions:** `--flag=value` syntax, combined short flags (`-abc`).
 - **12-Factor App:** Config from environment variables.
 - **XDG Base Directory:** `~/.config/mytool/`, `~/.local/share/mytool/` for config and data.
 
-## 14. References
+## 15. References
 
 - [1] [Command Line Interface Guidelines](https://clig.dev/) - Comprehensive CLI design principles
 - [2] [12-Factor App: Config](https://12factor.net/config) - Environment-based configuration
