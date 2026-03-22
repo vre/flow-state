@@ -11,18 +11,35 @@ Delegates tasks to OpenAI Codex CLI with session persistence. Two modes: direct 
 
 ## The solution: `.git` rename + `workspace-write`
 
-Codex's denylist checks literal path names: `.git`, `.codex`, `.agents`. Renaming the git directory to `.git-codex-sandbox-workaround` bypasses the denylist while keeping kernel-enforced sandbox restrictions.
+Only for worktrees where `.git` is a gitfile (pointer). Do not apply to repo root where `.git` is a directory.
+
+Codex's denylist checks literal path names: `.git`, `.codex`, `.agents`. Renaming the gitfile to `.git-codex-sandbox-workaround` bypasses the denylist while keeping kernel-enforced sandbox restrictions.
 
 Setup:
 ```bash
 git worktree add .worktrees/${NAME} -b ${NAME} main
+# Exclude workaround file from git add
+printf '.git-codex-sandbox-workaround\n' >> "$(git -C .worktrees/${NAME} rev-parse --git-path info/exclude)"
+# Rename gitfile
 mv .worktrees/${NAME}/.git .worktrees/${NAME}/.git-codex-sandbox-workaround
 printf 'gitdir: .git-codex-sandbox-workaround\n' > .worktrees/${NAME}/.git
 ```
 
-Git reads the `.git` pointer file, resolves to `.git-codex-sandbox-workaround`, and operates normally. Codex's sandbox allows writes to `.git-codex-sandbox-workaround` because it's not in the denylist.
+### Why GIT_DIR= prefix is required
 
-**Tested**: `git status`, `git add`, `git commit` all succeed under `workspace-write` sandbox with this rename.
+In a worktree, `.git` is a gitfile containing `gitdir: /abs/path/.git/worktrees/NAME`. After rename, there are two `gitdir:` hops:
+1. `.git` → `gitdir: .git-codex-sandbox-workaround`
+2. `.git-codex-sandbox-workaround` → `gitdir: /abs/path/.git/worktrees/NAME`
+
+Git does not follow two levels of `gitdir:` — plain `git` commands fail with "not a git repository".
+
+`GIT_DIR=.git-codex-sandbox-workaround` skips the first hop. Git reads the file, follows one `gitdir:` to the real git data. All git operations work with this prefix.
+
+**Constraints**: The relative `GIT_DIR` path only works from the worktree root. From nested directories, use absolute paths with `GIT_WORK_TREE`. Never use `git add .` or `git add -A` — use explicit paths or `git add -u`.
+
+**Every Codex prompt must include the GIT_DIR instruction** — see SKILL.md for the exact prompt prefix block.
+
+**Tested**: `git status`, `git add <path>`, `git add -u`, `git commit`, `git log`, `git diff` all succeed under `workspace-write` sandbox with `GIT_DIR=.git-codex-sandbox-workaround` prefix.
 
 ## Modes
 
@@ -34,7 +51,7 @@ For review, analysis, quick edits. Sandbox restricts to cwd + subdirs, no git. K
 
 For writing code, running tests, committing. Kernel-enforced sandbox restricts writes to CWD + subdirs. Network blocked. Git works via renamed directory.
 
-Every prompt must instruct Codex: `GIT_DIR=.git-codex-sandbox-workaround` before all git commands.
+Every prompt must instruct Codex: `GIT_DIR=.git-codex-sandbox-workaround` before all git commands. Never `git add .` / `git add -A`.
 
 ## Security comparison
 
@@ -63,7 +80,7 @@ Approval policies (config key `approval_policy`, set via `-c`):
 
 `--full-auto` = `-s workspace-write` + `approval_policy="on-request"`.
 
-`resume` does not support `-s` or `-C` — use `-c` config overrides. Working directory inherited from session.
+`resume` inherits sandbox mode and working directory from the session. Only `approval_policy` needs override via `-c`.
 
 ## Why this works
 

@@ -50,7 +50,7 @@ ORC informs HC what the next step is. Do not just say what you did.
 - ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development.
 - Copy plan file to worktree, `rm` from main, commit in worktree — plan is a deliverable, must not remain untracked in main.
 - Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml
-- Codex sandbox git workaround: in worktree, `mv .git .git-codex-sandbox-workaround && printf 'gitdir: .git-codex-sandbox-workaround\n' > .git` — enables git inside Codex `workspace-write` sandbox. Reverse before rebase/merge: `rm .git && mv .git-codex-sandbox-workaround .git`. Only works when `.git` is a directory (not in git worktrees where `.git` is a file).
+- Codex sandbox git workaround: follow `session-codex` skill instructions for `.git` rename and GIT_DIR setup. Only for worktrees (where `.git` is a gitfile pointer), not repo root.
 - Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase (pre-implementation gate through implementation end). Returns at IMPLEMENTATION END.
 
 2. PRE-IMPLEMENTATION GATE
