@@ -12,7 +12,7 @@ allowed-tools:
 
 # YouTube to Markdown
 
-Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions. Do not create your own scripts. Do not create or suggest channel subdirectories — channel folders are created only via `channel_browse`.
+Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions. Do not create your own scripts. Channel subfolder naming: `Channel Name (channel_id)` — always include the channel ID.
 
 ## Step -1: Detect input type
 
