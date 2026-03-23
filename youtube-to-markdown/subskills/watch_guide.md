@@ -48,7 +48,7 @@ Cross-link references:
 Do not include transcript filenames, slugs, or anchors. The assembler creates links.
 
 ACTION REQUIRED: Use the Write tool to save output to OUTPUT.
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   watch_guide: wrote ${BASE_NAME}_watch_guide.md

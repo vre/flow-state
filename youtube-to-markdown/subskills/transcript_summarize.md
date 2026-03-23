@@ -35,7 +35,7 @@ FORMATS_DIR: ./formats/
 
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   summarize: wrote ${BASE_NAME}_summary.md [TYPE]
@@ -70,7 +70,7 @@ Rules:
 Preserve original language - do not translate.
 
 ACTION REQUIRED: Use the Write tool NOW to save output to OUTPUT file. Do not ask for confirmation.
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   tighten: wrote ${BASE_NAME}_summary_tight.md

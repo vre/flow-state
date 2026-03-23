@@ -13,16 +13,12 @@ INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
 CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
 OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
 
-Analyze INPUT and identify natural paragraph break line numbers.
-
-Read CHAPTERS. If it contains chapters, use chapter timestamps as primary break points.
-
-Target ~500 chars per paragraph. Find natural break points at topic shifts or sentence endings.
-
-Write to OUTPUT in format:
-15,42,78,103,...
-
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+Steps:
+1. Read CHAPTERS JSON. Note chapter start timestamps.
+2. Read INPUT with Read tool. Scan the text and identify paragraph break line numbers:
+   - Place breaks at chapter boundaries (match chapter timestamps to nearby content)
+   - Between chapters, break at topic shifts or sentence endings, targeting ~500 chars per paragraph
+3. Write line numbers to OUTPUT in format: 15,42,78,103,...
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   paragraphs: wrote ${BASE_NAME}_transcript_paragraphs.txt
@@ -64,23 +60,22 @@ OUTPUT_ANALYSIS: {analysis_path}
 
 PERMISSION TEST: First, Write "test" to OUTPUT_CLEANED. If Write succeeds, proceed normally (Mode A). If Write fails, use Mode B.
 
-Read INPUT_CHUNK and clean speech artifacts.
-
-Tasks:
-- Remove fillers (um, uh, like, you know)
-- Fix transcription errors
-- Add proper punctuation
-- Reduce or add implicit words to improve flow
-- Preserve natural voice and tone
-- Keep timestamps at end of paragraphs
-- IMPORTANT: Do not merge, split, or reorder paragraphs. Preserve the exact paragraph count.
-
-Also write chunk analysis in markdown:
-- Header: chunk identity + paragraph range + time range
-- Gate: WATCH | SKIM | READ-ONLY with 1-sentence rationale
-- Topics: include GLOBAL paragraph numbers from PARAGRAPH_RANGE context
-- Watch moments: timestamped moments where visual context matters
-- Skip: timestamp ranges with reason
+Steps:
+1. Read INPUT_CHUNK with Read tool.
+2. Clean speech artifacts:
+   - Remove fillers (um, uh, like, you know)
+   - Fix transcription errors
+   - Add proper punctuation
+   - Reduce or add implicit words to improve flow
+   - Preserve natural voice and tone
+   - Keep timestamps at end of paragraphs
+   - IMPORTANT: Do not merge, split, or reorder paragraphs. Preserve the exact paragraph count.
+3. Write chunk analysis in markdown:
+   - Header: chunk identity + paragraph range + time range
+   - Gate: WATCH | SKIM | READ-ONLY with 1-sentence rationale
+   - Topics: include GLOBAL paragraph numbers from PARAGRAPH_RANGE context
+   - Watch moments: timestamped moments where visual context matters
+   - Skip: timestamp ranges with reason
 
 Mode A (Write works): Write cleaned text to OUTPUT_CLEANED and analysis to OUTPUT_ANALYSIS. Final message:
   clean+analyze: wrote {cleaned_filename} and {analysis_filename}
@@ -94,7 +89,6 @@ Mode B (Write denied): Return content in final message. Format:
   END_CONTENT
 
 Do not ask for confirmation. Do not output text during execution — only make tool calls (Mode A) or return CONTENT blocks (Mode B).
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 On failure: clean+analyze: FAIL - {what went wrong}
 ```
 
@@ -168,7 +162,7 @@ ACTION REQUIRED:
 2) Write markdown to OUTPUT_WATCH_GUIDE.
 Do not ask for confirmation.
 
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   synthesize: wrote ${BASE_NAME}_headings.json and ${BASE_NAME}_watch_guide.md
@@ -194,7 +188,7 @@ Output headings JSON:
 
 ACTION REQUIRED: Write valid JSON to OUTPUT_HEADINGS.
 Do not ask for confirmation.
-Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
+
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   synthesize: wrote ${BASE_NAME}_headings.json

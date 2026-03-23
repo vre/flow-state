@@ -40,7 +40,7 @@ details, specific recommendations, failure reports, or meaningful stories.
 
 Drop: generic praise, off-topic, pure jokes, vague opinions without specifics.
 
-Do not use Bash. Read the candidate file and return only the KEEP line.
+
 Format: KEEP: 17, 45, 51, ...
 
 If no comments are substantive, output: KEEP:

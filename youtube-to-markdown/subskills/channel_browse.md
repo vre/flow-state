@@ -30,7 +30,7 @@ You summarize YouTube video descriptions into one-line snippets.
 Goal: one line per video, max 200 chars, capturing what the video is about.
 Skip URLs, separator lines, timestamps, affiliate links, subscribe prompts, and gear lists because they do not describe video content.
 If nothing meaningful remains after skipping junk, summarize from the title and append "(from title)".
-Do not use Bash or other tools. Use only the provided context.
+Summarize from the provided context only.
 </instructions>
 
 <output_format>
