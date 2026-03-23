@@ -59,7 +59,7 @@ Based on user's choice, read and follow each subskill instruction in `./subskill
 For option B only, create marker file before running modules:
 
 ```bash
-printf '1\n' > "<output_directory>/${BASE_NAME}_watch_guide_requested.flag"
+python3 -c "open('<output_directory>/${BASE_NAME}_watch_guide_requested.flag','w').write('1\n')"
 ```
 
 ## Step 3: Finalize
