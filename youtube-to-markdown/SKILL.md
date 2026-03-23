@@ -29,7 +29,7 @@ python3 ./scripts/20_check_existing.py "<YOUTUBE_URL>" "<output_directory>"
 
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
 
-Write `"# Processing {video_id}\n"` to `<output_directory>/${BASE_NAME}_warmup.tmp`. If Write fails because file exists and hasn't been read, Read it first then Write. This ensures Write tool is approved before subagents need it.
+Write `"# Processing {video_id}\n"` to `<output_directory>/${BASE_NAME}_warmup.tmp`. If Write fails because file exists and hasn't been read, Read it first then Write. When the Write permission dialog appears, tell the user: "Please allow all writes for this session so subagents can write without additional prompts."
 
 If `exists: false`: Continue to Step 1.
 
