@@ -125,6 +125,19 @@ Start with INPUT and OUTPUT file paths. This tells the subagent exactly what it'
 
 Why INPUT/OUTPUT first: Subagents start fresh without your context. They need to know immediately what files to read and where to write. Burying this information in a paragraph of instructions leads to missed outputs.
 
+### Guide subagent workflow with explicit steps
+
+Subagents improvise when instructions are vague. "Analyze the transcript" → agent invents `python3 -c` scripts. Explicit steps prevent this:
+
+```
+Steps:
+1. Read INPUT with Read tool.
+2. Analyze content and identify [specific output].
+3. Write results to OUTPUT with Write tool.
+```
+
+Why steps over prohibitions: "Do not use Bash" gets rationalized away ("this is python3, not bash"). Explicit steps leave no room for invention — the agent follows the given workflow.
+
 ### Constrain subagent output
 
 TaskOutput returns the agent's final text message to the coordinator's context. Without constraints, agents produce verbose final messages ("I've analyzed the transcript and written a comprehensive summary covering...") that inflate coordinator context by ~30K chars per call — causing compaction every 2-3 subagent dispatches.
