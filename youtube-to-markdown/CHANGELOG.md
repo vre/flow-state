@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.13.1] - 2026-03-23
+
+### Background agent permission fix
+- Graceful degradation for background agents: Write permission test → Mode A (write to disk) or Mode B (return content to parent)
+- Module-level concurrency uses foreground agents (background agents lose Write/Bash permissions)
+- Chunk cleaning agents remain background with fallback
+
 ## [2.13.0] - 2026-03-12
 
 ### Watch Guide Into Polish Pipeline

@@ -49,7 +49,7 @@ AskUserQuestion:
 
 ## Step 2: Execute modules
 
-Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" marks possibility to run concurrently.
+Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" = run concurrently as parallel foreground agents in one message. Never use `run_in_background` — background agents lose Write and Bash permissions (Claude Code bug).
 
 - A: transcript_extract.md → (transcript_summarize.md | comment_extract.md) → comment_summarize.md
 - B: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md

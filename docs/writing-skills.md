@@ -142,9 +142,21 @@ This reduces TaskOutput from ~30K to ~40-130 chars. The subagent still writes fu
 
 See `docs/writing-model-specific-prompts.md` for model-specific formatting differences (Haiku copies instruction format literally).
 
-### Background agents cannot use Write
+### Background agent permissions may be unreliable
 
-Background Tasks (`run_in_background: true`) cannot prompt for tool permissions. The Write tool is auto-denied with "prompts unavailable". Use blocking Tasks when subagents need to write files. Background Tasks can use Bash for file writes, but this is fragile for large or complex content.
+Background agents (`run_in_background: true`) may lose access to Write and Bash. This has varied across Claude Code versions. Always design background agents with graceful degradation:
+
+```
+PERMISSION TEST: First, Write "test" to OUTPUT. If succeeds → Mode A (normal). If fails → Mode B (return content).
+
+Mode A: Write results to files. Final message: one-line status.
+Mode B: Return content in final message:
+  CONTENT:<path>
+  <content>
+  END_CONTENT
+
+Parent agent parses CONTENT: blocks and writes files.
+```
 
 ## Skill Is a Folder
 

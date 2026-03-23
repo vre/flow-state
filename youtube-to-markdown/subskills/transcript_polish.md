@@ -61,6 +61,8 @@ PARAGRAPH_RANGE: {para_start}-{para_end} (global paragraph numbers)
 OUTPUT_CLEANED: {chunk_path_cleaned}
 OUTPUT_ANALYSIS: {analysis_path}
 
+PERMISSION TEST: First, Write "test" to OUTPUT_CLEANED. If Write succeeds, proceed normally (Mode A). If Write fails, use Mode B.
+
 Read INPUT_CHUNK and clean speech artifacts.
 
 Tasks:
@@ -79,15 +81,19 @@ Also write chunk analysis in markdown:
 - Watch moments: timestamped moments where visual context matters
 - Skip: timestamp ranges with reason
 
-ACTION REQUIRED:
-1) Use Write tool NOW to save cleaned text to OUTPUT_CLEANED.
-2) Use Write tool NOW to save analysis markdown to OUTPUT_ANALYSIS.
-Do not ask for confirmation.
-
-Do not output text during execution - only make tool calls.
-Your final message must be ONLY one of:
+Mode A (Write works): Write cleaned text to OUTPUT_CLEANED and analysis to OUTPUT_ANALYSIS. Final message:
   clean+analyze: wrote {cleaned_filename} and {analysis_filename}
-  clean+analyze: FAIL - {what went wrong}
+
+Mode B (Write denied): Return content in final message. Format:
+  CONTENT:{OUTPUT_CLEANED}
+  <cleaned text>
+  END_CONTENT
+  CONTENT:{OUTPUT_ANALYSIS}
+  <analysis markdown>
+  END_CONTENT
+
+Do not ask for confirmation. Do not output text during execution — only make tool calls (Mode A) or return CONTENT blocks (Mode B).
+On failure: clean+analyze: FAIL - {what went wrong}
 ```
 
 Analysis naming convention:
@@ -95,6 +101,11 @@ Analysis naming convention:
 - If chunk file is passthrough `${BASE_NAME}_transcript_paragraphs.md`: analysis path is `<output_directory>/${BASE_NAME}_analysis.md`
 
 Wait for all subagents. If a chunk fails, retry once.
+
+If any subagent returned `CONTENT:` blocks (Mode B fallback), parse and write each file with Write tool:
+- Extract path from `CONTENT:<path>` line
+- Extract content between that line and `END_CONTENT`
+- Write to the specified path
 
 ```bash
 python3 ./scripts/34_concat_cleaned.py {chunk_1_cleaned} ... {chunk_N_cleaned} "<output_directory>/${BASE_NAME}_transcript_cleaned.md"
