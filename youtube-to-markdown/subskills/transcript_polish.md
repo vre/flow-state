@@ -116,28 +116,7 @@ python3 ./scripts/34_concat_cleaned.py {chunk_1_cleaned} ... {chunk_N_cleaned} "
 Resolve summary file before synthesis:
 
 ```bash
-python3 -c "
-from pathlib import Path
-import json, sys
-sys.path.insert(0, '.')
-from lib.assembler import Finalizer
-
-d = Path('<output_directory>')
-base = '${BASE_NAME}'
-tight = d / f'{base}_summary_tight.md'
-if tight.exists():
-    print(json.dumps({'summary': str(tight)}))
-    sys.exit(0)
-
-f = Finalizer()
-video_id = base.replace('youtube_', '', 1)
-existing = f.find_existing_summary(video_id, d)
-if existing:
-    print(json.dumps({'summary': str(existing)}))
-    sys.exit(0)
-
-print(json.dumps({'summary': None}))
-"
+python3 ./scripts/36_resolve_summary.py "${BASE_NAME}" "<output_directory>"
 ```
 
 Collect analysis files:
