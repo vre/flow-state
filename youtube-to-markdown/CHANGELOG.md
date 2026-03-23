@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.14.0] - 2026-03-24
+
+### run.py dispatcher — single permission entry point
+- `scripts/run.py` dispatches all skill scripts via one `python3` command — eliminates `printf`, `python3 -c`, `rm`, heredoc permission prompts
+- Built-in subcmds: `flag` (marker files), `rm` (file deletion), `guard` (file existence + size check)
+- Subagent prompts now prohibit Bash — use Read/Grep/Write only
+- 8 new dispatcher tests
+
 ## [2.13.1] - 2026-03-23
 
 ### Background agent permission fix

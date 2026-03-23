@@ -24,7 +24,7 @@ Otherwise: Continue to Step 0.
 ## Step 0: Check if extracted before
 
 ```bash
-python3 ./scripts/20_check_existing.py "<YOUTUBE_URL>" "<output_directory>"
+python3 ./scripts/run.py check "<YOUTUBE_URL>" "<output_directory>"
 ```
 
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
@@ -59,13 +59,13 @@ Based on user's choice, read and follow each subskill instruction in `./subskill
 For option B only, create marker file before running modules:
 
 ```bash
-python3 -c "open('<output_directory>/${BASE_NAME}_watch_guide_requested.flag','w').write('1\n')"
+python3 ./scripts/run.py flag "<output_directory>/${BASE_NAME}_watch_guide_requested.flag"
 ```
 
 ## Step 3: Finalize
 
 ```bash
-python3 ./scripts/50_assemble.py [flag] "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/run.py assemble [flag] "${BASE_NAME}" "<output_directory>"
 ```
 
 Flags: A=`--summary-comments`, B=(none), C=`--summary-only`, D=`--transcript-only`

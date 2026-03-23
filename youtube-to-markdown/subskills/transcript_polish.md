@@ -22,6 +22,7 @@ Target ~500 chars per paragraph. Find natural break points at topic shifts or se
 Write to OUTPUT in format:
 15,42,78,103,...
 
+Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   paragraphs: wrote ${BASE_NAME}_transcript_paragraphs.txt
@@ -29,13 +30,13 @@ Your final message must be ONLY one of:
 ```
 
 ```bash
-python3 ./scripts/31_format_transcript.py "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
+python3 ./scripts/run.py format-transcript "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt" "<output_directory>/${BASE_NAME}_transcript_paragraphs.md"
 ```
 
 ## Step 2: Clean speech artifacts + write chunk analysis
 
 ```bash
-python3 ./scripts/33_split_for_cleaning.py "<output_directory>/${BASE_NAME}_transcript_paragraphs.md" "<output_directory>"
+python3 ./scripts/run.py split-chunks "<output_directory>/${BASE_NAME}_transcript_paragraphs.md" "<output_directory>"
 ```
 
 Read stdout JSON.
@@ -93,6 +94,7 @@ Mode B (Write denied): Return content in final message. Format:
   END_CONTENT
 
 Do not ask for confirmation. Do not output text during execution — only make tool calls (Mode A) or return CONTENT blocks (Mode B).
+Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 On failure: clean+analyze: FAIL - {what went wrong}
 ```
 
@@ -108,7 +110,7 @@ If any subagent returned `CONTENT:` blocks (Mode B fallback), parse and write ea
 - Write to the specified path
 
 ```bash
-python3 ./scripts/34_concat_cleaned.py {chunk_1_cleaned} ... {chunk_N_cleaned} "<output_directory>/${BASE_NAME}_transcript_cleaned.md"
+python3 ./scripts/run.py concat-cleaned {chunk_1_cleaned} ... {chunk_N_cleaned} "<output_directory>/${BASE_NAME}_transcript_cleaned.md"
 ```
 
 ## Step 3: Synthesize headings + optional watch guide
@@ -116,7 +118,7 @@ python3 ./scripts/34_concat_cleaned.py {chunk_1_cleaned} ... {chunk_N_cleaned} "
 Resolve summary file before synthesis:
 
 ```bash
-python3 ./scripts/36_resolve_summary.py "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/run.py resolve-summary "${BASE_NAME}" "<output_directory>"
 ```
 
 Collect analysis files:
@@ -166,6 +168,7 @@ ACTION REQUIRED:
 2) Write markdown to OUTPUT_WATCH_GUIDE.
 Do not ask for confirmation.
 
+Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   synthesize: wrote ${BASE_NAME}_headings.json and ${BASE_NAME}_watch_guide.md
@@ -191,6 +194,7 @@ Output headings JSON:
 
 ACTION REQUIRED: Write valid JSON to OUTPUT_HEADINGS.
 Do not ask for confirmation.
+Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   synthesize: wrote ${BASE_NAME}_headings.json
@@ -200,5 +204,5 @@ Your final message must be ONLY one of:
 Then insert headings:
 
 ```bash
-python3 ./scripts/35_insert_headings_from_json.py "<output_directory>/${BASE_NAME}_transcript_cleaned.md" "<output_directory>/${BASE_NAME}_headings.json" "<output_directory>/${BASE_NAME}_transcript.md"
+python3 ./scripts/run.py insert-headings "<output_directory>/${BASE_NAME}_transcript_cleaned.md" "<output_directory>/${BASE_NAME}_headings.json" "<output_directory>/${BASE_NAME}_transcript.md"
 ```

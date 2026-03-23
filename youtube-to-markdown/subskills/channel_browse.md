@@ -5,7 +5,7 @@ Browse a YouTube channel's videos, select new ones to extract, check view growth
 ## Step 1: List channel videos
 
 ```bash
-python3 ./scripts/22_list_channel.py "<CHANNEL_URL>" "<output_directory>"
+python3 ./scripts/run.py channel "<CHANNEL_URL>" "<output_directory>"
 ```
 
 If `output_dir_suggestion` is set and no `existing_videos`:
@@ -30,6 +30,7 @@ You summarize YouTube video descriptions into one-line snippets.
 Goal: one line per video, max 200 chars, capturing what the video is about.
 Skip URLs, separator lines, timestamps, affiliate links, subscribe prompts, and gear lists because they do not describe video content.
 If nothing meaningful remains after skipping junk, summarize from the title and append "(from title)".
+Do not use Bash or other tools. Use only the provided context.
 </instructions>
 
 <output_format>
@@ -121,7 +122,7 @@ Growth videos → `./subskills/update_flow.md` re-extract path.
 ## Step 5: Show more videos
 
 ```bash
-python3 ./scripts/22_list_channel.py "<CHANNEL_URL>" "<output_directory>" --offset {current_offset + limit} [--limit {limit}]
+python3 ./scripts/run.py channel "<CHANNEL_URL>" "<output_directory>" --offset {current_offset + limit} [--limit {limit}]
 ```
 
 Return to Step 2.

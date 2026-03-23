@@ -5,7 +5,7 @@ Extracts, prefilters, and screens YouTube comments via two-tier filtering.
 ## Step 1: Extract comments
 
 ```bash
-python3 ./scripts/13_extract_comments.py "<YOUTUBE_URL>" "<output_directory>"
+python3 ./scripts/run.py comments "<YOUTUBE_URL>" "<output_directory>"
 ```
 
 Creates: youtube_{VIDEO_ID}_title.txt, youtube_{VIDEO_ID}_comments.md
@@ -13,7 +13,7 @@ Creates: youtube_{VIDEO_ID}_title.txt, youtube_{VIDEO_ID}_comments.md
 ## Step 2: Prefilter and split comments
 
 ```bash
-python3 ./scripts/32_filter_comments.py "<output_directory>/${BASE_NAME}_comments.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md" "<output_directory>/${BASE_NAME}_comments_candidates.md"
+python3 ./scripts/run.py filter-comments "<output_directory>/${BASE_NAME}_comments.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md" "<output_directory>/${BASE_NAME}_comments_candidates.md"
 ```
 
 Creates: ${BASE_NAME}_comments_prefiltered.md (tier 1), optionally ${BASE_NAME}_comments_candidates.md (tier 2)
@@ -40,6 +40,7 @@ details, specific recommendations, failure reports, or meaningful stories.
 
 Drop: generic praise, off-topic, pure jokes, vague opinions without specifics.
 
+Do not use Bash. Read the candidate file and return only the KEEP line.
 Format: KEEP: 17, 45, 51, ...
 
 If no comments are substantive, output: KEEP:
@@ -52,7 +53,7 @@ Save the KEEP output string.
 ALWAYS run when candidates file exists (even if KEEP list is empty — this adds safety wrapping):
 
 ```bash
-python3 ./scripts/33_merge_tier2.py "<output_directory>/${BASE_NAME}_comments_candidates.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md" "<KEEP_STRING>"
+python3 ./scripts/run.py merge-tier2 "<output_directory>/${BASE_NAME}_comments_candidates.md" "<output_directory>/${BASE_NAME}_comments_prefiltered.md" "<KEEP_STRING>"
 ```
 
 Final output: ${BASE_NAME}_comments_prefiltered.md (merged, renumbered, safety-wrapped)

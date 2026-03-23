@@ -5,7 +5,7 @@ Existing extraction found. Analyze and offer update options.
 ## Step U1: Analyze
 
 ```bash
-python3 ./scripts/21_prepare_update.py "<YOUTUBE_URL>" "<output_directory>"
+python3 ./scripts/run.py prepare-update "<YOUTUBE_URL>" "<output_directory>"
 ```
 
 If `video_available: false`: Inform user "Video no longer available on YouTube", STOP.
@@ -52,54 +52,54 @@ AskUserQuestion:
 
 **If "Re-extract comments":**
 ```bash
-python3 ./scripts/40_backup.py backup "<existing_files.comments>"
+python3 ./scripts/run.py backup backup "<existing_files.comments>"
 ```
 Run: comment_extract.md → comment_summarize.md
 ```bash
-python3 ./scripts/50_assemble.py --update-comments "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/run.py assemble --update-comments "${BASE_NAME}" "<output_directory>"
 ```
 DONE
 
 **If "Re-extract transcript":**
 ```bash
-python3 ./scripts/40_backup.py backup "<existing_files.transcript>"
+python3 ./scripts/run.py backup backup "<existing_files.transcript>"
 ```
 If `existing_files.watch_guide` exists:
 ```bash
-python3 ./scripts/40_backup.py backup "<existing_files.watch_guide>"
-rm "<existing_files.watch_guide>"
+python3 ./scripts/run.py backup backup "<existing_files.watch_guide>"
+python3 ./scripts/run.py rm "<existing_files.watch_guide>"
 ```
 Create marker so transcript polish synthesizes watch guide during re-extract:
 ```bash
-printf '1\n' > "<output_directory>/${BASE_NAME}_watch_guide_requested.flag"
+python3 ./scripts/run.py flag "<output_directory>/${BASE_NAME}_watch_guide_requested.flag"
 ```
 Run: transcript_extract.md → transcript_polish.md
 ```bash
-python3 ./scripts/50_assemble.py --transcript-only "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/run.py assemble --transcript-only "${BASE_NAME}" "<output_directory>"
 ```
 DONE
 
 **If "Update metadata only":**
 ```bash
-python3 ./scripts/41_update_metadata.py "<existing_files.summary>" "<output_directory>/${BASE_NAME}_metadata.md"
+python3 ./scripts/run.py update-metadata "<existing_files.summary>" "<output_directory>/${BASE_NAME}_metadata.md"
 ```
 DONE
 
 **If "Add comments":**
 Run: comment_extract.md → comment_summarize.md
 ```bash
-python3 ./scripts/50_assemble.py --comments-only "${BASE_NAME}" "<output_directory>"
+python3 ./scripts/run.py assemble --comments-only "${BASE_NAME}" "<output_directory>"
 ```
 DONE
 
 **If "Full refresh":**
 Backup each existing file (skip if null):
 ```bash
-python3 ./scripts/40_backup.py backup "<existing_files.summary>"
-python3 ./scripts/40_backup.py backup "<existing_files.transcript>"
-python3 ./scripts/40_backup.py backup "<existing_files.comments>"
-python3 ./scripts/40_backup.py backup "<existing_files.watch_guide>"
-rm "<existing_files.watch_guide>"
+python3 ./scripts/run.py backup backup "<existing_files.summary>"
+python3 ./scripts/run.py backup backup "<existing_files.transcript>"
+python3 ./scripts/run.py backup backup "<existing_files.comments>"
+python3 ./scripts/run.py backup backup "<existing_files.watch_guide>"
+python3 ./scripts/run.py rm "<existing_files.watch_guide>"
 ```
 Return to main SKILL.md Step 1. Watch guide is regenerated only if user then picks output option B.
 

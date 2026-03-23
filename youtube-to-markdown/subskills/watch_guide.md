@@ -5,21 +5,7 @@ Generates a watch guide from polished transcript with WATCH/SKIM/READ-ONLY gate.
 ## Step 1: Guard for long transcripts
 
 ```bash
-python3 - <<'PY'
-from pathlib import Path
-import os
-
-p = Path("<output_directory>/${BASE_NAME}_transcript.md")
-if not p.exists():
-    print("skip: transcript missing")
-    raise SystemExit(0)
-
-if p.stat().st_size > 153600:
-    print("skip: transcript >150KB")
-    raise SystemExit(0)
-
-print("ok")
-PY
+python3 ./scripts/run.py guard "<output_directory>/${BASE_NAME}_transcript.md" --max-size 153600
 ```
 
 If output starts with `skip:` then STOP and do not create `${BASE_NAME}_watch_guide.md`.
@@ -62,6 +48,7 @@ Cross-link references:
 Do not include transcript filenames, slugs, or anchors. The assembler creates links.
 
 ACTION REQUIRED: Use the Write tool to save output to OUTPUT.
+Do not use Bash. Use Read and Grep tools for file analysis, and Write for output.
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
   watch_guide: wrote ${BASE_NAME}_watch_guide.md
