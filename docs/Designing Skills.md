@@ -296,7 +296,28 @@ Do not ask for confirmation.
 
 Without this, subagents may stop to ask permission or present results instead of writing them.
 
-### 6.5 Incremental Update Flows
+### 6.5 Subagent Workflow Guidance
+
+Subagent prompts are not skills. Skills are reusable and benefit from flexibility (§14 "Don't Railroad"). Subagent prompts are single-use, task-specific, and the subagent has no context beyond the prompt. Different constraints → different design.
+
+**Problem:** Vague task descriptions cause subagents to improvise tools. "Analyze the transcript and identify paragraph breaks" → agent invents `python3 -c` scripts with timestamp parsing. The agent fills gaps in the instructions with its own approach.
+
+**Solution:** Explicit steps that name the tools and the sequence:
+
+```
+Steps:
+1. Read INPUT with Read tool.
+2. Analyze content and identify paragraph breaks at topic shifts, ~500 chars apart.
+3. Write line numbers to OUTPUT with Write tool.
+```
+
+This is not railroading — the agent still decides *what* the paragraph breaks are (the judgment). The steps constrain *how* it interacts with the system (the workflow). Railroading would be dictating the analysis logic.
+
+**Why prohibitions fail:** "Do not use Bash" gets rationalized ("this is python3, not bash"). "Do not write inline scripts" gets reinterpreted ("this is analysis code, not a script"). Explicit steps leave no gap to fill — the agent follows the given workflow instead of inventing one.
+
+**Guideline:** Constrain the workflow (tools, sequence, I/O). Leave the judgment free (analysis, classification, content generation).
+
+### 6.6 Incremental Update Flows
 
 For skills that may re-process existing data, handle updates explicitly:
 
@@ -494,7 +515,7 @@ For self-authored skills, gotchas are a design smell — fix the skill instead. 
 
 ### Don't Railroad
 
-Skills are reusable across many situations. Being too specific prevents Claude from adapting. Give information, not rigid steps [15].
+Skills are reusable across many situations. Being too specific prevents Claude from adapting. Give information, not rigid steps [15]. Note: this applies to skill-level instructions, not subagent prompts — subagents benefit from explicit workflow steps (§6.5).
 
 ### Setup and Persistent Data
 
