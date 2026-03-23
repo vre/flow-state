@@ -254,24 +254,32 @@ Evidence quality markers:
 
 ---
 
-## Lines 50-53: Worktree setup
+## Worktrees section (formerly lines 50-53)
 
-**[git → incident]** Worktrees introduced `58701f5` (2026-01-26). Path changed from `.git/worktrees/` to `.worktrees/` in `23161d1` (2026-01-27).
+**[git → incident → evolved]** Worktrees introduced `58701f5` (2026-01-26). Path changed from `.git/worktrees/` to `.worktrees/` in `23161d1` (2026-01-27). Restructured 2026-03-24: worktree creation moved from Implementation Setup to a standalone section above all phases, worktree created at Plan Phase start instead of Implementation start.
 
 **Why worktrees:** Isolation for parallel development without polluting main. Before worktrees, the original flow-state (Nov 2025) worked directly on main. out-in-vibe-flow had no isolation at all.
 
-**Line 51 — "Copy plan file to worktree, rm from main":** **[incident]** Multiple incidents where the plan remained on main and also existed in the worktree, causing merge conflicts every time. Especially problematic when the plan on main wasn't even committed — just sitting as an untracked file. The word "move" was tried first but the LLM copied instead of moving. Current wording "copy... rm" is explicit about both actions. Arguably could be "move and delete" but copy+delete is unambiguous.
+**Why worktree at Plan Phase start (2026-03-24 change):** Previously worktrees were created in Implementation Setup, and plans were written on main then copied to the worktree with `rm` from main. This caused repeated incidents: plans remaining as untracked files on main, merge conflicts when plan existed in both places, LLM copying instead of moving. The fix: create worktree before writing any files. Plans are born in the worktree, never touch main. The copy/rm instruction was removed entirely — the problem it solved no longer exists.
 
-**Line 52 — "run `uv sync` in dirs with pyproject.toml":** The flow-state project has multiple separate Python plugins (youtube-to-markdown, imap-stream-mcp), each built independently. `uv` was chosen from the start for modern, fast, clean package management. `pyproject.toml` is the modern way to manage dependencies with `uv`.
+**Previous line 51 — "Copy plan file to worktree, rm from main" — REMOVED:** **[incident]** Multiple incidents where the plan remained on main and also existed in the worktree, causing merge conflicts every time. Especially problematic when the plan on main wasn't even committed — just sitting as an untracked file. The 2026-03-24 restructuring eliminates this by writing plans directly in the worktree from the start.
+
+**Why "For Plan Phase work":** Small changes (under 5 tool calls, line 17) skip Plan Phase entirely and work directly on main. Worktree overhead is only justified for multi-phase work.
+
+**Why "Name not known yet? Use topic name":** Discovery may start before the scope or final name is clear. Allowing a temporary topic name (e.g., `research-auth`) prevents blocking on naming. `git branch -m` renames later.
+
+**`uv sync` and `.env*` copy:** Unchanged. See original rationale below.
+
+**`uv sync` in dirs with pyproject.toml:** The flow-state project has multiple separate Python plugins (youtube-to-markdown, imap-stream-mcp), each built independently. `uv` was chosen from the start for modern, fast, clean package management. `pyproject.toml` is the modern way to manage dependencies with `uv`.
 
 **Why `.env*` copy:** Environment files are not committed (`.gitignore`) but needed for tests and tools.
 
-**Codex sandbox workaround (line 53):** **[incident]** Added `42e2832` (2026-03-07). Three cycles documented the problem:
+**Codex sandbox workaround:** **[incident]** Added `42e2832` (2026-03-07). Moved from CLAUDE.md to `session-codex` skill (2026-03-24) — technical detail belongs in the skill, not the process doc. Three cycles documented the problem:
 - imap-stream-mcp v0.7.0: `index.lock` error — Codex can't write to `.git`
 - youtube-to-markdown v2.12.0: `.git` metadata outside writable roots
 - imap-stream-mcp v0.7.1: same issue, third time
 
-Codex's Seatbelt sandbox blocks `(subpath ".git")`. Renaming to `.git-codex-sandbox-workaround` bypasses this while keeping filesystem isolation. Documented in `docs/core/research/2026-02-25-agent-sandbox-session-delegation.md`.
+Codex's Seatbelt sandbox blocks `(subpath ".git")`. Renaming to `.git-codex-sandbox-workaround` bypasses this while keeping filesystem isolation. Full details in `session-codex/SKILL.md` and `session-codex/README.md`.
 
 ---
 
@@ -389,7 +397,7 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 ### Acceptance Testing
 
-**[inferred]** ORC tests the feature or asks HC. Defects go back to IMP for fixing via `session-codex` `continue`, then re-verified. The iteration continues until clean. HC confirms before proceeding to Merge Phase — another gate preventing premature completion.
+**[inferred]** ORC tests the feature or asks HC. Defects go back to IMP for fixing via the same session skill used for implementation (`session-codex` or `session-sandvault`), then re-verified. The iteration continues until clean. HC confirms before proceeding to Merge Phase — another gate preventing premature completion.
 
 ---
 

@@ -17,6 +17,14 @@ Roles: **HC** = Human Companion (direction, pace, approval gates), **ORC** = Orc
 Move to Plan Phase if the user request requires more than 5 tool calls or file changes to implement.
 ORC informs HC what the next step is. Do not just say what you did.
 
+### Worktrees
+
+- For Plan Phase work: create worktree when first file needs to be written: `git worktree add .worktrees/<name> -b <name> main`. Main stays clean — no untracked work files.
+- Read-only operations (grep, read, experiments without output) can happen on main. Writing a file → worktree first.
+- Name not known yet? Use topic name (e.g., `research-auth`). Rename later with `git branch -m`.
+- Multiple worktrees OK when scope requires parallel tracks.
+- Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml.
+
 ### 1. Plan Phase
 
 1. DISCOVERY
@@ -47,11 +55,8 @@ ORC informs HC what the next step is. Do not just say what you did.
 ### 2. Implementation Phase
 
 1. IMPLEMENTATION SETUP
-- ALWAYS create git worktree under '.worktrees/<short_description>/' to isolate for parallel development.
-- Copy plan file to worktree, `rm` from main, commit in worktree — plan is a deliverable, must not remain untracked in main.
-- Worktree setup: copy `.env*` files and state files (TODO.md etc.) from main (any directory level), run `uv sync` in dirs with pyproject.toml
-- Codex sandbox git workaround: follow `session-codex` skill instructions for `.git` rename and GIT_DIR setup. Only for worktrees (where `.git` is a gitfile pointer), not repo root.
-- Delegate implementation to IMP via `session-codex` `continue` (reuse plan review session). IMP scope: sections 2–5 of this phase (pre-implementation gate through implementation end). Returns at IMPLEMENTATION END.
+- Worktree exists from Plan Phase.
+- Delegate implementation to IMP via `session-codex` or `session-sandvault` (when build tools or network needed). IMP scope: sections 2–5 of this phase. Returns at IMPLEMENTATION END.
 
 2. PRE-IMPLEMENTATION GATE
 - STOP and evaluate: does the plan fit the existing architecture cleanly? Do not patch around friction — fix the friction.
@@ -82,16 +87,16 @@ ORC informs HC what the next step is. Do not just say what you did.
 ### 3. Review Phase
 
 1. CODE REVIEW
-- ORC reviews changes in worktree. Cross-check with the living plan. Send findings to IMP via `session-codex` `continue`. Fix all, no debt → iterate until clean.
+- ORC reviews changes in worktree. Cross-check with the living plan. Send findings to IMP via the same session skill used for implementation. Fix all, no debt → iterate until clean.
 
 2. ACCEPTANCE TESTING
-- ORC tests feature(s) or asks HC. Defects → fix via IMP `session-codex` `continue`, re-verify. Iterate until clean.
+- ORC tests feature(s) or asks HC. Defects → fix via IMP session, re-verify. Iterate until clean.
 - Confirm from HC to proceed to Merge Phase
 
 ### 4. Merge Phase
 
 1. DOCUMENTATION
-- Delegate implementation reflection to IMP via `session-codex` `continue`: IMP writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-impl-<short-name>.md` — what went well, what changed from plan, lessons learned.
+- Delegate implementation reflection to IMP via the same session skill: IMP writes `docs/<plugin/core>/reflections/<yyyy-mm-dd>-impl-<short-name>.md` — what went well, what changed from plan, lessons learned.
 - Update Documentation: 'CHANGELOG.md', 'TODO.md', 'TESTING.md', 'DEVELOPMENT.md', 'README.md' in project root and plugin directories.
 - If structure changed: update `ARCHITECTURE.md` to reflect actual code
 - If architectural decision with tradeoffs was made: write ADR in `docs/<plugin/core>/adrs/`
