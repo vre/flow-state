@@ -12,7 +12,7 @@ allowed-tools:
 
 # YouTube to Markdown
 
-Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions. Do not create your own scripts.
+Multiple videos: Process one video at a time, sequentially. Do not run parallel extractions. Do not create your own scripts. Do not create or suggest channel subdirectories — channel folders are created only via `channel_browse`.
 
 ## Step -1: Detect input type
 
