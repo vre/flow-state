@@ -13,6 +13,7 @@ Like session-claude / session-codex but inside Sandvault sandbox. `sv` handles i
 
 - `${SHARED}` — `/Users/Shared/sv-${USER}`
 - `${REPO}` — bare repo name in shared space (e.g., `myproject.git`)
+- `${PROJECT_DIR}` — `${REPO%.git}` (e.g., `myproject`) — compute once to avoid nested quoting issues
 - `${NAME}` — branch/worktree name
 - `${PROMPT}` — task prompt
 - `${THREAD_ID}` — Codex session ID (for resume)
@@ -37,14 +38,15 @@ Check if shared remote exists:
 git remote get-url shared 2>/dev/null
 ```
 
-If no shared remote → create the bridge:
+If no shared remote → create the bridge. Compute `${PROJECT_DIR}` (repo name without `.git`) first to avoid nested quoting issues:
 ```bash
+PROJECT_DIR="${REPO%.git}"
 git clone --bare "$(pwd)" "${SHARED}/${REPO}"
 git -C "${SHARED}/${REPO}" config core.sharedRepository group
 chgrp -R "sandvault-${USER}" "${SHARED}/${REPO}"
 chmod -R g+w "${SHARED}/${REPO}"
 git remote add shared "${SHARED}/${REPO}"
-sv shell -- zsh -c "git config --global --add safe.directory '${SHARED}/${REPO}' && git config --global --add safe.directory '${SHARED}/${REPO%.git}'"
+sv shell -- zsh -c "git config --global --add safe.directory ${SHARED}/${REPO} && git config --global --add safe.directory ${SHARED}/${PROJECT_DIR}"
 ```
 
 Push current branch:
@@ -54,7 +56,7 @@ git push shared ${NAME}
 
 Sandbox user clones (first time) or fetches:
 ```bash
-sv shell -- zsh -c "cd '${SHARED}' && { [ -d '${REPO%.git}' ] && cd '${REPO%.git}' && git fetch || git clone '${REPO}' && cd '${REPO%.git}'; }"
+sv shell -- zsh -c "cd ${SHARED} && { [ -d ${PROJECT_DIR} ] && cd ${PROJECT_DIR} && git fetch || git clone ${REPO} && cd ${PROJECT_DIR}; }"
 ```
 
 ### If CWD is not a git repo
@@ -72,31 +74,31 @@ Pass prompt via stdin (`-`) to avoid shell quoting issues. Use `sv shell PATH --
 
 First run:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${REPO%.git}" -- codex exec --json -
+echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- codex exec --json -
 ```
 
 Resume:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${REPO%.git}" -- codex exec resume --json ${THREAD_ID} -
+echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- codex exec resume --json ${THREAD_ID} -
 ```
 
 ## Delegate to Claude
 
 First run:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${REPO%.git}" -- claude -p --output-format json
+echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- claude -p --output-format json
 ```
 
 Resume (`-c` continues most recent in cwd):
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${REPO%.git}" -- claude -p -c --output-format json
+echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- claude -p -c --output-format json
 ```
 
 ## Get results back
 
 After agent finishes, push from sandbox and fetch on host:
 ```bash
-sv shell -- zsh -c "cd '${SHARED}/${REPO%.git}' && git push origin ${NAME}"
+sv shell -- zsh -c "cd ${SHARED}/${PROJECT_DIR} && git push origin ${NAME}"
 git fetch shared
 git log shared/${NAME} --oneline -5
 ```
