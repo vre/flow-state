@@ -45,8 +45,8 @@ AskUserQuestion:
 - multiSelect: false
 - options:
   A. "Summary + Comments (Recommended)" - Summary cross-analyzed with comments. Timestamped transcript stored for reference.
-  B. "Summary + Comments + Formatted Transcript" - Option A + cleaned and formatted full transcript with synthesized watch guide → double tokens
-  C. "Summary Only" - Summary of video content
+  B. "Summary + Comments + Formatted Transcript with Watch Guide" - Option A + cleaned and formatted full transcript with synthesized watch guide → double tokens
+  C. "Summary Only" - Summary of video content. Timestamped transcript stored for reference.
   D. "Formatted Transcript Only" - Cleaned and formatted full transcript
 
 ## Step 2: Execute modules
