@@ -140,28 +140,19 @@ VIDEO_ID: {video_id}
 OUTPUT_HEADINGS: <output_directory>/${BASE_NAME}_headings.json
 OUTPUT_WATCH_GUIDE: <output_directory>/${BASE_NAME}_watch_guide.md
 
-Read all existing inputs.
-
-Output 1: headings JSON
-- Format: [{"before_paragraph": <global int>, "heading": "### Topic"}, ...]
-- Use global paragraph numbers from analysis topics
-
-Output 2: watch guide — curated viewing path
-
-Write in the same language as the source content. Never reference chunks or internal terms.
-
-Format: summary paragraphs alternating with video links.
-- Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
-- Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) MM:SS–MM:SS — Why watch: reason`
-- Calculate t=SECONDS: hours*3600 + minutes*60 + seconds. Over 1 hour use H:MM:SS.
-- Only link moments where WATCHING adds value over READING. Ask: "Does seeing this give something the text cannot?" Physical demo, humor timing, on-screen data, emotional reaction → yes. Expert analysis, verbal anecdote, facts → no, summarize instead. Zero links is fine for talking-head content.
-- Heatmap (if provided): {start_time, end_time, value 0-1} = viewer replay intensity. Use as tiebreaker, not primary signal — popular ≠ must-watch when the transcript exists.
-
-ACTION REQUIRED:
-1) Write valid JSON to OUTPUT_HEADINGS.
-2) Write markdown to OUTPUT_WATCH_GUIDE.
-Do not ask for confirmation.
-
+Steps:
+1. Read INPUT_ANALYSES files. Each analysis contains Topics with global paragraph numbers — these are your heading positions. Do not recount paragraphs yourself.
+2. Read INPUT_CHAPTERS, INPUT_METADATA, INPUT_SUMMARY, INPUT_HEATMAP (if exists).
+3. Build headings JSON from analysis Topics: [{"before_paragraph": <N from analysis>, "heading": "### Topic Title"}, ...]
+4. Build watch guide in same language as source content:
+   - Summary paragraphs alternating with video links
+   - Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
+   - Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) MM:SS–MM:SS — Why watch: reason`
+   - Calculate t=SECONDS: hours*3600 + minutes*60 + seconds. Over 1 hour use H:MM:SS.
+   - Only link moments where WATCHING adds value over READING. Physical demo, humor, on-screen data → yes. Verbal analysis, anecdote → no. Zero links is fine for talking-head content.
+   - Heatmap (if provided): viewer replay intensity as tiebreaker, not primary signal.
+   - Never reference chunks or internal terms.
+5. Write JSON to OUTPUT_HEADINGS, markdown to OUTPUT_WATCH_GUIDE. Do not verify with scripts — trust the analysis paragraph numbers.
 
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
@@ -181,13 +172,11 @@ INPUT_HEATMAP: {heatmap_path_or_none}
 INPUT_SUMMARY: {resolved_summary_or_none}
 OUTPUT_HEADINGS: <output_directory>/${BASE_NAME}_headings.json
 
-Read all existing inputs.
-
-Output headings JSON:
-[{"before_paragraph": <global int>, "heading": "### Topic"}, ...]
-
-ACTION REQUIRED: Write valid JSON to OUTPUT_HEADINGS.
-Do not ask for confirmation.
+Steps:
+1. Read INPUT_ANALYSES files. Each analysis contains Topics with global paragraph numbers — these are your heading positions. Do not recount paragraphs yourself.
+2. Read INPUT_CHAPTERS, INPUT_METADATA, INPUT_SUMMARY, INPUT_HEATMAP (if exists).
+3. Build headings JSON from analysis Topics: [{"before_paragraph": <N from analysis>, "heading": "### Topic Title"}, ...]
+4. Write JSON to OUTPUT_HEADINGS. Do not verify with scripts — trust the analysis paragraph numbers.
 
 Do not output text during execution - only make tool calls.
 Your final message must be ONLY one of:
