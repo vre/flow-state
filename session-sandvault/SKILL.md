@@ -27,6 +27,21 @@ User must have:
 
 If `sv shell -- echo ok` fails → STOP, tell user to set up Sandvault.
 
+## Environment check
+
+When setting up a project for sandbox use, verify the sandbox has the project's toolchain. Do not assume — check:
+```bash
+sv shell -- zsh -c "which <tool> && <tool> --version"
+```
+
+Examples:
+- Android: `java`, `gradle`, `adb`, `JAVA_HOME`, `ANDROID_HOME`
+- Python: `python3`, `uv`, `VIRTUAL_ENV`
+- Node: `node`, `npm`/`bun`, `npx`
+- Rust: `cargo`, `rustc`
+
+If a required tool is missing → install via brew on host (sandbox shares `/opt/homebrew/bin`). If env vars are missing → copy the relevant exports from host's `~/.zprofile` to sandbox's `~/user/.zprofile` via `sv shell`.
+
 ## Sync setup
 
 Sandbox user cannot write host user's files. Shared bare repo bridges the gap.
