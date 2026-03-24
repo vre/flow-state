@@ -145,7 +145,7 @@ Steps:
 2. Read INPUT_CHAPTERS, INPUT_METADATA, INPUT_SUMMARY, INPUT_HEATMAP (if exists).
 3. Build headings JSON from analysis Topics: [{"before_paragraph": <N from analysis>, "heading": "### Topic Title"}, ...]
 4. Build watch guide in same language as source content:
-   - Summary paragraphs alternating with video links
+   - Sections with ## headings matching the headings from step 3.
    - Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
    - Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) HH:MM:SS–HH:MM:SS — Why watch: reason`
    - Always use HH:MM:SS format for all timestamps (e.g., 00:26:00, not 26:00 or 0:26).
@@ -153,7 +153,10 @@ Steps:
    - Only link moments where WATCHING adds value over READING. Physical demo, humor, on-screen data → yes. Verbal analysis, anecdote → no. Zero links is fine for talking-head content.
    - Heatmap (if provided): viewer replay intensity as tiebreaker, not primary signal.
    - Never reference chunks or internal terms.
-   - End with summary table: `| Section | HH:MM:SS–HH:MM:SS | Recommendation |` where every timestamp is a clickable `[HH:MM:SS](https://youtube.com/watch?v={video_id}&t=SECONDS)` link.
+   - End with summary table. Column Recommendation links to either transcript or YouTube:
+     - Read → Obsidian link `[[TRANSCRIPT_FILENAME#Heading]]` where TRANSCRIPT_FILENAME is derived from INPUT_METADATA (title, video_id) as `{date} - youtube - {title} - transcript ({video_id})`
+     - Watch → YouTube link `[▶ HH:MM:SS](https://youtube.com/watch?v={video_id}&t=SECONDS)`
+     - Table timestamps (time range column) do not need links.
 5. Write JSON to OUTPUT_HEADINGS, markdown to OUTPUT_WATCH_GUIDE. Do not verify with scripts — trust the analysis paragraph numbers.
 
 Do not output text during execution - only make tool calls.
