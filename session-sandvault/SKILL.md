@@ -40,7 +40,18 @@ Examples:
 - Node: `node`, `npm`/`bun`, `npx`
 - Rust: `cargo`, `rustc`
 
-If a required tool is missing → install via brew on host (sandbox shares `/opt/homebrew/bin`). SDK components (e.g., `sdkmanager "platforms;android-34"`) also install to the shared brew prefix — but sandbox can't install them itself (no write access to brew dir), so install on host. If env vars are missing → copy the relevant exports from host's `~/.zprofile` to sandbox's `~/user/.zprofile` via `sv shell`.
+If a required tool is missing → install via brew on host (sandbox shares `/opt/homebrew/bin`). SDK components (e.g., `sdkmanager "platforms;android-34"`) also install to the shared brew prefix — but sandbox can't install them itself (no write access to brew dir), so install on host. If build tools complain about missing SDK components → install them on host, not sandbox.
+
+If env vars are missing → copy the relevant exports from host's profile to sandbox's `~/user/.zprofile`. For multi-line or complex setup, write a script to shared space to avoid quoting issues:
+```bash
+cat > ${SHARED}/setup-env.sh << 'EOF'
+#!/bin/zsh
+echo 'export JAVA_HOME=/opt/homebrew/opt/openjdk@17' >> ~/user/.zprofile
+echo 'export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools' >> ~/user/.zprofile
+EOF
+chmod +x ${SHARED}/setup-env.sh
+sv shell -- ${SHARED}/setup-env.sh
+```
 
 ## Sync setup
 
@@ -72,6 +83,22 @@ git push shared ${NAME}
 Sandbox user clones (first time) or fetches:
 ```bash
 sv shell -- zsh -c "cd ${SHARED} && { [ -d ${PROJECT_DIR} ] && cd ${PROJECT_DIR} && git fetch || git clone ${REPO} && cd ${PROJECT_DIR}; }"
+```
+
+After clone/fetch, install project dependencies inside sandbox (e.g., `npm install`, `uv sync`).
+
+### Shell quoting
+
+`sv shell -- zsh -c "..."` breaks easily with quotes, dollars, semicolons. For anything beyond simple commands, write a script to shared space:
+```bash
+cat > ${SHARED}/task.sh << 'SCRIPT'
+#!/bin/zsh
+cd /Users/Shared/sv-vre/myproject
+npm install
+npx expo prebuild
+SCRIPT
+chmod +x ${SHARED}/task.sh
+sv shell -- ${SHARED}/task.sh
 ```
 
 ### If CWD is not a git repo
