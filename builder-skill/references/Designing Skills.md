@@ -334,6 +334,54 @@ Step U4: Backup before overwrite, then execute
 
 **Benefit:** Avoids wasteful re-processing. User controls what gets updated.
 
+### 6.7 Environment-Dependent Skills
+
+Skills that orchestrate external tools (CLIs, sandboxes, remote agents) face a different failure class than content-processing skills. The environment itself may be incomplete, misconfigured, or split across trust boundaries.
+
+**The problem:** A content skill like "summarize transcript" has simple prerequisites — a file exists or it doesn't. An environment skill like "delegate build to sandbox" has layered prerequisites: the sandbox exists, the user is logged in, the toolchain is installed, the correct version is available, env vars are set, the network path works, and shell quoting survives multiple interpretation layers. Each layer can fail silently.
+
+**Pattern: Check before act.** Verify the environment meets the task's requirements before delegating. Do not assume tools exist because they exist on the host — check inside the target environment.
+
+```
+## Environment check
+sv shell -- zsh -c "which java && java -version"
+```
+
+If missing → fix (install, configure) or STOP with actionable message. Actionable = what to install and where, not "something is wrong."
+
+**Real example (session-sandvault):** Sandbox shares `/opt/homebrew/bin` with host but not env vars. `gradle` was available but `JAVA_HOME` and `ANDROID_HOME` were unset → build failed with cryptic errors. The fix: check env vars during project setup, copy relevant exports from host profile to sandbox profile. Android SDK components installed via `sdkmanager` on host go to the shared brew prefix, but the sandbox user can't install them (no write access to brew dir) — so missing components must be installed on the host.
+
+**Pattern: Quoting resilience.** Nested shell invocation (host → sandbox → tool) multiplies quoting layers. Each layer interprets quotes, dollar signs, and special characters independently.
+
+```
+# Breaks: nested quotes, parameter expansion
+sv shell -- zsh -c "echo '${REPO%.git}' && git config --add safe.directory '${PATH}'"
+
+# Works: precompute variables
+PROJECT_DIR="${REPO%.git}"
+sv shell -- zsh -c "echo ${PROJECT_DIR}"
+
+# Works best: write script, execute script
+cat > ${SHARED}/task.sh << 'SCRIPT'
+#!/bin/zsh
+echo "$1"
+git config --global --add safe.directory "$2"
+SCRIPT
+sv shell -- ${SHARED}/task.sh "${PROJECT_DIR}" "${SHARED}/${PROJECT_DIR}"
+```
+
+**Guideline:** For anything beyond a simple one-liner, write a script to a shared location and execute it. Pass prompts via stdin (`echo "$PROMPT" | tool -`), not as shell arguments. Precompute derived variables (`${REPO%.git}` → `${PROJECT_DIR}`) to avoid parameter expansion inside nested quotes.
+
+**Pattern: State across boundaries.** When the skill operates across user or machine boundaries, there is no shared filesystem by default. State must cross the boundary explicitly.
+
+- **Git bare repo as bridge:** Host pushes to shared bare repo, sandbox clones/fetches from it. Both sides see the same history. Results come back via `git push` + `git fetch`.
+- **Session IDs for resume:** Codex `thread_id`, Claude `session_id` — parse from first response, pass to subsequent invocations.
+- **Dependency install after clone:** Git clone doesn't include `node_modules/`, `.venv/`, or other generated artifacts. The skill must include a dependency install step after clone/fetch.
+
+**When to apply these patterns:** Any skill that runs commands in an environment different from the orchestrator's — sandboxes, containers, remote machines, different OS users. Content-processing skills (file in → file out) don't need this.
+
+**Benefit:** Avoids wasteful re-processing. User controls what gets updated.
+
 ---
 
 # Part III: Operations (How)

@@ -230,6 +230,18 @@ Not absolute paths or paths relative to working directory. Skills may be install
 
 Scripts should be self-documenting - include usage information that Claude can read if needed. But the skill shouldn't duplicate what's in the script. The skill shows HOW to invoke; the script documents its own behavior.
 
+## Environment-Dependent Skills
+
+Skills that orchestrate external tools (sandboxes, CLIs, remote agents) must verify the environment before acting. Do not assume — check.
+
+**Check before act:** Verify toolchain and env vars inside the target environment, not just on the host. Missing tool → install on host. Missing env var → configure in target profile.
+
+**Quoting resilience:** Nested shell invocation (host → sandbox → tool) breaks quoting. For anything beyond simple commands, write a script to shared location and execute it. Pass prompts via stdin, not argv. Precompute derived variables (`${REPO%.git}` → `${PROJECT_DIR}`) to avoid parameter expansion inside nested quotes.
+
+**State across boundaries:** No shared filesystem between different users/machines. Use git bare repo as bridge, parse session IDs for resume, include dependency install step after clone.
+
+See `Designing Skills.md` §6.7 for full rationale and examples.
+
 ## Anti-patterns
 
 ### Duplicating Script Logic in Skill
