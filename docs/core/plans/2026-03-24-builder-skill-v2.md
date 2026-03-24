@@ -195,16 +195,16 @@ Raise from 2000 to 8000 in validate_structure.py. Real subskills (youtube-to-mar
 
 ## Acceptance Criteria
 
-- [ ] AC1: Iterative loop — builder guides user through test → observe → refine cycle, not one-shot generation
-- [ ] AC2: Edit mode — builder modifies existing skill while preserving coherence (scenario test)
-- [ ] AC3: Portable docs — writing-skills.md and Designing Skills.md live in builder-skill, symlinked to docs/
-- [ ] AC4: No unnecessary subagents — semantic check, minimize, coherence are direct orchestrator work
-- [ ] AC5: Content validation — validate_structure.py implements all 4 checks: subagent_has_io, subagent_output_constrained, creates_after_bash, background_has_degradation
-- [ ] AC6: Smoke test — concrete test-observe-refine pattern in both skill_only.md and builder_skill.md
-- [ ] AC7: generate_skill.py removed, Step 2 simplified
-- [ ] AC8: Subskill char limit raised — youtube-to-markdown subskills pass
-- [ ] AC9: Existing scenario still passes
-- [ ] AC10: New scenario: edit existing skill
+- [x] AC1: Iterative loop — builder guides user through test → observe → refine cycle, not one-shot generation
+- [>] AC2: Edit mode — builder modifies existing skill while preserving coherence (scenario test). Scenario file added; scenario execution not run in this session.
+- [x] AC3: Portable docs — writing-skills.md and Designing Skills.md live in builder-skill, symlinked to docs/
+- [x] AC4: No unnecessary subagents — semantic check, minimize, coherence are direct orchestrator work
+- [x] AC5: Content validation — validate_structure.py implements all 4 checks: subagent_has_io, subagent_output_constrained, creates_after_bash, background_has_degradation
+- [x] AC6: Smoke test — concrete test-observe-refine pattern in both skill_only.md and builder_skill.md
+- [x] AC7: generate_skill.py removed, Step 2 simplified
+- [>] AC8: Subskill char limit raised — builder validator limit is 8000; full `youtube-to-markdown` validation still fails on pre-existing out-of-scope issues.
+- [>] AC9: Existing scenario still passes. Not run in this session.
+- [x] AC10: New scenario: edit existing skill
 
 ## Testing Strategy
 
@@ -223,19 +223,19 @@ Raise from 2000 to 8000 in validate_structure.py. Real subskills (youtube-to-mar
 
 ## Tasks
 
-- [ ] 1. Move writing-skills.md and Designing Skills.md to builder-skill/references/, symlink from docs/
-- [ ] 2. Update SKILL.md — references to ./references/, add Edit and Validate-only routes
-- [ ] 3. Rewrite skill_only.md — iterative loop (write → test → observe → refine), remove generate_skill.py call, remove subagent semantic check
-- [ ] 4. Rewrite builder_skill.md — iterative loop, concrete smoke test pattern
-- [ ] 5. Create edit_skill.md — read whole skill, change request, coherence-preserving edit, test loop
-- [ ] 6. Remove generate_skill.py
-- [ ] 7. Raise subskill char limit in validate_structure.py (2000 → 8000)
-- [ ] 8. Add all 4 content checks to validate_structure.py (subagent_has_io, subagent_output_constrained, creates_after_bash, background_has_degradation)
-- [ ] 9. Tests for all 4 new validation checks
-- [ ] 10. Test harness: symlink-based skill loading for smoke tests in iterative loop
-- [ ] 10. New scenario: edit-youtube-skill.yaml
-- [ ] 11. Verify existing scenario still passes
-- [ ] 12. Self-validate: run validate_structure.py on builder-skill itself
+- [x] 1. Move writing-skills.md and Designing Skills.md to builder-skill/references/, symlink from docs/
+- [x] 2. Update SKILL.md — references to ./references/, add Edit and Validate-only routes
+- [x] 3. Rewrite skill_only.md — iterative loop (write → test → observe → refine), remove generate_skill.py call, remove subagent semantic check
+- [x] 4. Rewrite builder_skill.md — iterative loop, concrete smoke test pattern
+- [x] 5. Create edit_skill.md — read whole skill, change request, coherence-preserving edit, test loop
+- [x] 6. Remove generate_skill.py
+- [x] 7. Raise subskill char limit in validate_structure.py (2000 → 8000)
+- [x] 8. Add all 4 content checks to validate_structure.py (subagent_has_io, subagent_output_constrained, creates_after_bash, background_has_degradation)
+- [x] 9. Tests for all 4 new validation checks
+- [x] 10. Test harness: symlink-based skill loading for smoke tests in iterative loop
+- [x] 10. New scenario: edit-youtube-skill.yaml
+- [>] 11. Verify existing scenario still passes. Not run in this session.
+- [x] 12. Self-validate: run validate_structure.py on builder-skill itself
 
 ## Files Changed
 

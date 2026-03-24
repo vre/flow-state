@@ -32,6 +32,8 @@ Creates: `widgets/${NAME}/widget.py`
 python3 ./scripts/validate_widget.py "${NAME}"
 ```
 
+Creates: `widgets/${NAME}/validation.json`
+
 DONE.
 """
 

@@ -1,0 +1,45 @@
+# Scenario: Edit youtube-to-markdown to fix one existing subagent prompt
+#
+# Goal: test edit mode on a real skill without changing its overall flow.
+
+name: edit-youtube-skill
+type: end-to-end
+hypothesis: "Agent reads the whole skill, applies one coherence-preserving edit, tests it, and leaves the rest of the skill intact."
+
+inputs:
+  skill_path: youtube-to-markdown
+  change_request: >
+    Edit youtube-to-markdown/subskills/channel_browse.md. In Step 2, rewrite the
+    Haiku description-summary task_tool so it uses INPUT/OUTPUT-first structure,
+    explicit steps, and constrained final-message format. Keep the one-line
+    'VIDEO_ID: summary text' contract because the parent flow parses that output.
+  done_condition: >
+    channel_browse.md contains the new task_tool pattern, the parse step still
+    matches the output contract, and youtube-to-markdown still routes channel
+    inputs through channel_browse.md.
+  constraints:
+    - Read youtube-to-markdown/SKILL.md before editing subskills.
+    - Preserve existing labels, selection flow, and view-growth logic.
+    - Do not rewrite unrelated subskills.
+    - Validate youtube-to-markdown/SKILL.md after the edit.
+
+rubric:
+  - check: validate_structure_passes
+    assert: true
+  - check: edited_in_place
+    path: youtube-to-markdown/subskills/channel_browse.md
+  - check: subagent_has_io
+    assert: true
+  - check: subagent_output_constrained
+    assert: true
+  - check: coherence_preserved
+    assert: true
+    note: "Parent parser still expects `VIDEO_ID: summary text` and routing still uses channel_browse.md."
+  - check: no_scope_creep
+    assert: true
+    note: "Only directly dependent files may change."
+
+manual_test:
+  prompt: >
+    Use youtube-to-markdown on a channel URL and verify the browse flow still
+    lists videos, summarizes new descriptions, and reaches the selection step.

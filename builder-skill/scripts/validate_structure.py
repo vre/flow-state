@@ -11,6 +11,7 @@ from pathlib import Path
 
 TOKEN_BUDGET_WORKFLOW = 300
 TOKEN_BUDGET_BUILDER = 500
+SUBSKILL_CHAR_LIMIT = 8000
 _VERB = r"(gathers?|generates?|validates?|creates?|processes?|builds?|checks?|runs?|executes?)"
 _SEP = r"(,|\band\b|\bthen\b)"
 WORKFLOW_VERBS = re.compile(
@@ -24,6 +25,19 @@ PROSE_PATTERNS = [
 ]
 KEBAB_RE = re.compile(r"^[a-z]+(-[a-z]+)+$")
 PATH_REF_RE = re.compile(r"\./scripts/([^\s\"'`]+\.py)|\./subskills/([^\s\"'`]+\.md)")
+TASK_CONTEXT_RE = re.compile(r"\btask[_ ]tool\b", re.IGNORECASE)
+TASK_LINE_RE = re.compile(r"^\s*TASK\s*:", re.IGNORECASE | re.MULTILINE)
+INPUT_LINE_RE = re.compile(r"^\s*INPUT[A-Z_]*\s*:", re.IGNORECASE | re.MULTILINE)
+OUTPUT_LINE_RE = re.compile(r"^\s*OUTPUT[A-Z_]*\s*:", re.IGNORECASE | re.MULTILINE)
+RUN_IN_BACKGROUND_RE = re.compile(r"run_in_background\s*:\s*true", re.IGNORECASE)
+CONSTRAINED_OUTPUT_RE = re.compile(r"do not output text during execution", re.IGNORECASE)
+FINAL_MESSAGE_RE = re.compile(
+    r"your final message must be only one of|final message:|on failure:",
+    re.IGNORECASE,
+)
+PERMISSION_TEST_RE = re.compile(r"permission test", re.IGNORECASE)
+MODE_A_RE = re.compile(r"\bmode a\b", re.IGNORECASE)
+MODE_B_RE = re.compile(r"\bmode b\b", re.IGNORECASE)
 
 
 def _parse_frontmatter(text: str) -> tuple[dict[str, str], int]:
@@ -91,11 +105,130 @@ def check_script_syntax(script_refs: list[str], skill_dir: Path) -> list[dict]:
     return issues
 
 
+def _iter_code_blocks(lines: list[str]) -> list[dict[str, object]]:
+    """Extract fenced code blocks with line numbers and nearby context."""
+    blocks: list[dict[str, object]] = []
+    in_code_block = False
+    lang = ""
+    start_line = 0
+    context_lines: list[str] = []
+    content_lines: list[str] = []
+
+    for i, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_code_block:
+                in_code_block = True
+                start_line = i
+                lang = stripped[3:].strip().lower()
+                context_lines = lines[max(0, i - 6) : i - 1]
+                content_lines = []
+            else:
+                blocks.append(
+                    {
+                        "lang": lang,
+                        "content": "\n".join(content_lines),
+                        "start_line": start_line,
+                        "end_line": i,
+                        "context": context_lines,
+                    }
+                )
+                in_code_block = False
+            continue
+
+        if in_code_block:
+            content_lines.append(line)
+
+    return blocks
+
+
+def _format_issue(line: int, msg: str, prefix: str | None = None, severity: str | None = None) -> dict:
+    """Build an issue dict with optional filename prefix and severity."""
+    issue = {"line": line, "msg": f"[{prefix}] {msg}" if prefix else msg}
+    if severity:
+        issue["severity"] = severity
+    return issue
+
+
+def _is_task_block(block: dict[str, object]) -> bool:
+    """Return True when a fenced block looks like a Task/tool prompt."""
+    context_text = "\n".join(block["context"])  # type: ignore[arg-type]
+    content = str(block["content"])
+    return bool(TASK_CONTEXT_RE.search(context_text) or TASK_LINE_RE.search(content))
+
+
+def check_content_patterns(text: str, prefix: str | None = None) -> list[dict]:
+    """Run targeted content checks on fenced task and bash blocks."""
+    issues: list[dict] = []
+    lines = text.split("\n")
+
+    for block in _iter_code_blocks(lines):
+        content = str(block["content"])
+        context_text = "\n".join(block["context"])  # type: ignore[arg-type]
+        start_line = int(block["start_line"])
+        end_line = int(block["end_line"])
+        lang = str(block["lang"]).split()[0] if str(block["lang"]).strip() else ""
+
+        if lang == "bash":
+            next_nonempty = ""
+            for line in lines[end_line:]:
+                if line.strip():
+                    next_nonempty = line.strip()
+                    break
+            if not next_nonempty.lower().startswith("creates:"):
+                issues.append(
+                    _format_issue(
+                        end_line,
+                        "creates_after_bash: Bash block should be followed by a Creates: line",
+                        prefix=prefix,
+                        severity="warning",
+                    )
+                )
+
+        if not _is_task_block(block):
+            continue
+
+        has_input = bool(INPUT_LINE_RE.search(content))
+        has_output = bool(OUTPUT_LINE_RE.search(content))
+        if not (has_input and has_output):
+            issues.append(
+                _format_issue(
+                    start_line,
+                    "subagent_has_io: Task block must include INPUT and OUTPUT paths",
+                    prefix=prefix,
+                )
+            )
+
+        if not (CONSTRAINED_OUTPUT_RE.search(content) and FINAL_MESSAGE_RE.search(content)):
+            issues.append(
+                _format_issue(
+                    start_line,
+                    "subagent_output_constrained: Task block should constrain the final message format",
+                    prefix=prefix,
+                    severity="warning",
+                )
+            )
+
+        if RUN_IN_BACKGROUND_RE.search(context_text) or RUN_IN_BACKGROUND_RE.search(content):
+            has_degradation = bool(PERMISSION_TEST_RE.search(content) and MODE_A_RE.search(content) and MODE_B_RE.search(content))
+            if not has_degradation:
+                issues.append(
+                    _format_issue(
+                        start_line,
+                        "background_has_degradation: Background task should include Permission Test and Mode A/B fallback",
+                        prefix=prefix,
+                        severity="warning",
+                    )
+                )
+
+    return issues
+
+
 def check_subskill_validity(subskill_refs: list[str], skill_dir: Path) -> list[dict]:
     """Light validation on referenced subskill markdown files.
 
     NOT recursive SKILL.md validation (subskills lack frontmatter).
-    Checks: not empty, has heading, under 2000 chars (~500 tokens).
+    Checks: not empty, has heading, under 8000 chars, targeted content checks.
 
     Args:
         subskill_refs: Relative paths like 'subskills/foo.md'.
@@ -117,13 +250,14 @@ def check_subskill_validity(subskill_refs: list[str], skill_dir: Path) -> list[d
         has_heading = any(line.strip().startswith("#") for line in content.split("\n"))
         if not has_heading:
             issues.append({"line": 0, "msg": f"[{filename}] Subskill has no markdown headings"})
-        if len(content) > 2000:
+        if len(content) > SUBSKILL_CHAR_LIMIT:
             issues.append(
                 {
                     "line": 0,
-                    "msg": f"[{filename}] Subskill too long: {len(content)} chars (max 2000)",
+                    "msg": f"[{filename}] Subskill too long: {len(content)} chars (max {SUBSKILL_CHAR_LIMIT})",
                 }
             )
+        issues.extend(check_content_patterns(content, prefix=filename))
     return issues
 
 
@@ -246,9 +380,13 @@ def validate(text: str, skill_dir: Path | None = None) -> dict:
                 issues.append({"line": i, "msg": f"Prose pattern detected: '{line.strip()}'"})
                 break
 
+    issues.extend(check_content_patterns(text))
+
     # Referenced paths + collect refs for deeper checks
     script_refs: list[str] = []
     subskill_refs: list[str] = []
+    seen_script_refs: set[str] = set()
+    seen_subskill_refs: set[str] = set()
     if skill_dir:
         for i, line in enumerate(lines, start=1):
             for match in PATH_REF_RE.finditer(line):
@@ -256,9 +394,13 @@ def validate(text: str, skill_dir: Path | None = None) -> dict:
                 prefix = "scripts" if match.group(1) else "subskills"
                 ref_path = skill_dir / prefix / ref
                 if match.group(1):
-                    script_refs.append(f"{prefix}/{ref}")
+                    if ref not in seen_script_refs:
+                        script_refs.append(f"{prefix}/{ref}")
+                        seen_script_refs.add(ref)
                 else:
-                    subskill_refs.append(f"{prefix}/{ref}")
+                    if ref not in seen_subskill_refs:
+                        subskill_refs.append(f"{prefix}/{ref}")
+                        seen_subskill_refs.add(ref)
                 if not ref_path.exists():
                     issues.append({"line": i, "msg": f"Referenced path missing: {prefix}/{ref}"})
 

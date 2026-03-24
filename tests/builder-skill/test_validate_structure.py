@@ -508,6 +508,189 @@ class TestSubskillValidity:
         assert len(issues) == 1
         assert issues[0]["msg"].startswith("[bad.md]")
 
+    def test_subskill_at_8000_chars_passes(self, tmp_path):
+        subskills_dir = tmp_path / "subskills"
+        subskills_dir.mkdir()
+        base = "# Good Subskill\n\n"
+        content = base + ("a" * (8000 - len(base)))
+        (subskills_dir / "good.md").write_text(content)
+        issues = check_subskill_validity(["subskills/good.md"], tmp_path)
+        assert len(issues) == 0
+
+    def test_subskill_over_8000_chars_reports_issue(self, tmp_path):
+        subskills_dir = tmp_path / "subskills"
+        subskills_dir.mkdir()
+        base = "# Good Subskill\n\n"
+        content = base + ("a" * (8001 - len(base)))
+        (subskills_dir / "too_long.md").write_text(content)
+        issues = check_subskill_validity(["subskills/too_long.md"], tmp_path)
+        assert len(issues) == 1
+        assert "max 8000" in issues[0]["msg"]
+
+
+class TestContentChecks:
+    def test_subagent_has_io_errors_when_output_missing(self):
+        skill = """---
+name: task-checker
+description: Use when checking subagent prompts
+keywords: task, prompt
+---
+
+# Task Checker
+
+Task tool:
+
+```text
+INPUT: /tmp/input.md
+TASK: Review the file.
+Steps:
+1. Read INPUT with Read.
+Do not output text during execution — only make tool calls.
+Your final message must be ONLY one of:
+review: wrote /tmp/output.md
+review: FAIL - reason
+```
+
+DONE.
+"""
+        result = validate(skill)
+        io_issues = [i for i in result["issues"] if "subagent_has_io" in i["msg"]]
+        assert result["pass"] is False
+        assert len(io_issues) == 1
+
+    def test_subagent_output_constrained_warns_when_missing(self):
+        skill = """---
+name: task-checker
+description: Use when checking subagent prompts
+keywords: task, prompt
+---
+
+# Task Checker
+
+Task tool:
+
+```text
+INPUT: /tmp/input.md
+OUTPUT: /tmp/output.md
+TASK: Review the file.
+Steps:
+1. Read INPUT with Read.
+2. Write output to OUTPUT with Write.
+```
+
+DONE.
+"""
+        result = validate(skill)
+        constrained_issues = [i for i in result["issues"] if "subagent_output_constrained" in i["msg"]]
+        assert result["pass"] is True
+        assert len(constrained_issues) == 1
+        assert constrained_issues[0]["severity"] == "warning"
+
+    def test_creates_after_bash_warns_when_missing(self):
+        skill = """---
+name: bash-checker
+description: Use when checking bash steps
+keywords: bash, creates
+---
+
+# Bash Checker
+
+```bash
+python3 ./scripts/run.py
+```
+
+DONE.
+"""
+        result = validate(skill)
+        creates_issues = [i for i in result["issues"] if "creates_after_bash" in i["msg"]]
+        assert result["pass"] is True
+        assert len(creates_issues) == 1
+        assert creates_issues[0]["severity"] == "warning"
+
+    def test_background_has_degradation_warns_without_permission_test(self):
+        skill = """---
+name: background-checker
+description: Use when checking background task prompts
+keywords: background, task
+---
+
+# Background Checker
+
+Launch a `task_tool`:
+- run_in_background: true
+- prompt:
+
+```text
+INPUT: /tmp/input.md
+OUTPUT: /tmp/output.md
+TASK: Process the file.
+Steps:
+1. Read INPUT with Read.
+2. Write output to OUTPUT with Write.
+Do not output text during execution — only make tool calls.
+Your final message must be ONLY one of:
+process: wrote /tmp/output.md
+process: FAIL - reason
+```
+
+DONE.
+"""
+        result = validate(skill)
+        background_issues = [i for i in result["issues"] if "background_has_degradation" in i["msg"]]
+        assert result["pass"] is True
+        assert len(background_issues) == 1
+        assert background_issues[0]["severity"] == "warning"
+
+    def test_content_checks_pass_for_well_formed_skill(self):
+        skill = """---
+name: task-checker
+description: Use when checking subagent prompts
+keywords: task, prompt
+---
+
+# Task Checker
+
+Launch a `task_tool`:
+- run_in_background: true
+- prompt:
+
+```text
+INPUT: /tmp/input.md
+OUTPUT: /tmp/output.md
+TASK: Process the file.
+PERMISSION TEST: First, Write "test" to OUTPUT. If succeeds -> Mode A. If fails -> Mode B.
+Steps:
+1. Read INPUT with Read.
+2. Write output to OUTPUT with Write.
+Mode A: Write to OUTPUT. Final message:
+  process: wrote /tmp/output.md
+Mode B: Return content. Final message:
+  CONTENT:/tmp/output.md
+  <content>
+  END_CONTENT
+Do not output text during execution — only make tool calls.
+On failure: process: FAIL - reason
+```
+
+```bash
+python3 ./scripts/run.py
+```
+
+Creates: /tmp/output.md
+
+DONE.
+"""
+        result = validate(skill)
+        content_issues = [
+            i
+            for i in result["issues"]
+            if "subagent_has_io" in i["msg"]
+            or "subagent_output_constrained" in i["msg"]
+            or "creates_after_bash" in i["msg"]
+            or "background_has_degradation" in i["msg"]
+        ]
+        assert len(content_issues) == 0
+
 
 class TestTestCoverage:
     def test_scripts_with_tests_same_level(self, tmp_path):

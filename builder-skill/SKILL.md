@@ -14,7 +14,7 @@ allowed-tools:
 
 ## Step 0: Read guidelines
 
-Read `docs/writing-skills.md` — apply its principles throughout.
+Read `./references/writing-skills.md` — apply its principles throughout.
 
 ## Step 1: Gate
 
@@ -23,7 +23,9 @@ Single command ≤2 flags, no pipes → "Could be: `{cmd}`. Need a skill?" If no
 ## Step 2: Route
 
 - New skill → Read and follow `./subskills/skill_only.md`
-- Builder skill (scripts/templates/tests) → `./subskills/builder_skill.md`
+- Builder skill (scripts/templates/tests) → Read and follow `./subskills/builder_skill.md`
+- Edit or improve existing skill → Read and follow `./subskills/edit_skill.md`
+- Validate existing skill only → Skip to Step 3
 - Bottling session → Document workflow first, then `./subskills/skill_only.md`
 - From historian → Needs `mcp__claude-historian-mcp__*`. Missing → STOP.
 
@@ -32,5 +34,7 @@ Single command ≤2 flags, no pipes → "Could be: `{cmd}`. Need a skill?" If no
 ```bash
 python3 ./scripts/validate_structure.py <SKILL.md path>
 ```
+
+Creates: validation result on stdout
 
 Fix issues → re-validate. DONE.

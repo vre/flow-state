@@ -1,64 +1,93 @@
-# Builder Skill: Create Skill with Scripts/Templates/Tests
+# Builder Skill: Scripts, Tests, and Iteration
 
-If no scripts needed, use `./subskills/skill_only.md` instead. STOP.
+If the skill does not need scripts, templates, or tests: use `./subskills/skill_only.md` and STOP.
 
-Flow: Gather → Structure → Tests → Implement → Write SKILL.md → Validate → Smoke Test
+Flow: brief -> tests -> scripts -> SKILL.md -> smoke test -> refine -> validate
 
-## Step 1: Gather Requirements
+## Step 1: Write the package brief
 
-AskUserQuestion (all at once):
+AskUserQuestion once:
 
-1. "Skill name?" header: "Name" (kebab-case)
-2. "When should this skill activate?" header: "Trigger"
-3. "What does it produce?" header: "Outputs"
-4. "What scripts are needed?" header: "Scripts"
-5. "Any templates?" header: "Templates"
+1. `Name` — skill name, kebab-case
+2. `Trigger` — when the skill should activate
+3. `Outputs` — files the skill should create
+4. `Scripts` — script names and purpose
+5. `Templates` — template files, if any
 
-Set `${SKILL_NAME}`, `${SKILL_DIR}`.
+Set `${SKILL_NAME}` and `${SKILL_DIR}`.
+Write `${SKILL_DIR}/brief.md` with the brief, outputs, scripts, test cases, and constraints.
 
-## Step 2: Create Directory Structure
+## Step 2: Create the package layout
 
-```
-${SKILL_DIR}/
-├── SKILL.md
-├── scripts/
-│   └── ${scripts from step 1}
-├── subskills/
-└── templates/
-```
+Create:
 
-## Step 3: Write Tests First (TDD)
+- `${SKILL_DIR}/SKILL.md`
+- `${SKILL_DIR}/scripts/`
+- `${SKILL_DIR}/subskills/`
+- `${SKILL_DIR}/templates/` when needed
+- `tests/${SKILL_NAME}/`
 
-Create `tests/${SKILL_NAME}/conftest.py` with `sys.path.insert(0, str(Path(__file__).parent.parent.parent / "${SKILL_NAME}" / "scripts"))`.
-Create `tests/${SKILL_NAME}/test_*.py`. Tests fail until scripts implemented. One test class per script.
-If scripts pipe to each other: define shared output schema (field names, types). Write integration test that runs the pipeline end-to-end.
+## Step 3: Write tests first
 
-## Step 4: Implement Scripts
+Write failing tests before scripts:
 
-Pure functions, type hints, Google docstrings. Thin `main()` glue.
-Each script: `#!/usr/bin/env python3`, stdin/stdout, JSON output, exit codes.
+- unit tests for each script
+- one integration test for the full script path
+- fixtures with realistic sample input
 
-If script is a CLI tool with actions, use builder-cli-tool `--flat`:
+Run:
 
 ```bash
-python3 ./builder-cli-tool/scripts/generate_cli.py --name ${SCRIPT} --operations '["action1", "action2"]' --output ${SKILL_DIR}/scripts/ --flat
+uv run pytest "tests/${SKILL_NAME}/" -v
 ```
 
-Then fill in action stubs with real logic.
+Creates: test result on stdout
 
-## Step 5: Write SKILL.md
+## Step 4: Implement scripts and templates
 
-Use `./subskills/skill_only.md` Step 2-3 for the SKILL.md skeleton.
-Budget: 500 tokens (`len(text)/4`). Include `./scripts/` and `./subskills/` refs.
+Implement only what the tests require.
+Use pure functions, type hints, Google-style docstrings, and thin `main()` glue.
+Re-run `uv run pytest "tests/${SKILL_NAME}/" -v` until the tests pass.
 
-## Step 6: Validate
+## Step 5: Write the skill instructions
+
+Write `${SKILL_DIR}/SKILL.md` and any needed `subskills/*.md`.
+Reference only the files that exist.
+Keep the dispatcher short and push heavy detail into subskills.
+Include allowed-tools, keywords, Creates: lines after bash blocks, and explicit STOP or DONE.
+
+## Step 6: Smoke test the whole skill
+
+Write `${SKILL_DIR}/tests/smoke-prompt.txt` with one minimal real request that should exercise the package.
+
+```bash
+mkdir -p .claude/skills "${SKILL_DIR}/tests"
+rm -f ".claude/skills/${SKILL_NAME}"
+ln -s "${SKILL_DIR}" ".claude/skills/${SKILL_NAME}"
+claude -p "$(cat "${SKILL_DIR}/tests/smoke-prompt.txt")" --allowedTools 'Bash,Read,Write,Task,AskUserQuestion' > "${SKILL_DIR}/tests/smoke.txt"
+rm ".claude/skills/${SKILL_NAME}"
+```
+
+Creates: `.claude/skills/${SKILL_NAME}` (temporary), `${SKILL_DIR}/tests/smoke.txt`
+
+Check:
+
+- expected files created
+- no unnecessary tools
+- no improvised inline scripts
+- no unexpected permission failures
+
+If the smoke test fails, refine the scripts, tests, or SKILL.md and run it again.
+
+## Step 7: Final validation
+
+Run:
 
 ```bash
 python3 ./scripts/validate_structure.py "${SKILL_DIR}/SKILL.md"
+uv run pytest "tests/${SKILL_NAME}/" -v
 ```
 
-Fix issues, re-validate. Run tests: `uv run pytest tests/${SKILL_NAME}/ -v`.
+Creates: validation and test results on stdout
 
-## Step 7: Smoke Test
-
-Run full pipeline with sample data. Verify output. DONE.
+Fix issues, re-run, then DONE.
