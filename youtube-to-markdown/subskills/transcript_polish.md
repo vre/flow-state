@@ -147,11 +147,13 @@ Steps:
 4. Build watch guide in same language as source content:
    - Summary paragraphs alternating with video links
    - Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
-   - Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) MM:SS–MM:SS — Why watch: reason`
-   - Calculate t=SECONDS: hours*3600 + minutes*60 + seconds. Over 1 hour use H:MM:SS.
+   - Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) HH:MM:SS–HH:MM:SS — Why watch: reason`
+   - Always use HH:MM:SS format for all timestamps (e.g., 00:26:00, not 26:00 or 0:26).
+   - Calculate t=SECONDS: hours*3600 + minutes*60 + seconds.
    - Only link moments where WATCHING adds value over READING. Physical demo, humor, on-screen data → yes. Verbal analysis, anecdote → no. Zero links is fine for talking-head content.
    - Heatmap (if provided): viewer replay intensity as tiebreaker, not primary signal.
    - Never reference chunks or internal terms.
+   - End with summary table: `| Section | HH:MM:SS–HH:MM:SS | Recommendation |` where every timestamp is a clickable `[HH:MM:SS](https://youtube.com/watch?v={video_id}&t=SECONDS)` link.
 5. Write JSON to OUTPUT_HEADINGS, markdown to OUTPUT_WATCH_GUIDE. Do not verify with scripts — trust the analysis paragraph numbers.
 
 Do not output text during execution - only make tool calls.
