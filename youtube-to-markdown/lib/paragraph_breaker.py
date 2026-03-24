@@ -48,12 +48,12 @@ class ParagraphBreaker:
             if match:
                 minutes, seconds = map(int, match.groups())
                 total_seconds = minutes * 60 + seconds
-                display_time = f"{minutes:02d}:{seconds:02d}"
+                display_time = f"00:{minutes:02d}:{seconds:02d}"
             else:
                 return timestamp
 
         youtube_url = f"https://youtube.com/watch?v={self.video_id}&t={total_seconds}s"
-        return f"[[{display_time}]]({youtube_url})"
+        return f"[{display_time}]({youtube_url})"
 
     def parse_transcript_line(self, line: str) -> ParsedLine:
         if line.startswith("[") and len(line) > 15:
