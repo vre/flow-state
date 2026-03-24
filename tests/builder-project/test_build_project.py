@@ -1,11 +1,15 @@
 """Tests for build_project.py."""
 
+import io
 import json
 import os
 import subprocess
+import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+import project_builder.build_project as build_project_module
 import pytest
 from project_builder.build_project import (
     create_base,
@@ -65,12 +69,10 @@ class TestCreateBase:
         assert "hatchling" in content
         assert "ruff" in content
 
-    def test_creates_marketplace_json(self, output_dir: Path):
+    def test_base_no_marketplace(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
         mp = project_dir / ".claude-plugin" / "marketplace.json"
-        assert mp.exists()
-        data = json.loads(mp.read_text())
-        assert data["name"] == "test-project"
+        assert not mp.exists()
 
     def test_creates_tests_directory(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
@@ -85,6 +87,34 @@ class TestCreateBase:
     def test_creates_docs_plans_directory(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
         assert (project_dir / "docs" / "plans").is_dir()
+
+    def test_base_creates_docs_subdirs(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        assert (project_dir / "docs" / "research").is_dir()
+        assert (project_dir / "docs" / "research" / ".gitkeep").exists()
+        assert (project_dir / "docs" / "reflections").is_dir()
+        assert (project_dir / "docs" / "reflections" / ".gitkeep").exists()
+
+    def test_base_creates_todo_md(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        todo = project_dir / "TODO.md"
+        assert todo.exists()
+        assert todo.read_text() == "# TODO\n"
+
+    def test_base_creates_architecture_md(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        architecture = project_dir / "ARCHITECTURE.md"
+        assert architecture.exists()
+        content = architecture.read_text()
+        assert content.startswith("# Architecture\n")
+        assert "Update this document when the structure changes." in content
+
+    def test_base_creates_claude_dir(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        settings = project_dir / ".claude" / "settings.json"
+        assert settings.exists()
+        assert settings.read_text() == "{}\n"
+        assert (project_dir / ".claude" / "skills").is_dir()
 
     def test_creates_worktrees_directory(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
@@ -109,7 +139,30 @@ class TestCreateBase:
     def test_gitignore_includes_claude(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
         content = (project_dir / ".gitignore").read_text()
-        assert ".claude/" in content
+        assert ".claude/*" in content
+        assert "!.claude/settings.json" in content
+
+    def test_gitignore_claude_selective(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        subprocess.run(["git", "init"], cwd=project_dir, capture_output=True, check=True)
+        subprocess.run(["git", "add", ".gitignore", ".claude/settings.json"], cwd=project_dir, capture_output=True, check=True)
+        (project_dir / ".claude" / "skills" / "foo").write_text("")
+
+        settings_result = subprocess.run(
+            ["git", "check-ignore", ".claude/settings.json"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+        skills_result = subprocess.run(
+            ["git", "check-ignore", ".claude/skills/foo"],
+            cwd=project_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        assert settings_result.returncode != 0
+        assert skills_result.returncode == 0
 
     def test_claude_md_has_persona(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
@@ -122,6 +175,14 @@ class TestCreateBase:
         content = (project_dir / "CLAUDE.md").read_text()
         assert "THE DEVELOPMENT PROCESS" in content
         assert "Context Management" in content
+
+    def test_claude_md_references_project_docs(self, output_dir: Path):
+        project_dir = create_base("test-project", output_dir)
+        content = (project_dir / "CLAUDE.md").read_text()
+        assert "docs/research/" in content
+        assert "docs/reflections/" in content
+        assert "TODO.md" in content
+        assert "ARCHITECTURE.md" in content
 
     def test_claude_md_excludes_implementing_sections(self, output_dir: Path):
         project_dir = create_base("test-project", output_dir)
@@ -200,6 +261,11 @@ class TestCreateSkill:
         assert "skills" in data["plugins"][0]
         assert data["plugins"][0]["skills"] == ["./"]
 
+    def test_skill_implies_plugin(self, output_dir: Path):
+        project_dir = create_base("my-skill", output_dir)
+        create_skill("my-skill", project_dir)
+        assert (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
 
 class TestCreateMcp:
     def test_creates_mcp_json(self, output_dir: Path):
@@ -207,11 +273,31 @@ class TestCreateMcp:
         create_mcp("my-mcp", project_dir)
         assert (project_dir / ".mcp.json").exists()
 
-    def test_mcp_json_has_plugin_root(self, output_dir: Path):
+    def test_mcp_json_non_plugin(self, output_dir: Path):
         project_dir = create_base("my-mcp", output_dir)
         create_mcp("my-mcp", project_dir)
-        content = (project_dir / ".mcp.json").read_text()
-        assert "${CLAUDE_PLUGIN_ROOT}" in content
+        data = json.loads((project_dir / ".mcp.json").read_text())
+        assert data == {
+            "mcpServers": {
+                "my-mcp": {
+                    "command": "uv",
+                    "args": ["--directory", ".", "run", "my-mcp"],
+                }
+            }
+        }
+
+    def test_mcp_json_plugin(self, output_dir: Path):
+        project_dir = create_base("my-mcp", output_dir)
+        create_mcp("my-mcp", project_dir, plugin=True)
+        data = json.loads((project_dir / ".mcp.json").read_text())
+        assert data == {
+            "mcpServers": {
+                "my-mcp": {
+                    "command": "uv",
+                    "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}", "run", "my-mcp"],
+                }
+            }
+        }
 
     def test_creates_server_py(self, output_dir: Path):
         project_dir = create_base("my-mcp", output_dir)
@@ -243,9 +329,19 @@ class TestCreateMcp:
         content = (project_dir / "pyproject.toml").read_text()
         assert 'my-mcp = "my_mcp:main"' in content
 
-    def test_marketplace_no_skills_field(self, output_dir: Path):
+    def test_no_marketplace_without_plugin_flag(self, output_dir: Path):
         project_dir = create_base("my-mcp", output_dir)
         create_mcp("my-mcp", project_dir)
+        assert not (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_marketplace_with_plugin_flag(self, output_dir: Path):
+        project_dir = create_base("my-mcp", output_dir)
+        create_mcp("my-mcp", project_dir, plugin=True)
+        assert (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_marketplace_no_skills_field(self, output_dir: Path):
+        project_dir = create_base("my-mcp", output_dir)
+        create_mcp("my-mcp", project_dir, plugin=True)
         mp = project_dir / ".claude-plugin" / "marketplace.json"
         data = json.loads(mp.read_text())
         assert "skills" not in data["plugins"][0]
@@ -281,9 +377,14 @@ class TestCreateCli:
         content = (project_dir / "pyproject.toml").read_text()
         assert 'my-cli = "my_cli.cli:main"' in content
 
-    def test_marketplace_no_skills_field(self, output_dir: Path):
+    def test_cli_no_marketplace_without_plugin_flag(self, output_dir: Path):
         project_dir = create_base("my-cli", output_dir)
         create_cli("my-cli", project_dir)
+        assert not (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_marketplace_no_skills_field(self, output_dir: Path):
+        project_dir = create_base("my-cli", output_dir)
+        create_cli("my-cli", project_dir, plugin=True)
         mp = project_dir / ".claude-plugin" / "marketplace.json"
         data = json.loads(mp.read_text())
         assert "skills" not in data["plugins"][0]
@@ -318,6 +419,16 @@ class TestDryRun:
         assert any("pyproject.toml" in n for n in names)
         assert any("tests/" in n for n in names)
 
+    def test_dry_run_includes_new_base_files(self):
+        result = dry_run_report("test-project", "skill", plugin=True)
+        names = [r["path"] for r in result]
+        assert "TODO.md" in names
+        assert "ARCHITECTURE.md" in names
+        assert ".claude/settings.json" in names
+        assert ".claude/skills/" in names
+        assert "docs/research/" in names
+        assert "docs/reflections/" in names
+
     def test_skill_includes_skill_md(self):
         result = dry_run_report("test-project", "skill")
         names = [r["path"] for r in result]
@@ -332,6 +443,31 @@ class TestDryRun:
         result = dry_run_report("test-project", "cli")
         names = [r["path"] for r in result]
         assert any("cli.py" in n for n in names)
+
+    def test_dry_run_mcp_no_plugin(self):
+        result = dry_run_report("test-project", "mcp", plugin=False)
+        names = [r["path"] for r in result]
+        assert ".claude-plugin/marketplace.json" not in names
+
+    def test_dry_run_mcp_with_plugin(self):
+        result = dry_run_report("test-project", "mcp", plugin=True)
+        names = [r["path"] for r in result]
+        assert ".claude-plugin/marketplace.json" in names
+
+    def test_dry_run_cli_no_plugin(self):
+        result = dry_run_report("test-project", "cli", plugin=False)
+        names = [r["path"] for r in result]
+        assert ".claude-plugin/marketplace.json" not in names
+
+    def test_dry_run_cli_with_plugin(self):
+        result = dry_run_report("test-project", "cli", plugin=True)
+        names = [r["path"] for r in result]
+        assert ".claude-plugin/marketplace.json" in names
+
+    def test_dry_run_skill_implies_plugin(self):
+        result = dry_run_report("test-project", "skill", plugin=False)
+        names = [r["path"] for r in result]
+        assert ".claude-plugin/marketplace.json" in names
 
 
 class TestMainCli:
@@ -358,3 +494,61 @@ class TestMainCli:
         assert "skill" in result.stdout.lower()
         assert "mcp" in result.stdout.lower()
         assert "cli" in result.stdout.lower()
+
+    def test_plugin_flag_argparse(self, tmp_path: Path):
+        result = self._run_cli("--dry-run", "--plugin", "mcp", "my-mcp", str(tmp_path))
+        assert result.returncode == 0
+
+    def test_module_docstring_includes_plugin_usage(self):
+        assert "[--plugin]" in (build_project_module.__doc__ or "")
+
+    def _run_main(self, *args: str) -> dict:
+        output = io.StringIO()
+        verification = {
+            "pytest": {"returncode": 0, "output": ""},
+            "ruff": {"returncode": 0, "output": ""},
+        }
+
+        with (
+            patch.object(build_project_module, "init_git") as mock_init_git,
+            patch.object(build_project_module, "init_uv") as mock_init_uv,
+            patch.object(build_project_module, "verify", return_value=verification) as mock_verify,
+            patch.object(sys, "argv", ["build_project", *args]),
+            redirect_stdout(output),
+        ):
+            build_project_module.main()
+
+        assert mock_init_git.called
+        assert mock_init_uv.called
+        assert mock_verify.called
+        return json.loads(output.getvalue())
+
+    def test_main_mcp_no_plugin(self, tmp_path: Path):
+        result = self._run_main("mcp", "my-mcp", str(tmp_path))
+        project_dir = Path(result["project_dir"])
+        assert not (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_main_mcp_with_plugin(self, tmp_path: Path):
+        result = self._run_main("mcp", "my-mcp", str(tmp_path), "--plugin")
+        project_dir = Path(result["project_dir"])
+        assert (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_main_cli_no_plugin(self, tmp_path: Path):
+        result = self._run_main("cli", "my-cli", str(tmp_path))
+        project_dir = Path(result["project_dir"])
+        assert not (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_main_cli_with_plugin(self, tmp_path: Path):
+        result = self._run_main("cli", "my-cli", str(tmp_path), "--plugin")
+        project_dir = Path(result["project_dir"])
+        assert (project_dir / ".claude-plugin" / "marketplace.json").exists()
+
+    def test_main_skill_implies_plugin(self, tmp_path: Path):
+        result = self._run_main("skill", "my-skill", str(tmp_path))
+        project_dir = Path(result["project_dir"])
+        assert (project_dir / ".claude-plugin" / "marketplace.json").exists()
+        assert ".claude-plugin/marketplace.json" in result["files"]
+
+    def test_main_mcp_no_plugin_files_output(self, tmp_path: Path):
+        result = self._run_main("mcp", "my-mcp", str(tmp_path))
+        assert ".claude-plugin/marketplace.json" not in result["files"]

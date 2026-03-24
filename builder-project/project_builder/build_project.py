@@ -1,6 +1,6 @@
 """Build project structure for skills, MCP servers, or CLI tools.
 
-Usage: python3 -m project_builder.build_project <type> <name> <output_dir> [--dry-run]
+Usage: python3 -m project_builder.build_project <type> <name> <output_dir> [--plugin] [--dry-run]
 
 Arguments:
   type          Project type: skill, mcp, cli
@@ -8,6 +8,7 @@ Arguments:
   output_dir    Parent directory for the project
 
 Options:
+  --plugin      Create Claude plugin scaffolding for mcp/cli projects
   --dry-run     Show what would be created, create nothing
   --help        Show this help text
 
@@ -60,10 +61,12 @@ detect hidden assumptions.
 1. Plan Phase Rules
    - Work in cooperation with the human companion, don't push to proceed before they say so.
    - ALWAYS WRITE THE PLAN: 'docs/plans/' for project-specific
+   - Use 'docs/research/' for discovery notes and 'docs/reflections/' for implementation reflections
    - Define measurable acceptance criteria and validation approach
    - Mission Command: include intent, goal, proper guidance with constraints and necessary situational context
    - Use exact requirements, no temporal references ("current best practices", "latest version")
    - Create git worktree under '.worktrees/[short_description]' for isolated development
+   - Track pending work in TODO.md during implementation
 2. Implementation Phase Rules
    - Implement ONLY what is explicitly requested - no unrequested additions
    - Don't touch working code. New ideas -> new branch, not mutation of existing features.
@@ -78,7 +81,7 @@ detect hidden assumptions.
    - Add "## Reflection": what went well, what changed from plan, lessons learned
 4. Merge Phase Rules
    - Validate what was created with skeptic's eye
-   - Update Documentation: CHANGELOG.md, TESTING.md, DEVELOPMENT.md, README.md
+   - Update Documentation: CHANGELOG.md, TESTING.md, DEVELOPMENT.md, README.md, ARCHITECTURE.md
    - Ask final acceptance from the human companion
 
 ## Context Management
@@ -112,7 +115,8 @@ env/
 uv.lock
 
 # IDE
-.claude/
+.claude/*
+!.claude/settings.json
 .vscode/
 .idea/
 *.swp
@@ -349,13 +353,14 @@ def _marketplace_json(name: str, project_type: str) -> str:
     return json.dumps(data, indent=2) + "\n"
 
 
-def _mcp_json(name: str) -> str:
+def _mcp_json(name: str, plugin: bool = False) -> str:
     """Generate .mcp.json content."""
+    directory = "${CLAUDE_PLUGIN_ROOT}" if plugin else "."
     data = {
         "mcpServers": {
             name: {
                 "command": "uv",
-                "args": ["--directory", "${CLAUDE_PLUGIN_ROOT}", "run", name],
+                "args": ["--directory", directory, "run", name],
             }
         }
     }
@@ -365,6 +370,13 @@ def _mcp_json(name: str) -> str:
 def _test_file(name: str) -> str:
     """Generate placeholder test."""
     return 'def test_placeholder():\n    """Verify test infrastructure works."""\n    assert True\n'
+
+
+def _write_marketplace_json(project_dir: Path, name: str, project_type: str) -> None:
+    """Create marketplace.json for plugin-enabled projects."""
+    plugin_dir = project_dir / ".claude-plugin"
+    plugin_dir.mkdir(exist_ok=True)
+    (plugin_dir / "marketplace.json").write_text(_marketplace_json(name, project_type))
 
 
 # --- Core functions ---
@@ -379,18 +391,21 @@ def create_base(name: str, output_dir: Path) -> Path:
     project_dir.mkdir(parents=True)
 
     # Directories (empty dirs get .gitkeep so git tracks them in worktrees/clones)
-    (project_dir / "docs" / "plans").mkdir(parents=True)
-    (project_dir / "docs" / "plans" / ".gitkeep").touch()
+    for docs_dir in ("plans", "research", "reflections"):
+        (project_dir / "docs" / docs_dir).mkdir(parents=True, exist_ok=True)
+        (project_dir / "docs" / docs_dir / ".gitkeep").touch()
     (project_dir / "tests").mkdir()
     (project_dir / ".worktrees").mkdir()
     (project_dir / ".worktrees" / ".gitkeep").touch()
-    (project_dir / ".claude-plugin").mkdir()
+    (project_dir / ".claude" / "skills").mkdir(parents=True)
 
     # Documentation stubs (LLM fills these)
     (project_dir / "README.md").write_text(f"# {name}\n")
     (project_dir / "CHANGELOG.md").write_text("# Changelog\n")
     (project_dir / "DEVELOPMENT.md").write_text("# Development\n")
     (project_dir / "TESTING.md").write_text("# Testing\n")
+    (project_dir / "TODO.md").write_text("# TODO\n")
+    (project_dir / "ARCHITECTURE.md").write_text("# Architecture\n\n<!-- Update this document when the structure changes. -->\n")
     (project_dir / "LICENSE").write_text("")
 
     # CLAUDE.md with full persona template
@@ -401,12 +416,10 @@ def create_base(name: str, output_dir: Path) -> Path:
     (project_dir / ".gitignore").write_text(GITIGNORE)
     (project_dir / ".markdownlint.json").write_text(MARKDOWNLINT_JSON)
     (project_dir / ".pre-commit-config.yaml").write_text(PRE_COMMIT_CONFIG)
+    (project_dir / ".claude" / "settings.json").write_text("{}\n")
 
     # pyproject.toml (base — type-specific functions append to it)
     (project_dir / "pyproject.toml").write_text(_pyproject_toml(name, "base"))
-
-    # marketplace.json (base — type-specific functions may update)
-    (project_dir / ".claude-plugin" / "marketplace.json").write_text(_marketplace_json(name, "base"))
 
     # Tests
     pkg = to_pkg_name(name)
@@ -416,8 +429,9 @@ def create_base(name: str, output_dir: Path) -> Path:
     return project_dir
 
 
-def create_skill(name: str, project_dir: Path) -> None:
+def create_skill(name: str, project_dir: Path, plugin: bool = True) -> None:
     """Add skill-specific files to project."""
+    _ = plugin
     pkg = to_pkg_name(name)
 
     # Skill directories
@@ -439,18 +453,18 @@ def create_skill(name: str, project_dir: Path) -> None:
     # Update pyproject.toml (skill type, no entry points)
     (project_dir / "pyproject.toml").write_text(_pyproject_toml(name, "skill"))
 
-    # Update marketplace.json with skills field
-    (project_dir / ".claude-plugin" / "marketplace.json").write_text(_marketplace_json(name, "skill"))
+    # Skill projects are always Claude plugins.
+    _write_marketplace_json(project_dir, name, "skill")
 
 
-def create_mcp(name: str, project_dir: Path) -> None:
+def create_mcp(name: str, project_dir: Path, plugin: bool = False) -> None:
     """Add MCP server-specific files to project."""
     pkg = to_pkg_name(name)
 
     (project_dir / pkg).mkdir(exist_ok=True)
 
     # .mcp.json
-    (project_dir / ".mcp.json").write_text(_mcp_json(name))
+    (project_dir / ".mcp.json").write_text(_mcp_json(name, plugin))
 
     # Server template
     (project_dir / pkg / "server.py").write_text(SERVER_PY_TEMPLATE.format(name=name, pkg=pkg))
@@ -461,11 +475,11 @@ def create_mcp(name: str, project_dir: Path) -> None:
     # Update pyproject.toml with MCP deps and entry point
     (project_dir / "pyproject.toml").write_text(_pyproject_toml(name, "mcp"))
 
-    # marketplace.json (no skills field)
-    (project_dir / ".claude-plugin" / "marketplace.json").write_text(_marketplace_json(name, "mcp"))
+    if plugin:
+        _write_marketplace_json(project_dir, name, "mcp")
 
 
-def create_cli(name: str, project_dir: Path) -> None:
+def create_cli(name: str, project_dir: Path, plugin: bool = False) -> None:
     """Add CLI tool-specific files to project."""
     pkg = to_pkg_name(name)
 
@@ -480,8 +494,8 @@ def create_cli(name: str, project_dir: Path) -> None:
     # Update pyproject.toml with entry point
     (project_dir / "pyproject.toml").write_text(_pyproject_toml(name, "cli"))
 
-    # marketplace.json (no skills field)
-    (project_dir / ".claude-plugin" / "marketplace.json").write_text(_marketplace_json(name, "cli"))
+    if plugin:
+        _write_marketplace_json(project_dir, name, "cli")
 
 
 def init_git(project_dir: Path) -> None:
@@ -545,9 +559,10 @@ def verify(project_dir: Path) -> dict:
     return results
 
 
-def dry_run_report(name: str, project_type: str) -> list[dict]:
+def dry_run_report(name: str, project_type: str, plugin: bool = False) -> list[dict]:
     """Return list of files that would be created without creating them."""
     pkg = to_pkg_name(name)
+    include_plugin = project_type == "skill" or plugin
 
     common = [
         {"path": "CLAUDE.md", "description": "LLM behavioral config"},
@@ -556,17 +571,24 @@ def dry_run_report(name: str, project_type: str) -> list[dict]:
         {"path": "CHANGELOG.md", "description": "Version history"},
         {"path": "DEVELOPMENT.md", "description": "Dev setup"},
         {"path": "TESTING.md", "description": "Test guide"},
+        {"path": "TODO.md", "description": "Task tracking"},
+        {"path": "ARCHITECTURE.md", "description": "Architecture notes"},
         {"path": "LICENSE", "description": "License file"},
         {"path": ".gitignore", "description": "Git ignore rules"},
         {"path": ".markdownlint.json", "description": "Markdown lint config"},
         {"path": ".pre-commit-config.yaml", "description": "Pre-commit hooks"},
+        {"path": ".claude/settings.json", "description": "Shared Claude settings"},
+        {"path": ".claude/skills/", "description": "Local skill symlinks"},
         {"path": "pyproject.toml", "description": "Build + lint config"},
-        {"path": ".claude-plugin/marketplace.json", "description": "Plugin marketplace entry"},
         {"path": "docs/plans/", "description": "Plans directory"},
+        {"path": "docs/research/", "description": "Research notes"},
+        {"path": "docs/reflections/", "description": "Implementation reflections"},
         {"path": "tests/conftest.py", "description": "Test fixtures"},
         {"path": f"tests/test_{pkg}.py", "description": "Placeholder test"},
         {"path": ".worktrees/", "description": "Git worktree directory"},
     ]
+    if include_plugin:
+        common.append({"path": ".claude-plugin/marketplace.json", "description": "Plugin marketplace entry"})
 
     type_specific: dict[str, list[dict]] = {
         "skill": [
@@ -620,6 +642,11 @@ def main() -> None:
         action="store_true",
         help="Show what would be created, create nothing",
     )
+    parser.add_argument(
+        "--plugin",
+        action="store_true",
+        help="Create Claude plugin scaffolding for mcp/cli projects",
+    )
 
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
@@ -627,15 +654,16 @@ def main() -> None:
 
     args = parser.parse_args()
     output_dir = Path(args.output_dir)
+    plugin = args.type == "skill" or args.plugin
 
     if args.dry_run:
-        report = dry_run_report(args.name, args.type)
+        report = dry_run_report(args.name, args.type, plugin)
         print(json.dumps({"dry_run": True, "files": report}, indent=2))
         sys.exit(0)
 
     try:
         project_dir = create_base(args.name, output_dir)
-        CREATORS[args.type](args.name, project_dir)
+        CREATORS[args.type](args.name, project_dir, plugin)
         init_git(project_dir)
         init_uv(project_dir)
         verification = verify(project_dir)
@@ -645,7 +673,7 @@ def main() -> None:
             "type": args.type,
             "name": args.name,
             "package": to_pkg_name(args.name),
-            "files": [f["path"] for f in dry_run_report(args.name, args.type)],
+            "files": [f["path"] for f in dry_run_report(args.name, args.type, plugin)],
             "verification": verification,
         }
         print(json.dumps(result, indent=2))
