@@ -78,6 +78,21 @@ Sandvault's Seatbelt profile allows localhost TCP. Agent controls host-side GUI 
 - **Chrome DevTools**: CDP over `localhost:9222`. `Page.captureScreenshot` for visual feedback. Host starts Chrome with `--remote-debugging-port=9222`.
 - **Dev servers, databases**: standard ports, no configuration needed.
 
+## Toolchain setup: install on host, shared via brew
+
+Sandbox shares `/opt/homebrew/bin` with host. Install tools via brew on host — sandbox sees them immediately. Env vars need separate setup in sandbox profile (`~/user/.zprofile`).
+
+### Example: Android
+
+```bash
+# Host: install via brew + sdkmanager
+brew install android-commandlinetools android-platform-tools openjdk@17
+sdkmanager "platforms;android-34" "build-tools;35.0.0" "ndk;27.1.12297006" "cmake;3.22.1"
+# Add more as Gradle demands — sandbox can't auto-install (no write to brew dir)
+```
+
+Set `ANDROID_HOME=/opt/homebrew/share/android-commandlinetools` and `JAVA_HOME=/opt/homebrew/opt/openjdk@17` in both host and sandbox profiles. Emulator runs on host only (needs GUI) — sandbox agent connects via `adb` over localhost.
+
 ## Limitations
 
 - **No GUI**: sandbox user has no WindowServer access. For macOS GUI apps or iOS Simulator, use ClodPod (macOS VM with its own display).

@@ -35,12 +35,12 @@ sv shell -- zsh -c "which <tool> && <tool> --version"
 ```
 
 Examples:
-- Android: `java`, `gradle`, `adb`, `JAVA_HOME`, `ANDROID_HOME`
+- Android: `java`, `gradle`, `adb`, `JAVA_HOME`, `ANDROID_HOME`. SDK managed via `sdkmanager` on host → `/opt/homebrew/share/android-commandlinetools/`, visible to both users. Emulator runs on host (needs GUI), sandbox agent connects via `adb` over localhost.
 - Python: `python3`, `uv`, `VIRTUAL_ENV`
 - Node: `node`, `npm`/`bun`, `npx`
 - Rust: `cargo`, `rustc`
 
-If a required tool is missing → install via brew on host (sandbox shares `/opt/homebrew/bin`). If env vars are missing → copy the relevant exports from host's `~/.zprofile` to sandbox's `~/user/.zprofile` via `sv shell`.
+If a required tool is missing → install via brew on host (sandbox shares `/opt/homebrew/bin`). SDK components (e.g., `sdkmanager "platforms;android-34"`) also install to the shared brew prefix — but sandbox can't install them itself (no write access to brew dir), so install on host. If env vars are missing → copy the relevant exports from host's `~/.zprofile` to sandbox's `~/user/.zprofile` via `sv shell`.
 
 ## Sync setup
 
