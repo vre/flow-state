@@ -73,7 +73,7 @@ def test_dispatch_resolves_script_relative_to_run_py(monkeypatch, tmp_path: Path
     exit_code = module.main(["check", "arg1"])
 
     assert exit_code == 3
-    assert recorded == [["python3", str(helper_script), "arg1"]]
+    assert recorded == [[module.sys.executable, str(helper_script), "arg1"]]
 
 
 def test_unknown_subcommand_errors(capsys) -> None:
@@ -150,3 +150,13 @@ def test_guard_reports_ok_missing_and_oversize(tmp_path: Path, capsys) -> None:
     assert missing_output.startswith("skip:")
     assert oversize_exit == 0
     assert oversize_output.startswith("skip:")
+
+
+def test_paragraph_breaks_subcommand_registered() -> None:
+    """Dispatcher should expose the deterministic paragraph-break command."""
+    module = _load_module()
+    parser = module.build_parser()
+    namespace = parser.parse_args(["paragraph-breaks"])
+
+    assert "paragraph-breaks" in module.SCRIPT_MAP
+    assert namespace.command == "paragraph-breaks"

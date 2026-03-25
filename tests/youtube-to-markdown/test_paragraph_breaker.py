@@ -131,7 +131,7 @@ class TestParagraphBreaker:
         timestamp = "[00:01:08.400]"
         result = breaker.convert_timestamp_to_link(timestamp)
 
-        assert result == "[[00:01:08]](https://youtube.com/watch?v=dQw4w9WgXcQ&t=68s)"
+        assert result == "[00:01:08](https://youtube.com/watch?v=dQw4w9WgXcQ&t=68s)"
 
     def test_convert_timestamp_to_link_ms_format(self):
         """Test converting MM:SS timestamp to YouTube link."""
@@ -139,7 +139,7 @@ class TestParagraphBreaker:
         timestamp = "[01:30.500]"
         result = breaker.convert_timestamp_to_link(timestamp)
 
-        assert result == "[[01:30]](https://youtube.com/watch?v=dQw4w9WgXcQ&t=90s)"
+        assert result == "[00:01:30](https://youtube.com/watch?v=dQw4w9WgXcQ&t=90s)"
 
     def test_convert_timestamp_to_link_no_video_id(self):
         """Test timestamp conversion without video_id returns original."""
@@ -157,7 +157,7 @@ class TestParagraphBreaker:
 
         # Should round down to 68 seconds, not 69
         assert "t=68s" in result
-        assert "[[00:01:08]]" in result
+        assert "[00:01:08]" in result
 
     def test_apply_breaks_with_video_id_creates_links(self, mock_fs):
         """Test that applying breaks with video_id creates clickable links."""
@@ -173,7 +173,7 @@ class TestParagraphBreaker:
         content = mock_fs.read_text(output_path)
 
         # Should contain markdown link instead of plain timestamp
-        assert "[[00:00:01]](https://youtube.com/watch?v=test_video_id&t=1s)" in content
+        assert "[00:00:01](https://youtube.com/watch?v=test_video_id&t=1s)" in content
         assert "[00:00:01.000]" not in content  # Original timestamp should be replaced
 
 

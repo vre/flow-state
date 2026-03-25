@@ -4,25 +4,8 @@ Cleans and formats transcript for readability.
 
 ## Step 1: Add natural paragraph breaks
 
-task_tool:
-- subagent_type: "general-purpose"
-- model: "sonnet"
-- prompt:
-```
-INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
-CHAPTERS: <output_directory>/${BASE_NAME}_chapters.json
-OUTPUT: <output_directory>/${BASE_NAME}_transcript_paragraphs.txt
-
-Steps:
-1. Read CHAPTERS JSON. Note chapter start timestamps.
-2. Read INPUT with Read tool. Scan the text and identify paragraph break line numbers:
-   - Place breaks at chapter boundaries (match chapter timestamps to nearby content)
-   - Between chapters, break at topic shifts or sentence endings, targeting ~500 chars per paragraph
-3. Write line numbers to OUTPUT in format: 15,42,78,103,...
-Do not output text during execution - only make tool calls.
-Your final message must be ONLY one of:
-  paragraphs: wrote ${BASE_NAME}_transcript_paragraphs.txt
-  paragraphs: FAIL - {what went wrong}
+```bash
+python3 ./scripts/run.py paragraph-breaks "<output_directory>/${BASE_NAME}_transcript_dedup.md" "<output_directory>/${BASE_NAME}_chapters.json" "<output_directory>/${BASE_NAME}_transcript_paragraphs.txt"
 ```
 
 ```bash

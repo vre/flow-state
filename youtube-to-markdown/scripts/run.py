@@ -23,6 +23,7 @@ SCRIPT_MAP: dict[str, str] = {
     "filter-comments": "32_filter_comments.py",
     "format-transcript": "31_format_transcript.py",
     "insert-headings": "35_insert_headings_from_json.py",
+    "paragraph-breaks": "37_paragraph_breaks.py",
     "merge-tier2": "33_merge_tier2.py",
     "metadata": "10_extract_metadata.py",
     "prepare-update": "21_prepare_update.py",
@@ -77,7 +78,7 @@ def dispatch_script(command: str, args: Sequence[str]) -> int:
         print(f"Missing dispatcher target: {script_path}", file=sys.stderr)
         return 1
 
-    result = subprocess.run(["python3", str(script_path), *args])
+    result = subprocess.run([sys.executable, str(script_path), *args])
     return result.returncode
 
 

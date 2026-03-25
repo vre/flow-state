@@ -39,20 +39,21 @@ No task_tool, no subagent. Pure script.
 
 ## Acceptance Criteria
 
-- [ ] AC1: Break points land on chapter boundaries (first line with timestamp ≥ chapter start)
-- [ ] AC2: Between chapters, breaks at sentence endings nearest ~500 char target
-- [ ] AC3: No LLM subagent in transcript_polish.md Step 1
-- [ ] AC4: `run.py paragraph-breaks` subcmd registered
-- [ ] AC5: Tests: with chapters (exact match + non-exact), without chapters, short transcript, empty chapters, empty input
-- [ ] AC6: Output line numbers compatible with `31_format_transcript.py` (uses same dedup.md file)
+- [x] AC1: Break points land on chapter boundaries (first line with timestamp ≥ chapter start)
+- [x] AC2: Between chapters, breaks at sentence endings nearest ~500 char target
+- [x] AC3: No LLM subagent in transcript_polish.md Step 1
+- [x] AC4: `run.py paragraph-breaks` subcmd registered
+- [x] AC5: Tests: with chapters (exact match + non-exact), without chapters, short transcript, empty chapters, empty input
+- [x] AC6: Output line numbers compatible with `31_format_transcript.py` (uses same dedup.md file)
 
 ## Tasks
 
-- [ ] 1. Write tests for paragraph break algorithm (TDD)
-- [ ] 2. Implement `37_paragraph_breaks.py` — chapter matching + sentence-boundary breaks
-- [ ] 3. Add `paragraph-breaks` to `run.py` dispatcher
-- [ ] 4. Update `transcript_polish.md` Step 1 — remove task_tool, use script
-- [ ] 5. Verify: full option B/D extraction produces correct paragraphs
+- [x] 1. Write tests for paragraph break algorithm (TDD)
+- [x] 2. Implement `37_paragraph_breaks.py` — chapter matching + sentence-boundary breaks
+- [x] 3. Add `paragraph-breaks` to `run.py` dispatcher
+- [+] 3a. Make `run.py` dispatch through `sys.executable` instead of hardcoded `python3` so subcommands use the active project interpreter
+- [x] 4. Update `transcript_polish.md` Step 1 — remove task_tool, use script
+- [>] 5. Verify: full option B/D extraction produces correct paragraphs - deferred; Step 1 + formatter path verified locally via `run.py paragraph-breaks` and `run.py format-transcript`, but full extraction requires network/video access not available in this sandbox
 
 ## Reflection
 
