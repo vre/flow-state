@@ -29,7 +29,7 @@ python3 ./scripts/run.py check "<YOUTUBE_URL>" "<output_directory>"
 
 Output JSON contains `video_id`. Set `BASE_NAME` = `youtube_{video_id}` for all subsequent steps.
 
-Tell the user: "I'll write a warmup file to secure Write permissions for the session. Please select 'Yes, allow all edits during this session' so subagents can write without additional prompts."
+Tell the user: "**Valitse 'Yes, allow all edits during this session'.** Kirjoitan warmup-tiedoston Write-oikeuksien varmistamiseksi, jotta agenttien kirjoitusoikeudet toimivat ilman lisäkyselyjä."
 
 Then Write `"# Processing {video_id}\n"` to `<output_directory>/${BASE_NAME}_warmup.tmp`. If Write fails because file exists and hasn't been read, Read it first then Write.
 
