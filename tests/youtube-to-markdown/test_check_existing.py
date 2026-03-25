@@ -117,9 +117,9 @@ class TestFindExistingFiles:
 
     def test_finds_files_with_date_prefix(self, tmp_path):
         """Find files with new date prefix format."""
-        (tmp_path / "2024-01-15 - youtube - Test Title (abc123).md").write_text("summary")
-        (tmp_path / "2024-01-15 - youtube - Test Title - comments (abc123).md").write_text("comments")
-        (tmp_path / "2024-01-15 - youtube - Test Title - transcript (abc123).md").write_text("transcript")
+        (tmp_path / "2024-01-15 - Test Title (abc123).md").write_text("summary")
+        (tmp_path / "2024-01-15 - Test Title - comments (abc123).md").write_text("comments")
+        (tmp_path / "2024-01-15 - Test Title - transcript (abc123).md").write_text("transcript")
 
         result = find_existing_files("abc123", tmp_path)
 
@@ -128,7 +128,17 @@ class TestFindExistingFiles:
         assert result["transcript_file"] is not None
 
     def test_finds_files_without_date_prefix(self, tmp_path):
-        """Find files with old format (no date prefix) - backward compat."""
+        """Find files with current format without date prefix."""
+        (tmp_path / "Test Title (abc123).md").write_text("summary")
+        (tmp_path / "Test Title - comments (abc123).md").write_text("comments")
+
+        result = find_existing_files("abc123", tmp_path)
+
+        assert result["summary_file"] is not None
+        assert result["comment_file"] is not None
+
+    def test_finds_legacy_files_with_youtube_prefix(self, tmp_path):
+        """Legacy youtube-prefixed filenames still resolve."""
         (tmp_path / "youtube - Test Title (abc123).md").write_text("summary")
         (tmp_path / "youtube - Test Title - comments (abc123).md").write_text("comments")
 
@@ -147,8 +157,8 @@ class TestFindExistingFiles:
 
     def test_excludes_backup_files(self, tmp_path):
         """Backup files are excluded from results."""
-        (tmp_path / "2024-01-15 - youtube - Test Title (abc123).md").write_text("summary")
-        (tmp_path / "2024-01-15 - youtube - Test Title_backup_20240201 (abc123).md").write_text("backup")
+        (tmp_path / "2024-01-15 - Test Title (abc123).md").write_text("summary")
+        (tmp_path / "2024-01-15 - Test Title_backup_20240201 (abc123).md").write_text("backup")
 
         result = find_existing_files("abc123", tmp_path)
 

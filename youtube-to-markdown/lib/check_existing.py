@@ -10,7 +10,7 @@ from lib.shared_types import extract_video_id
 def find_existing_files(video_id: str, output_dir: Path) -> dict:
     """Find existing summary, comment, and intermediate files for a video ID."""
     # Use broad pattern first, then filter
-    all_files = list(output_dir.glob(f"*youtube - * ({video_id}).md"))
+    all_files = list(output_dir.glob(f"* ({video_id}).md"))
 
     # Filter out backups
     all_files = [f for f in all_files if "_backup_" not in f.name]

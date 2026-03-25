@@ -184,19 +184,19 @@ class TestBuildFilename:
     """Tests for build_filename static method."""
 
     def test_with_date_and_title(self):
-        assert Finalizer.build_filename("2024-01-15", "Test Title", "abc123") == "2024-01-15 - youtube - Test Title (abc123).md"
+        assert Finalizer.build_filename("2024-01-15", "Test Title", "abc123") == "2024-01-15 - Test Title (abc123).md"
 
     def test_with_date_title_and_suffix(self):
         assert (
             Finalizer.build_filename("2024-01-15", "Test Title", "abc123", " - transcript")
-            == "2024-01-15 - youtube - Test Title - transcript (abc123).md"
+            == "2024-01-15 - Test Title - transcript (abc123).md"
         )
 
     def test_without_date(self):
-        assert Finalizer.build_filename(None, "Test Title", "abc123") == "youtube - Test Title (abc123).md"
+        assert Finalizer.build_filename(None, "Test Title", "abc123") == "Test Title (abc123).md"
 
     def test_without_date_with_suffix(self):
-        assert Finalizer.build_filename(None, "Test Title", "abc123", " - comments") == "youtube - Test Title - comments (abc123).md"
+        assert Finalizer.build_filename(None, "Test Title", "abc123", " - comments") == "Test Title - comments (abc123).md"
 
 
 class TestAssembleSummaryContent:
@@ -262,6 +262,53 @@ class TestAssembleTranscriptContent:
 
         assert "Desc:" in result
         assert "Trans:" in result
+
+
+class TestInjectWatchLinks:
+    """Tests for transcript watch-link injection."""
+
+    def test_matching_heading_injects_watch_link(self, finalizer):
+        """Matching transcript headings get watch links inserted below them."""
+        transcript = "## Transcription\n\n### Topic One\n\nParagraph one.\n"
+        watch_guide = (
+            "WATCH: visual demo\n\n## Highlights\n\n- [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here\n→ Topic One\n"
+        )
+
+        result = finalizer.inject_watch_links(transcript, watch_guide)
+
+        assert ("### Topic One\n\n▶ [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here\n\nParagraph one.\n") in result
+
+    def test_no_matching_heading_leaves_transcript_unchanged(self, finalizer):
+        """Unmatched watch-guide references do not modify transcript."""
+        transcript = "## Transcription\n\n### Topic One\n\nParagraph one.\n"
+        watch_guide = (
+            "WATCH: visual demo\n\n## Highlights\n\n- [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here\n→ Different Topic\n"
+        )
+
+        assert finalizer.inject_watch_links(transcript, watch_guide) == transcript
+
+    def test_missing_watch_guide_leaves_transcript_unchanged(self, finalizer):
+        """Empty watch guide content is a no-op."""
+        transcript = "## Transcription\n\n### Topic One\n\nParagraph one.\n"
+
+        assert finalizer.inject_watch_links(transcript, "") == transcript
+
+    def test_multiple_watch_links_for_same_heading(self, finalizer):
+        """Multiple watch moments for one heading are all inserted."""
+        transcript = "## Transcription\n\n### Topic One\n\nParagraph one.\n"
+        watch_guide = (
+            "WATCH: visual demo\n\n"
+            "## Highlights\n\n"
+            "- [00:12](https://www.youtube.com/watch?v=vid&t=12s) First moment\n"
+            "→ Topic One\n\n"
+            "- [01:20](https://www.youtube.com/watch?v=vid&t=80s) Second moment\n"
+            "→ Topic One\n"
+        )
+
+        result = finalizer.inject_watch_links(transcript, watch_guide)
+
+        assert "▶ [00:12](https://www.youtube.com/watch?v=vid&t=12s) First moment" in result
+        assert "▶ [01:20](https://www.youtube.com/watch?v=vid&t=80s) Second moment" in result
 
 
 class TestAssembleCommentsContent:
@@ -444,7 +491,7 @@ class TestFinalizeSummaryOnly:
         mock_fs.files[output_dir / f"{base_name}_summary_tight.md"] = "Summary"
 
         result = finalizer.finalize_summary_only(base_name, output_dir, template_dir, debug=True)
-        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(result)
+        assert "2024-01-15 - Test Title (abc123).md" in str(result)
 
     def test_creates_file_without_title(self, finalizer, mock_fs):
         """Test finalize_summary_only creates summary file without title."""
@@ -474,7 +521,7 @@ class TestFinalizeTranscriptOnly:
         mock_fs.files[output_dir / f"{base_name}_transcript.md"] = "Trans"
 
         result = finalizer.finalize_transcript_only(base_name, output_dir, template_dir, debug=True)
-        assert "2024-01-15 - youtube - Test Title - transcript (abc123).md" in str(result)
+        assert "2024-01-15 - Test Title - transcript (abc123).md" in str(result)
 
 
 class TestFinalizeCommentsOnly:
@@ -493,7 +540,7 @@ class TestFinalizeCommentsOnly:
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         result = finalizer.finalize_comments_only(base_name, output_dir, template_dir, debug=True)
-        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(result)
+        assert "2024-01-15 - Test Title - comments (abc123).md" in str(result)
 
 
 class TestFinalizeSummaryComments:
@@ -516,8 +563,8 @@ class TestFinalizeSummaryComments:
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         summary_path, comments_path, transcript_path = finalizer.finalize_summary_comments(base_name, output_dir, template_dir, debug=True)
-        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(summary_path)
-        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(comments_path)
+        assert "2024-01-15 - Test Title (abc123).md" in str(summary_path)
+        assert "2024-01-15 - Test Title - comments (abc123).md" in str(comments_path)
         assert transcript_path is None
 
 
@@ -544,9 +591,9 @@ class TestFinalizeFull:
         mock_fs.files[output_dir / f"{base_name}_comments_prefiltered.md"] = "Comments"
 
         summary_path, transcript_path, comments_path = finalizer.finalize_full(base_name, output_dir, template_dir, debug=True)
-        assert "2024-01-15 - youtube - Test Title (abc123).md" in str(summary_path)
-        assert "2024-01-15 - youtube - Test Title - transcript (abc123).md" in str(transcript_path)
-        assert "2024-01-15 - youtube - Test Title - comments (abc123).md" in str(comments_path)
+        assert "2024-01-15 - Test Title (abc123).md" in str(summary_path)
+        assert "2024-01-15 - Test Title - transcript (abc123).md" in str(transcript_path)
+        assert "2024-01-15 - Test Title - comments (abc123).md" in str(comments_path)
 
     def test_cleanup_in_non_debug_mode(self, finalizer, mock_fs):
         """Test that work files are cleaned up when not in debug mode."""
@@ -642,7 +689,7 @@ class TestUpdateComments:
         template_dir = Path("/templates")
 
         # Existing summary file
-        summary_filename = "2024-01-15 - youtube - Test Title (abc123).md"
+        summary_filename = "2024-01-15 - Test Title (abc123).md"
         mock_fs.files[output_dir / summary_filename] = "## Video\n\nMeta\n\n## Summary\n\nContent"
 
         # Templates and work files
@@ -669,7 +716,7 @@ class TestUpdateComments:
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
 
-        summary_filename = "2024-01-15 - youtube - Test Title (abc123).md"
+        summary_filename = "2024-01-15 - Test Title (abc123).md"
         mock_fs.files[output_dir / summary_filename] = "## Summary\n\nContent\n\n## Comment Insights (old)\n\nOld insights\n"
 
         mock_fs.files[template_dir / "comments.md"] = "## Curated Comments\n\n{comments}"
@@ -690,7 +737,7 @@ class TestUpdateComments:
         base_name = "youtube_abc123"
         template_dir = Path("/templates")
 
-        summary_filename = "youtube - Test Title (abc123).md"
+        summary_filename = "Test Title (abc123).md"
         mock_fs.files[output_dir / summary_filename] = "## Summary\n\nContent"
 
         mock_fs.files[template_dir / "comments.md"] = "{comments}"

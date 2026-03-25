@@ -68,8 +68,8 @@ class Finalizer:
             suffix: Optional suffix like " - transcript" or " - comments"
         """
         if upload_date:
-            return f"{upload_date} - youtube - {cleaned_title}{suffix} ({video_id}).md"
-        return f"youtube - {cleaned_title}{suffix} ({video_id}).md"
+            return f"{upload_date} - {cleaned_title}{suffix} ({video_id}).md"
+        return f"{cleaned_title}{suffix} ({video_id}).md"
 
     def assemble_summary_content(self, template: str, base_name: str, output_dir: Path) -> str:
         """Assemble summary content from template and components."""
@@ -103,6 +103,71 @@ class Finalizer:
         transcript_content = transcript_content.replace("{transcription}", transcription.strip())
 
         return transcript_content
+
+    @staticmethod
+    def _normalize_watch_link_line(line: str) -> str:
+        """Normalize a watch-guide moment line for transcript injection."""
+        stripped = line.strip()
+        for marker in ("- ", "* ", "+ "):
+            if stripped.startswith(marker):
+                return stripped[2:].strip()
+        return stripped
+
+    def _extract_watch_links_by_heading(self, watch_guide_content: str) -> dict[str, list[str]]:
+        """Map transcript headings to watch-guide moment lines."""
+        links_by_heading: dict[str, list[str]] = {}
+        previous_line: str | None = None
+
+        for raw_line in watch_guide_content.splitlines():
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            if stripped.startswith("→ "):
+                heading = stripped[2:].strip()
+                if previous_line and "](" in previous_line and "http" in previous_line:
+                    links_by_heading.setdefault(heading, []).append(self._normalize_watch_link_line(previous_line))
+                continue
+            previous_line = stripped
+
+        return links_by_heading
+
+    def inject_watch_links(self, transcript_content: str, watch_guide_content: str) -> str:
+        """Insert watch-guide moments under matching transcript headings."""
+        if not transcript_content.strip() or not watch_guide_content.strip():
+            return transcript_content
+
+        links_by_heading = self._extract_watch_links_by_heading(watch_guide_content)
+        if not links_by_heading:
+            return transcript_content
+
+        transcript_lines = transcript_content.splitlines()
+        output_lines: list[str] = []
+        index = 0
+
+        while index < len(transcript_lines):
+            line = transcript_lines[index]
+            output_lines.append(line)
+            index += 1
+
+            if not line.startswith("### "):
+                continue
+
+            heading = line[4:].strip()
+            watch_lines = links_by_heading.get(heading)
+            if not watch_lines:
+                continue
+
+            if index < len(transcript_lines) and not transcript_lines[index].strip():
+                index += 1
+
+            output_lines.append("")
+            output_lines.extend(f"▶ {watch_line}" for watch_line in watch_lines)
+            output_lines.append("")
+
+        result = "\n".join(output_lines)
+        if transcript_content.endswith("\n"):
+            result += "\n"
+        return result
 
     def _save_raw_transcript(
         self,
@@ -292,6 +357,8 @@ class Finalizer:
         template = self.read_template(template_dir, "transcript.md")
 
         content = self.assemble_transcript_content(template, base_name, output_dir)
+        watch_guide = self.read_component_or_empty(output_dir / f"{base_name}_watch_guide.md")
+        content = self.inject_watch_links(content, watch_guide)
         cleaned_title, video_id, upload_date = self.get_filenames(base_name, output_dir)
 
         if cleaned_title:
@@ -431,6 +498,8 @@ class Finalizer:
 
         transcript_template = self.read_template(template_dir, "transcript.md")
         transcript_content = self.assemble_transcript_content(transcript_template, base_name, output_dir)
+        watch_guide = self.read_component_or_empty(output_dir / f"{base_name}_watch_guide.md")
+        transcript_content = self.inject_watch_links(transcript_content, watch_guide)
         transcript_path = output_dir / transcript_filename
         self.fs.write_text(transcript_path, transcript_content)
         print(f"Created transcript file: {transcript_filename}")

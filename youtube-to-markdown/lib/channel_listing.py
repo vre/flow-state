@@ -137,14 +137,14 @@ def list_channel_videos(
 def _is_summary_file(path: Path) -> bool:
     """Check if file is a main summary (not backup, comments, or transcript)."""
     name = path.name
-    return "_backup_" not in name and " - comments " not in name and " - transcript " not in name
+    return "_backup_" not in name and " - comments " not in name and " - transcript " not in name and " - watch guide " not in name
 
 
 def _find_summary_for_video_id(video_id: str, output_dir: Path) -> Path | None:
     """Find summary file for a video ID in output_dir and one level of subdirs."""
     dirs = [output_dir] + [d for d in output_dir.iterdir() if d.is_dir()]
     for d in dirs:
-        for f in d.glob(f"*youtube - * ({video_id}).md"):
+        for f in d.glob(f"* ({video_id}).md"):
             if _is_summary_file(f):
                 return f
     return None

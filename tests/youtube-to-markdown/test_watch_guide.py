@@ -62,10 +62,10 @@ def test_find_existing_summary_excludes_watch_guide_file(tmp_path: Path) -> None
     finalizer = Finalizer()
     video_id = "abc123"
 
-    summary = tmp_path / f"youtube - Main ({video_id}).md"
-    watch_guide = tmp_path / f"youtube - Main - watch guide ({video_id}).md"
-    transcript = tmp_path / f"youtube - Main - transcript ({video_id}).md"
-    comments = tmp_path / f"youtube - Main - comments ({video_id}).md"
+    summary = tmp_path / f"Main ({video_id}).md"
+    watch_guide = tmp_path / f"Main - watch guide ({video_id}).md"
+    transcript = tmp_path / f"Main - transcript ({video_id}).md"
+    comments = tmp_path / f"Main - comments ({video_id}).md"
 
     for p in [watch_guide, transcript, comments, summary]:
         p.write_text("x")
@@ -95,7 +95,7 @@ def test_save_raw_transcript_prefers_dedup_file(tmp_path: Path) -> None:
     )
 
     assert path is not None
-    assert path.name == "2026-02-25 - youtube - Title - transcript (vid).md"
+    assert path.name == "2026-02-25 - Title - transcript (vid).md"
     assert "[00:00:01.000] Dedup" in path.read_text()
 
 
@@ -154,7 +154,7 @@ def test_finalize_transcript_only_calls_save_watch_guide(monkeypatch, tmp_path: 
 
     output_path = finalizer.finalize_transcript_only(base_name, tmp_path, template_dir, debug=True)
 
-    assert output_path.name == "2026-02-25 - youtube - Title - transcript (vid).md"
+    assert output_path.name == "2026-02-25 - Title - transcript (vid).md"
     assert captured["called"]
 
 
@@ -177,7 +177,7 @@ def test_save_watch_guide_empty_file_skips_output(tmp_path: Path) -> None:
     )
 
     assert out is None
-    assert not (tmp_path / "2026-02-25 - youtube - Title - watch guide (vid).md").exists()
+    assert not (tmp_path / "2026-02-25 - Title - watch guide (vid).md").exists()
 
 
 def test_save_watch_guide_missing_file_skips_output(tmp_path: Path) -> None:
@@ -197,22 +197,51 @@ def test_save_watch_guide_missing_file_skips_output(tmp_path: Path) -> None:
     )
 
     assert out is None
-    assert not (tmp_path / "2026-02-25 - youtube - Title - watch guide (vid).md").exists()
+    assert not (tmp_path / "2026-02-25 - Title - watch guide (vid).md").exists()
 
 
 def test_find_existing_files_classifies_watch_guide(tmp_path: Path) -> None:
     """find_existing_files returns watch_guide_file separately."""
     video_id = "abc123"
-    (tmp_path / f"youtube - Main ({video_id}).md").write_text("summary")
-    (tmp_path / f"youtube - Main - transcript ({video_id}).md").write_text("transcript")
-    (tmp_path / f"youtube - Main - comments ({video_id}).md").write_text("comments")
-    watch = tmp_path / f"youtube - Main - watch guide ({video_id}).md"
+    (tmp_path / f"Main ({video_id}).md").write_text("summary")
+    (tmp_path / f"Main - transcript ({video_id}).md").write_text("transcript")
+    (tmp_path / f"Main - comments ({video_id}).md").write_text("comments")
+    watch = tmp_path / f"Main - watch guide ({video_id}).md"
     watch.write_text("watch")
 
     result = find_existing_files(video_id, tmp_path)
 
     assert result["watch_guide_file"] == str(watch)
-    assert result["summary_file"].endswith(f"youtube - Main ({video_id}).md")
+    assert result["summary_file"].endswith(f"Main ({video_id}).md")
+
+
+def test_finalize_full_injects_watch_links_into_transcript(tmp_path: Path) -> None:
+    """finalize_full injects watch-guide video links under matching transcript headings."""
+    finalizer = Finalizer()
+    base_name = "youtube_vid"
+    template_dir = tmp_path / "templates"
+    template_dir.mkdir(parents=True, exist_ok=True)
+    (template_dir / "summary.md").write_text("{quick_summary}\n{metadata}\n{summary}")
+    (template_dir / "transcript.md").write_text("## Description\n\n{description}\n\n## Transcription\n\n{transcription}\n")
+    (template_dir / "comments.md").write_text("{comments}")
+    (template_dir / "watch_guide.md").write_text("{watch_guide}")
+
+    (tmp_path / f"{base_name}_title.txt").write_text("Title")
+    (tmp_path / f"{base_name}_upload_date.txt").write_text("2026-02-25")
+    (tmp_path / f"{base_name}_quick_summary.md").write_text("Quick")
+    (tmp_path / f"{base_name}_metadata.md").write_text("Meta")
+    (tmp_path / f"{base_name}_summary_tight.md").write_text("Summary")
+    (tmp_path / f"{base_name}_description.md").write_text("Desc")
+    (tmp_path / f"{base_name}_transcript.md").write_text("### Topic One\n\nParagraph one.\n")
+    (tmp_path / f"{base_name}_comments_prefiltered.md").write_text("Comments")
+    (tmp_path / f"{base_name}_watch_guide.md").write_text(
+        "WATCH: visual demo\n\n## Highlights\n\n- [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here\n→ Topic One\n"
+    )
+
+    _, transcript_path, _ = finalizer.finalize_full(base_name, tmp_path, template_dir, debug=True)
+
+    transcript = transcript_path.read_text()
+    assert "▶ [00:12](https://www.youtube.com/watch?v=vid&t=12s) Start here" in transcript
 
 
 def test_prepare_update_includes_watch_guide_for_exists(monkeypatch, tmp_path: Path) -> None:

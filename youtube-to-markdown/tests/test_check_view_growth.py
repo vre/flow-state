@@ -40,7 +40,7 @@ class TestCheckViewGrowth:
         """Videos with >30% view growth are flagged."""
         # Stored: 1M, current: 1.5M → 50% growth
         summary = _make_summary("Test Video", "1M")
-        (tmp_path / "youtube - Test Video (vid1).md").write_text(summary)
+        (tmp_path / "Test Video (vid1).md").write_text(summary)
 
         existing = [_make_existing_video("vid1", 1_500_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -54,7 +54,7 @@ class TestCheckViewGrowth:
         """Videos with <30% growth are not flagged."""
         # Stored: 1M, current: 1.1M → 10% growth
         summary = _make_summary("Test Video", "1M")
-        (tmp_path / "youtube - Test Video (vid1).md").write_text(summary)
+        (tmp_path / "Test Video (vid1).md").write_text(summary)
 
         existing = [_make_existing_video("vid1", 1_100_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -64,7 +64,7 @@ class TestCheckViewGrowth:
     def test_no_stored_views(self, tmp_path: Path) -> None:
         """Videos without stored views are skipped."""
         summary = _make_summary("Test Video", "N/A")
-        (tmp_path / "youtube - Test Video (vid1).md").write_text(summary)
+        (tmp_path / "Test Video (vid1).md").write_text(summary)
 
         existing = [_make_existing_video("vid1", 1_000_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -81,7 +81,7 @@ class TestCheckViewGrowth:
     def test_zero_stored_views(self, tmp_path: Path) -> None:
         """Videos with 0 stored views are skipped (avoid division by zero)."""
         summary = _make_summary("Test Video", "0")
-        (tmp_path / "youtube - Test Video (vid1).md").write_text(summary)
+        (tmp_path / "Test Video (vid1).md").write_text(summary)
 
         existing = [_make_existing_video("vid1", 1_000_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -92,8 +92,8 @@ class TestCheckViewGrowth:
         """Mixed: one with growth, one without."""
         s1 = _make_summary("Growing", "100K")
         s2 = _make_summary("Stable", "1M")
-        (tmp_path / "youtube - Growing (vid1).md").write_text(s1)
-        (tmp_path / "youtube - Stable (vid2).md").write_text(s2)
+        (tmp_path / "Growing (vid1).md").write_text(s1)
+        (tmp_path / "Stable (vid2).md").write_text(s2)
 
         existing = [
             _make_existing_video("vid1", 200_000),  # 100% growth
@@ -107,7 +107,7 @@ class TestCheckViewGrowth:
     def test_result_fields(self, tmp_path: Path) -> None:
         """Result dict has all required fields."""
         summary = _make_summary("Test", "500K")
-        (tmp_path / "youtube - Test (vid1).md").write_text(summary)
+        (tmp_path / "Test (vid1).md").write_text(summary)
 
         existing = [_make_existing_video("vid1", 1_000_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -124,7 +124,7 @@ class TestCheckViewGrowth:
     def test_custom_threshold(self, tmp_path: Path) -> None:
         """Custom threshold works correctly."""
         summary = _make_summary("Test", "1M")
-        (tmp_path / "youtube - Test (vid1).md").write_text(summary)
+        (tmp_path / "Test (vid1).md").write_text(summary)
 
         # 15% growth — below 0.3 default but above 0.1
         existing = [_make_existing_video("vid1", 1_150_000)]
@@ -138,7 +138,7 @@ class TestCheckViewGrowth:
     def test_date_prefixed_summary_filename_supported(self, tmp_path: Path) -> None:
         """Date-prefixed summary filenames are found and analyzed."""
         summary = _make_summary("Test Video", "1M")
-        (tmp_path / "2026-02-05 - youtube - Test Video (dQw4w9WgXcQ).md").write_text(summary)
+        (tmp_path / "2026-02-05 - Test Video (dQw4w9WgXcQ).md").write_text(summary)
 
         existing = [_make_existing_video("dQw4w9WgXcQ", 1_500_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)
@@ -149,7 +149,7 @@ class TestCheckViewGrowth:
     def test_exact_threshold_not_included_with_compact_stored_views(self, tmp_path: Path) -> None:
         """Exact threshold (30.0%) is excluded even with compact stored count format."""
         summary = _make_summary("Test Video", "1.5M")
-        (tmp_path / "youtube - Test Video (dQw4w9WgXcQ).md").write_text(summary)
+        (tmp_path / "Test Video (dQw4w9WgXcQ).md").write_text(summary)
 
         # Stored: 1,500,000. Current: 1,950,000 -> exactly 30% growth.
         existing = [_make_existing_video("dQw4w9WgXcQ", 1_950_000)]
@@ -160,7 +160,7 @@ class TestCheckViewGrowth:
     def test_comma_formatted_stored_views_parsed_correctly(self, tmp_path: Path) -> None:
         """Stored views in comma format are parsed and compared correctly."""
         summary = _make_summary("Test Video", "2,183,167")
-        (tmp_path / "youtube - Test Video (dQw4w9WgXcQ).md").write_text(summary)
+        (tmp_path / "Test Video (dQw4w9WgXcQ).md").write_text(summary)
 
         existing = [_make_existing_video("dQw4w9WgXcQ", 3_000_000)]
         result = check_view_growth(existing, tmp_path, threshold=0.3)

@@ -8,14 +8,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "youtube-to-markdown"))
 from lib.channel_listing import (
     _normalize_channel_url,
-    parse_channel_entry,
-    parse_channel_metadata,
-    match_existing_videos,
     check_comment_growth,
     find_output_dir,
+    match_existing_videos,
+    parse_channel_entry,
+    parse_channel_metadata,
     suggest_output_dir,
 )
-
 
 SAMPLE_FLAT_ENTRY = {
     "id": "BHdbsHFs2P0",
@@ -140,7 +139,7 @@ class TestMatchExistingVideos:
 
     def test_existing_video_in_root(self, tmp_path):
         # Create a summary file with metadata
-        summary = tmp_path / "youtube - Test Video (abc123).md"
+        summary = tmp_path / "Test Video (abc123).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test Video](https://youtube.com/watch?v=abc123) · 10:00\n"
@@ -162,7 +161,7 @@ class TestMatchExistingVideos:
     def test_existing_video_in_subdir(self, tmp_path):
         subdir = tmp_path / "3Blue1Brown (UCYO)"
         subdir.mkdir()
-        summary = subdir / "youtube - Test Video (abc123).md"
+        summary = subdir / "Test Video (abc123).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=abc123) · 10:00\n"
@@ -179,7 +178,7 @@ class TestMatchExistingVideos:
         assert existing[0]["stored_comments"] == "120"
 
     def test_ignores_backup_files(self, tmp_path):
-        summary = tmp_path / "youtube - Test (abc123).md"
+        summary = tmp_path / "Test (abc123).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=abc123) · 10:00\n"
@@ -187,7 +186,7 @@ class TestMatchExistingVideos:
             "- **Engagement:** 1K views · 50 likes · 30 comments\n"
             "- **Published:** 2025-01-01 | Extracted: 2025-06-01\n"
         )
-        backup = tmp_path / "youtube - Test (abc123)_backup_20250601_120000.md"
+        backup = tmp_path / "Test (abc123)_backup_20250601_120000.md"
         backup.write_text("old content")
 
         videos = [
@@ -203,7 +202,7 @@ class TestMatchExistingVideos:
 
     def test_old_metadata_format(self, tmp_path):
         """Old format: Views/Likes line instead of Engagement line."""
-        summary = tmp_path / "youtube - Old (old123).md"
+        summary = tmp_path / "Old (old123).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Old](https://youtube.com/watch?v=old123) · 10:00\n"
@@ -217,13 +216,45 @@ class TestMatchExistingVideos:
         # Old format doesn't have comments field
         assert existing[0]["stored_comments"] is None
 
+    def test_legacy_youtube_prefixed_summary_still_matches(self, tmp_path):
+        """Legacy youtube-prefixed filenames remain supported."""
+        summary = tmp_path / "youtube - Test Video (abc123).md"
+        summary.write_text(
+            "## Video\n\n"
+            "- **Title:** [Test Video](https://youtube.com/watch?v=abc123) · 10:00\n"
+            "- **Channel:** [Chan](https://youtube.com/c/chan) (1K subscribers)\n"
+            "- **Engagement:** 1K views · 100 likes · 50 comments\n"
+            "- **Published:** 2025-01-01 | Extracted: 2025-06-01\n"
+        )
+        videos = [
+            {"video_id": "abc123", "title": "Test Video", "views": "1K", "duration": "10:00", "url": "https://youtube.com/watch?v=abc123"},
+        ]
+
+        new, existing = match_existing_videos(videos, tmp_path)
+
+        assert new == []
+        assert len(existing) == 1
+
+    def test_watch_guide_is_not_treated_as_summary(self, tmp_path):
+        """Watch guide files do not count as extracted summaries."""
+        watch_guide = tmp_path / "Test Video - watch guide (abc123).md"
+        watch_guide.write_text("watch")
+        videos = [
+            {"video_id": "abc123", "title": "Test Video", "views": "1K", "duration": "10:00", "url": "https://youtube.com/watch?v=abc123"},
+        ]
+
+        new, existing = match_existing_videos(videos, tmp_path)
+
+        assert len(new) == 1
+        assert existing == []
+
 
 class TestCheckCommentGrowth:
     """Tests for check_comment_growth."""
 
     def test_significant_growth(self, tmp_path):
         """25% growth should be flagged."""
-        summary = tmp_path / "youtube - Test (vid1).md"
+        summary = tmp_path / "Test (vid1).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=vid1) · 10:00\n"
@@ -239,7 +270,7 @@ class TestCheckCommentGrowth:
 
     def test_below_threshold(self, tmp_path):
         """5% growth should NOT be flagged."""
-        summary = tmp_path / "youtube - Test (vid2).md"
+        summary = tmp_path / "Test (vid2).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=vid2) · 10:00\n"
@@ -254,7 +285,7 @@ class TestCheckCommentGrowth:
 
     def test_exactly_10_percent(self, tmp_path):
         """Exactly 10% should NOT be flagged (>10% required)."""
-        summary = tmp_path / "youtube - Test (vid3).md"
+        summary = tmp_path / "Test (vid3).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=vid3) · 10:00\n"
@@ -268,7 +299,7 @@ class TestCheckCommentGrowth:
 
     def test_11_percent_growth(self, tmp_path):
         """11% growth should be flagged."""
-        summary = tmp_path / "youtube - Test (vid4).md"
+        summary = tmp_path / "Test (vid4).md"
         summary.write_text(
             "## Video\n\n"
             "- **Title:** [Test](https://youtube.com/watch?v=vid4) · 10:00\n"
@@ -282,11 +313,9 @@ class TestCheckCommentGrowth:
 
     def test_no_stored_comments(self, tmp_path):
         """Video without stored comment count should not crash."""
-        summary = tmp_path / "youtube - Test (vid5).md"
+        summary = tmp_path / "Test (vid5).md"
         summary.write_text(
-            "## Video\n\n"
-            "- **Title:** [Test](https://youtube.com/watch?v=vid5) · 10:00\n"
-            "- **Views:** 5,000 | Likes: 200 | Duration: 10:00\n"
+            "## Video\n\n- **Title:** [Test](https://youtube.com/watch?v=vid5) · 10:00\n- **Views:** 5,000 | Likes: 200 | Duration: 10:00\n"
         )
         current_counts = {"vid5": 500}
         results = check_comment_growth(current_counts, tmp_path)
@@ -296,7 +325,7 @@ class TestCheckCommentGrowth:
 
     def test_multiple_videos(self, tmp_path):
         for vid_id, comments in [("a1", "100"), ("b2", "200")]:
-            f = tmp_path / f"youtube - Vid ({vid_id}).md"
+            f = tmp_path / f"Vid ({vid_id}).md"
             f.write_text(
                 "## Video\n\n"
                 f"- **Title:** [Vid](https://youtube.com/watch?v={vid_id}) · 10:00\n"
@@ -344,7 +373,6 @@ class TestFindOutputDir:
 
 
 class TestSuggestOutputDir:
-
     def test_basic(self, tmp_path):
         result = suggest_output_dir(tmp_path, "3Blue1Brown", "UCYO_jab")
         assert result == tmp_path / "3Blue1Brown (UCYO_jab)"

@@ -52,13 +52,13 @@ class TestBackup:
         """Test backup handles filename with multiple dots."""
         file_ops = FileOps(fs=mock_fs)
 
-        original = Path("/output/youtube - Video Title (abc123).md")
+        original = Path("/output/Video Title (abc123).md")
         mock_fs.write_text(original, "Content")
 
         backup_path = file_ops.backup(original)
 
         today = datetime.now().strftime("%Y%m%d")
-        assert backup_path.name.startswith(f"youtube - Video Title (abc123)_backup_{today}_")
+        assert backup_path.name.startswith(f"Video Title (abc123)_backup_{today}_")
         assert backup_path.name.endswith(".md")
 
 
@@ -111,8 +111,8 @@ class TestCleanup:
         mock_fs.write_text(output_dir / f"{base_name}_metadata.md", "intermediate")
 
         # Create final files (should be preserved)
-        final_summary = output_dir / "youtube - Test Video (test123).md"
-        final_transcript = output_dir / "youtube - Test Video - transcript (test123).md"
+        final_summary = output_dir / "Test Video (test123).md"
+        final_transcript = output_dir / "Test Video - transcript (test123).md"
         mock_fs.write_text(final_summary, "final summary")
         mock_fs.write_text(final_transcript, "final transcript")
 

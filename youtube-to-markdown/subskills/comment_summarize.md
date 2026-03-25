@@ -9,7 +9,7 @@ task_tool:
 - model: "sonnet"
 - prompt:
 ```
-SUMMARY: "<output_directory>/youtube - * ({video_id}).md" if exists
+SUMMARY: "<output_directory>/* ({video_id}).md" main summary file if exists
 INPUT: <output_directory>/${BASE_NAME}_comments_prefiltered.md
 OUTPUT: <output_directory>/${BASE_NAME}_comment_insights.md
 
@@ -67,7 +67,7 @@ task_tool:
 - model: "sonnet"
 - prompt:
 ```
-SUMMARY: "<output_directory>/youtube - * ({video_id}).md" if exists
+SUMMARY: "<output_directory>/* ({video_id}).md" main summary file if exists
 INPUT: <output_directory>/${BASE_NAME}_comment_insights.md
 OUTPUT: <output_directory>/${BASE_NAME}_comment_insights_tight.md
 
