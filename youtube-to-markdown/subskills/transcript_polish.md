@@ -130,15 +130,19 @@ Steps:
 4. Build watch guide in same language as source content:
    - Sections with ## headings matching the headings from step 3.
    - Summary = what was discussed, key claims and data. Reader gets 95% of value from summaries alone.
-   - Video link = `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) HH:MM:SS–HH:MM:SS — Why watch: reason`
+   - No time ranges under headings. Do not add "**Aika:**" or similar.
+   - After each summary paragraph, add relevant links on their own lines:
+     - Read detail: `📖 [[TRANSCRIPT_FILENAME.md#Heading]] — read in detail`
+     - Watch video (only when visual adds value): `▶ [Title](https://youtube.com/watch?v={video_id}&t=SECONDS) HH:MM:SS–HH:MM:SS — Why watch: reason`
+   - TRANSCRIPT_FILENAME is derived from INPUT_METADATA: `{date} - {title} - transcript ({video_id})`
    - Always use HH:MM:SS format for all timestamps (e.g., 00:26:00, not 26:00 or 0:26).
    - Calculate t=SECONDS: hours*3600 + minutes*60 + seconds.
-   - Only link moments where WATCHING adds value over READING. Physical demo, humor, on-screen data → yes. Verbal analysis, anecdote → no. Zero links is fine for talking-head content.
+   - Only link ▶ moments where WATCHING adds value over READING. Physical demo, humor, on-screen data → yes. Verbal analysis, anecdote → no. Zero ▶ links is fine for talking-head content.
    - Heatmap (if provided): viewer replay intensity as tiebreaker, not primary signal.
    - Never reference chunks or internal terms.
    - End with summary table. Column Recommendation links to either transcript or YouTube:
-     - Read → Obsidian link `[[TRANSCRIPT_FILENAME#Heading]]` where TRANSCRIPT_FILENAME is derived from INPUT_METADATA (title, video_id) as `{date} - youtube - {title} - transcript ({video_id})`
-     - Watch → YouTube link `[▶ HH:MM:SS](https://youtube.com/watch?v={video_id}&t=SECONDS)`
+     - Read → `[[TRANSCRIPT_FILENAME.md#Heading]]`
+     - Watch → `[▶ HH:MM:SS](https://youtube.com/watch?v={video_id}&t=SECONDS)`
      - Table timestamps (time range column) do not need links.
 5. Write JSON to OUTPUT_HEADINGS, markdown to OUTPUT_WATCH_GUIDE. Do not verify with scripts — trust the analysis paragraph numbers.
 
