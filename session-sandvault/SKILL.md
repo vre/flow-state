@@ -14,9 +14,16 @@ Like session-claude / session-codex but inside Sandvault sandbox. `sv` handles i
 - `${SHARED}` — `/Users/Shared/sv-${USER}`
 - `${REPO}` — bare repo name in shared space (e.g., `myproject.git`)
 - `${PROJECT_DIR}` — `${REPO%.git}` (e.g., `myproject`) — compute once to avoid nested quoting issues
+- `${SV_REPO}` — sandbox working copy: `~/repositories/${PROJECT_DIR}`
 - `${NAME}` — branch/worktree name
 - `${PROMPT}` — task prompt
 - `${THREAD_ID}` — Codex session ID (for resume)
+
+## Git remote naming
+
+- Host: remote `sandvault` → `${SHARED}/${REPO}` (bare repo bridge)
+- Host: remote `origin` → upstream (GitHub etc.)
+- Sandbox: remote `origin` → `${SHARED}/${REPO}` (natural — it's where clone came from)
 
 ## Prerequisites
 
@@ -61,7 +68,7 @@ Sandbox user cannot write host user's files. Shared bare repo bridges the gap.
 
 Check if shared remote exists:
 ```bash
-git remote get-url shared 2>/dev/null
+git remote get-url sandvault 2>/dev/null
 ```
 
 If no shared remote → create the bridge. Compute `${PROJECT_DIR}` (repo name without `.git`) first to avoid nested quoting issues:
@@ -71,18 +78,18 @@ git clone --bare "$(pwd)" "${SHARED}/${REPO}"
 git -C "${SHARED}/${REPO}" config core.sharedRepository group
 chgrp -R "sandvault-${USER}" "${SHARED}/${REPO}"
 chmod -R g+w "${SHARED}/${REPO}"
-git remote add shared "${SHARED}/${REPO}"
-sv shell -- zsh -c "git config --global --add safe.directory ${SHARED}/${REPO} && git config --global --add safe.directory ${SHARED}/${PROJECT_DIR}"
+git remote add sandvault "${SHARED}/${REPO}"
+sv shell -- zsh -c "git config --global --add safe.directory ${SHARED}/${REPO} && git config --global --add safe.directory ~/repositories/${PROJECT_DIR}"
 ```
 
 Push current branch:
 ```bash
-git push shared ${NAME}
+git push sandvault ${NAME}
 ```
 
-Sandbox user clones (first time) or fetches:
+Sandbox user clones to `~/repositories/` (first time) or fetches:
 ```bash
-sv shell -- zsh -c "cd ${SHARED} && { [ -d ${PROJECT_DIR} ] && cd ${PROJECT_DIR} && git fetch || git clone ${REPO} && cd ${PROJECT_DIR}; }"
+sv shell -- zsh -c "mkdir -p ~/repositories && cd ~/repositories && { [ -d ${PROJECT_DIR} ] && cd ${PROJECT_DIR} && git fetch || git clone ${SHARED}/${REPO} ${PROJECT_DIR} && cd ${PROJECT_DIR}; }"
 ```
 
 After clone/fetch, install project dependencies inside sandbox (e.g., `npm install`, `uv sync`).
@@ -116,33 +123,33 @@ Pass prompt via stdin (`-`) to avoid shell quoting issues. Use `sv shell PATH --
 
 First run:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- codex exec --json -
+echo "${PROMPT}" | sv shell "~/repositories/${PROJECT_DIR}" -- codex exec --json -
 ```
 
 Resume:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- codex exec resume --json ${THREAD_ID} -
+echo "${PROMPT}" | sv shell "~/repositories/${PROJECT_DIR}" -- codex exec resume --json ${THREAD_ID} -
 ```
 
 ## Delegate to Claude
 
 First run:
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- claude -p --output-format json
+echo "${PROMPT}" | sv shell "~/repositories/${PROJECT_DIR}" -- claude -p --output-format json
 ```
 
 Resume (`-c` continues most recent in cwd):
 ```bash
-echo "${PROMPT}" | sv shell "${SHARED}/${PROJECT_DIR}" -- claude -p -c --output-format json
+echo "${PROMPT}" | sv shell "~/repositories/${PROJECT_DIR}" -- claude -p -c --output-format json
 ```
 
 ## Get results back
 
 After agent finishes, push from sandbox and fetch on host:
 ```bash
-sv shell -- zsh -c "cd ${SHARED}/${PROJECT_DIR} && git push origin ${NAME}"
-git fetch shared
-git log shared/${NAME} --oneline -5
+sv shell -- zsh -c "cd ~/repositories/${PROJECT_DIR} && git push origin ${NAME}"
+git fetch sandvault
+git log sandvault/${NAME} --oneline -5
 ```
 
 Merge or cherry-pick as needed.

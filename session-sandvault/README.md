@@ -66,7 +66,7 @@ See [Sandvault practical testing](docs/core/research/2026-03-11-sandvault-practi
 
 Creates shared bare repo at `/Users/Shared/sv-${USER}/<name>.git` as bridge between host and sandbox user. No profile patching needed. `core.sharedRepository=group` handles permissions.
 
-Sync flow: host `git push shared <branch>` → sandbox `git fetch && git rebase`.
+Sync flow: host `git push sandvault <branch>` → sandbox `git fetch && git rebase`. Sandbox clones to `~/repositories/`.
 
 See [Sandvault practical testing](docs/core/research/2026-03-11-sandvault-practical-testing.md) section 7 for exact commands.
 
