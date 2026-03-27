@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.15.0] - 2026-03-27
+
+### Deterministic paragraph breaks + watch guide improvements
+- Paragraph break detection moved from LLM subagent to script `37_paragraph_breaks.py` — eliminates 100K+ token improvised python3 -c scripts
+- Synthesis agent prompt: explicit Steps workflow, "trust analysis paragraph numbers" — 19 tool uses vs previous 87
+- Watch guide: HH:MM:SS timestamps, 📖 read-detail links, clickable summary table, no redundant time ranges
+- Transcript timestamps: standard markdown `[HH:MM:SS](url)` (was `[[HH:MM:SS]](url)`)
+- Shorter filenames: removed " - youtube" from generated names
+- Transcript ← watch guide crosslinks: assembler injects ▶ video links under matching headings
+- Warmup: CTA-first message, retry with Read if file exists
+- Channel subfolder naming includes channel ID
+- Regression tests for timestamp formatting
+
 ## [2.14.0] - 2026-03-24
 
 ### run.py dispatcher — single permission entry point
