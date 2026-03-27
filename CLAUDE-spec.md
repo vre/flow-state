@@ -22,15 +22,29 @@ Evidence quality markers:
 
 ---
 
-## Line 3: "NEVER START IMPLEMENTATION BEFORE APPROVAL. Autopilot is FAILURE."
+## Former line 3: "NEVER START IMPLEMENTATION BEFORE APPROVAL" — REPLACED by Two Modes
 
-**[founding]** Present from initial commit `ecad5f0` (2025-11-09). Original wording: "DO NOT START to edit the file before the user approved the idea." Promoted to line 3 (top of file) and strengthened to ALL CAPS in `467f8a9` (2026-01-31).
+**[founding → replaced 2026-03-25]** Present from initial commit `ecad5f0` (2025-11-09). Removed in the Framing/Execution restructuring.
 
-**Why top of file:** The writing guide (`docs/writing-claude-agents-md.md`) documents that instructions at the beginning receive stronger LLM attention. This is the single most important rule — an LLM that starts implementing before approval wastes entire cycles.
+**Why removed:** Not because the principle is wrong, but because a blanket prohibition conflicted with the autonomous execution model adopted from MathTrainer (see MathTrainer CLAUDE-spec.md lines 324-326). The blanket "NEVER" prevented both bad (autoexecute without approval) and good (autonomous execution after explicit "go") behavior. The two-mode system (Framing/Execution) replaces it with context-dependent authority: in Framing mode, ORC doesn't proceed without HC alignment. In Execution mode, ORC proceeds autonomously.
 
-**Why the wording:** "NEVER" + ALL CAPS is the strongest available emphasis. "Autopilot is FAILURE" names the anti-pattern concretely so the LLM can match against it.
+**Triggering incident:** In a 2026-03-24 session, removing the standalone Worktrees section and simplifying Implementation Setup eliminated friction that had served as an implicit brake. The agent began autoexecuting — editing files without approval, working in main instead of worktrees. The blanket prohibition was insufficient to prevent this because it addressed the symptom (unauthorized execution) rather than the cause (unclear authority boundaries). The two-mode system addresses the cause: authority is explicit per mode.
 
-**Predecessor context:** Out-In-Vibe-Flow's AGENTS.md (line 69-71) already had: "Framework development: Ask user what they want before proceeding" and "Never auto-fill templates or make domain assumptions." The flow-state version is stronger because Out-In-Vibe-Flow's softer phrasing ("Ask user") was insufficient — the agent still proceeded without waiting for approval. The escalation to "NEVER" + "FAILURE" reflects learned insufficiency of polite instructions.
+**Previous history:** Out-In-Vibe-Flow AGENTS.md (line 69-71): "Framework development: Ask user what they want before proceeding." Escalated through multiple iterations: "Ask user" → "DO NOT START" → "NEVER" + "FAILURE". Each escalation was triggered by the agent finding ways around the softer phrasing. The two-mode system breaks this escalation spiral by restructuring authority rather than strengthening prohibitions.
+
+---
+
+## Two modes: Framing vs Execution
+
+**[adapted from MathTrainer, 2026-03-25]** MathTrainer developed the two-mode system across 20+ implementation cycles (`bbf509a`, 2026-03-11). Adopted into flow-state after observing that the blanket "NEVER START IMPLEMENTATION" caused two failure modes: (1) agent autoexecuted anyway when friction was removed, (2) agent asked unnecessary permission during phases where autonomy was appropriate.
+
+**Why two modes, not "always autonomous":** Some work genuinely needs HC in the loop — exploring new problem spaces, design decisions, scope definitions. Framing is divergent thinking where HC's domain knowledge is critical. Execution is convergent — the plan defines the box.
+
+**Escalation criteria:** ORC escalates during Execution only when: (1) scope change beyond frame, (2) blocked after 3 attempts, (3) architectural fork. This is narrower than flow-state's previous implicit model where ORC could escalate for anything.
+
+**Non-escalation list:** **[adapted from MathTrainer]** "ORC does NOT escalate for: implementation details, refactoring, review findings, test strategy, code style, naming." Without this explicit list, ORC defaults to asking HC about everything. The list channels decision authority to where the context advantage lies. MathTrainer validated across 20+ cuts — ORC never needed HC for items on this list.
+
+**Language during execution:** **[adapted from MathTrainer]** "Use English during autonomous execution (saves tokens)." Long autonomous execution phases produce output only for machine consumption (commits, plan updates, reflections). HC-facing dialogue still matches HC's language.
 
 ---
 
@@ -102,9 +116,31 @@ Evidence quality markers:
 
 ---
 
-## Line 17: "More than 5 tool calls or file changes"
+## Framing Phase (Section 0)
 
-**[git]** Originally "more than 3 calls or 500 tokens" in `467f8a9` (2026-01-31). Changed to "5 tool calls or file changes" same day in `ae5d7e3`.
+**[adapted from MathTrainer, 2026-03-25]** MathTrainer created the Framing Phase (`bbf509a`, 2026-03-11) to separate divergent thinking (understanding the problem) from convergent thinking (designing the solution). flow-state previously mixed these in Plan Phase Discovery.
+
+**Why a separate phase:** flow-state's Plan Phase Discovery mixed "what's the problem?" with "how do we solve it?" During discovery, ORC would start converging on a solution before HC had fully shaped the problem. The Framing Phase makes divergent thinking explicit: explore, challenge, propose alternatives, no commitment yet.
+
+**Why interface change exploration belongs in Framing:** Previously in Plan Phase Discovery (flow-state) as "iterate 3-5 designs with HC." Moved to Framing because design exploration is divergent thinking requiring HC interaction — it shapes the *what*, not the *how*. In Plan Phase (which may run in Execution mode), HC interaction for design exploration conflicts with autonomous execution. MathTrainer (line 54): "Discovery belongs here, not in Plan Phase."
+
+**Why framing document is a living document:** **[adapted from MathTrainer, `8e20c23`]** Framing may span multiple sessions. Without a persistent document, decisions made in session 1 must be re-discovered in session 2. The framing document captures decisions as they're made. HC can review and evaluate the frame at any point, including across session boundaries. "Each update overwrites stale sections" — prevents accumulation of contradictory versions.
+
+**Why worktree creation is here:** Framing may produce files — research docs, prototypes, UI mockups. These must not go on main (pollutes main, confuses parallel agents). Creating a worktree during framing (when first file is needed) keeps main clean while allowing file output. The sandvault delegation path requires git for file transfer between users — files must be committed, not just written. This replaces the previous standalone Worktrees section which read as a meta-rule above phases and triggered autoexecute behavior.
+
+**Why "Do not switch branches in project root":** Multiple agents may be working in the repo simultaneously. Branch-switching in the project root changes state under all of them. Worktrees isolate without affecting other agents.
+
+**Why "HC says go → Execution mode begins":** The explicit "go" trigger replaces "NEVER START IMPLEMENTATION BEFORE APPROVAL". One "go" covers the entire cycle: Plan → Implementation → Review → Merge. This matches MathTrainer's continuity rule — HC's approval at framing end covers the full scope. Asking permission per phase is like a general approving a battle plan and then being asked to approve each platoon's movement.
+
+**Why plan review gate with "default: no review":** Adapted from MathTrainer (`5f2481f`, 2026-03-12). HC who trusts the process doesn't need to review every plan. HC who wants oversight can request it at framing end. The default reflects that well-framed work produces good plans. At Plan Phase end: if HC requested review, present and wait. Otherwise, proceed to implementation autonomously.
+
+**Predecessor:** flow-state had no Framing Phase — HC and ORC started directly in Plan Phase Discovery. MathTrainer's Framing Phase was developed after observing that discovery in Plan Phase created confirmation bias: once planning starts, you look for evidence supporting the plan you've already begun writing.
+
+---
+
+## "More than 5 tool calls or file changes" → Move to Framing
+
+**[git → evolved 2026-03-27]** Originally "more than 3 calls or 500 tokens" in `467f8a9` (2026-01-31). Changed to "5 tool calls or file changes" same day in `ae5d7e3`. Target changed from "Plan Phase" to "Framing" when Framing Phase was introduced (2026-03-25) — Framing is now the entry point for non-trivial work, not Plan Phase directly.
 
 **Why the change:** "500 tokens" is not observable at decision time — the LLM cannot count tokens. "File changes" is concrete. Threshold raised from 3 to 5 because 3 triggered plan phases for trivial changes.
 
@@ -254,32 +290,34 @@ Evidence quality markers:
 
 ---
 
-## Worktrees section (formerly lines 50-53)
+## Worktrees (embedded in Framing and Implementation Setup)
 
-**[git → incident → evolved]** Worktrees introduced `58701f5` (2026-01-26). Path changed from `.git/worktrees/` to `.worktrees/` in `23161d1` (2026-01-27). Restructured 2026-03-24: worktree creation moved from Implementation Setup to a standalone section above all phases, worktree created at Plan Phase start instead of Implementation start.
+**[git → incident → evolved]** Worktrees introduced `58701f5` (2026-01-26). Path changed from `.git/worktrees/` to `.worktrees/` in `23161d1` (2026-01-27).
 
-**Why worktrees:** Isolation for parallel development without polluting main. Before worktrees, the original flow-state (Nov 2025) worked directly on main. out-in-vibe-flow had no isolation at all.
+**Evolution history:**
+1. Original (2026-01): created in Implementation Setup, plans on main
+2. 2026-03-24 attempt: standalone section above phases, "write file → worktree first" — caused autoexecute (agent read it as universal permission to create and write)
+3. 2026-03-25 current: embedded in Framing (worktree when first file needed) and Implementation Setup (verify exists, setup env)
 
-**Why worktree at Plan Phase start (2026-03-24 change):** Previously worktrees were created in Implementation Setup, and plans were written on main then copied to the worktree with `rm` from main. This caused repeated incidents: plans remaining as untracked files on main, merge conflicts when plan existed in both places, LLM copying instead of moving. The fix: create worktree before writing any files. Plans are born in the worktree, never touch main. The copy/rm instruction was removed entirely — the problem it solved no longer exists.
+**Why worktrees:** Isolation for parallel development without polluting main. Before worktrees, flow-state worked directly on main.
 
-**Previous line 51 — "Copy plan file to worktree, rm from main" — REMOVED:** **[incident]** Multiple incidents where the plan remained on main and also existed in the worktree, causing merge conflicts every time. Especially problematic when the plan on main wasn't even committed — just sitting as an untracked file. The 2026-03-24 restructuring eliminates this by writing plans directly in the worktree from the start.
+**Why embedded, not standalone:** The 2026-03-24 standalone Worktrees section above all phases read as a meta-rule that overrode phase gates. "Writing a file → worktree first" was an imperative that triggered action without HC alignment. Moving it into Framing (where HC is in the loop) and Implementation Setup (where it's a setup step with ceremony) preserves the rule without the autoexecute trigger.
 
-**Why "For Plan Phase work":** Small changes (under 5 tool calls, line 17) skip Plan Phase entirely and work directly on main. Worktree overhead is only justified for multi-phase work.
+**Why worktree in Framing, not just Implementation:** Framing may produce files — research docs, prototypes, mockups. These need a worktree for isolation. The sandvault delegation path (session-sandvault skill) requires git for file transfer between host and sandbox users — files must be committed, not just written. Copy/rm cannot work across user boundaries.
 
-**Why "Name not known yet? Use topic name":** Discovery may start before the scope or final name is clear. Allowing a temporary topic name (e.g., `research-auth`) prevents blocking on naming. `git branch -m` renames later.
+**Previous "Copy plan file to worktree, rm from main" — REMOVED:** **[incident]** Multiple incidents where plans remained on main. The Framing Phase eliminates this: plans are written in the worktree from the start, never on main. Sandvault path: plans are committed in worktree, pushed via shared bare repo.
 
-**`uv sync` and `.env*` copy:** Unchanged. See original rationale below.
+**Why "Do not switch branches in project root":** Multiple agents may work in parallel. Branch-switching in project root changes state under all of them. Worktrees isolate without side effects.
 
-**`uv sync` in dirs with pyproject.toml:** The flow-state project has multiple separate Python plugins (youtube-to-markdown, imap-stream-mcp), each built independently. `uv` was chosen from the start for modern, fast, clean package management. `pyproject.toml` is the modern way to manage dependencies with `uv`.
+**Why "Name not known yet? Use topic name":** Discovery may start before scope is clear. Temporary name prevents blocking. `git branch -m` renames later.
 
-**Why `.env*` copy:** Environment files are not committed (`.gitignore`) but needed for tests and tools.
+**`uv sync` in dirs with pyproject.toml:** Multiple separate Python plugins, each built independently with `uv`.
 
-**Codex sandbox workaround:** **[incident]** Added `42e2832` (2026-03-07). Moved from CLAUDE.md to `session-codex` skill (2026-03-24) — technical detail belongs in the skill, not the process doc. Three cycles documented the problem:
-- imap-stream-mcp v0.7.0: `index.lock` error — Codex can't write to `.git`
-- youtube-to-markdown v2.12.0: `.git` metadata outside writable roots
-- imap-stream-mcp v0.7.1: same issue, third time
+**Why `.env*` copy:** Environment files are not committed but needed for tests and tools.
 
-Codex's Seatbelt sandbox blocks `(subpath ".git")`. Renaming to `.git-codex-sandbox-workaround` bypasses this while keeping filesystem isolation. Full details in `session-codex/SKILL.md` and `session-codex/README.md`.
+**Codex sandbox workaround:** **[incident]** Added `42e2832` (2026-03-07). Lives in `session-codex` skill, referenced from Implementation Setup. Three cycles documented the problem (`.git` write failures in Seatbelt sandbox). Full details in `session-codex/SKILL.md`.
+
+**Delegation choice and session reuse:** **[evolved 2026-03-27]** `session-sandvault` is preferred — full OS sandbox (Seatbelt user isolation) with build tools and network. `session-codex` is lightweight alternative — host worktree with Codex's own sandbox. "Reuse plan review session (continue)" — the IMP session that reviewed the plan already has deep understanding of the plan, no context re-loading needed. Session resume works across both delegation paths: Codex sessions persist in the sandbox user's home and can be resumed via `--resume`.
 
 ---
 
@@ -337,9 +375,21 @@ Coding standard. Relates to testability (lines 62-63) and code quality. Without 
 
 One consistent documentation format. Without specifying, the model alternates between styles (Sphinx, NumPy, Google, or none). Eliminates variance.
 
-### Line 68: "NOT writing documentation or a book — concise everywhere"
+### "NO comments that restate the code. Comments explain *why*, not *what*."
+
+**[adapted from MathTrainer, 2026-03-25]** MathTrainer added "NO verbose math comments in code" after Codex produced extensive comments explaining coordinate math (`// Calculate center X by taking width / 2 and adding offset...`). Generalized for flow-state: LLMs produce comments that restate the code in English. "avoid Wordiness" and "concise everywhere" are insufficient to prevent this — empirically confirmed in both projects. A separate, specific prohibition is needed because the general rules don't trigger on comments as strongly as on prose output.
+
+### "NOT writing documentation or a book — concise everywhere"
 
 Repeated emphasis on conciseness because earlier Claude models had a serious problem with excessive text production. Related to "Wordiness" in line 61. Applied specifically to Merge Phase docs because documentation-writing triggers the model's verbosity more than code-writing.
+
+### BDD scenarios and Outside-In per AC
+
+**[adapted from MathTrainer]** MathTrainer added BDD (Gherkin) in plans and Outside-In implementation order based on Out-In-Vibe-Flow lineage and the observation that acceptance criteria without concrete scenarios left "done" ambiguous. Codex wrote tests that passed but didn't verify the actual requirement. Gherkin's Given/When/Then forces the planner to think about preconditions, actions, and expected outcomes. Outside-In (BDD scenario → unit tests → implement → all green) ensures tests verify requirements, not just implementation. The problem is not project-specific — it applies wherever ACs are delegated to an implementing agent.
+
+### "All tests must run fast — no external service dependency for core logic"
+
+**[adapted from MathTrainer]** MathTrainer: "no emulator dependency for core logic." Generalized: core logic tests that depend on external services (database, network, sandbox) become flaky gates. Pure domain logic must test without external dependencies. Integration tests that require services are separate and explicitly scoped.
 
 ---
 
@@ -355,7 +405,9 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 **[git]** Introduced `fa73a4d` (2026-02-15). Escalation chain added `215c27b` (2026-02-25).
 
-**Why 3 rounds:** LLMs retry the same failing approach indefinitely, burning tokens without progress. 3 rounds is enough to confirm a problem is not trivially fixable. The escalation chain (IMP → ORC → HC) uses the role system to bring progressively more context to the problem.
+**Why 3 rounds:** LLMs retry the same failing approach indefinitely, burning tokens without progress. 3 rounds is enough to confirm a problem is not trivially fixable.
+
+**Escalation changed (2026-03-25):** Previously "IMP alerts ORC, ORC alerts HC." Changed to "ORC decides: fix within scope or escalate to HC." Adapted from MathTrainer (line 109): ORC has more context than HC during Execution mode — ORC should decide whether to fix within scope or escalate. Going directly to HC for every blocked issue violates the autonomous execution principle and adds latency for decisions ORC can make.
 
 ---
 
@@ -397,7 +449,21 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 ### Acceptance Testing
 
-**[inferred]** ORC tests the feature or asks HC. Defects go back to IMP for fixing via the same session skill used for implementation (`session-codex` or `session-sandvault`), then re-verified. The iteration continues until clean. HC confirms before proceeding to Merge Phase — another gate preventing premature completion.
+**[inferred → evolved 2026-03-25]** ORC tests the feature. Defects go back to IMP for fixing via the same session skill used for implementation (`session-codex` or `session-sandvault`), then re-verified. The iteration continues until clean.
+
+**HC gate removed (2026-03-25):** Previously: "HC confirms before proceeding to Merge Phase." Adapted from MathTrainer (`bc6ca2d`, 2026-03-12): HC never rejected a merge that had passed review. The gate added latency without catching issues. In Execution mode, completed review = permission to merge. ORC briefs HC ("review complete, ready for merge") instead of blocking for approval.
+
+### Output Verification
+
+**[adapted from MathTrainer Visual Verification, 2026-03-25]** MathTrainer has mandatory Visual Verification for UI changes (lines 130-136): ORC uses `adb shell screencap` to verify screens directly, delegates screenshot work to subagents, and does not ask HC to check screens.
+
+Generalized for flow-state: ORC verifies outputs directly instead of asking HC. The principle "ORC has eyes — use them" applies beyond visual UI:
+- CLI output: run command, read result
+- Generated files: read and validate content
+- API responses: invoke and check
+- Web UI (if applicable): CDP screenshots via sandvault localhost
+
+The rule prevents a common delegation failure where ORC asks HC to manually verify something ORC could check itself. This adds latency and breaks autonomous execution.
 
 ---
 
@@ -409,6 +475,8 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 **Why squash merge:** Worktree development creates many small incremental commits. Squash produces one clean commit on main. "Linux-style" refers to kernel convention: descriptive subject line + optional body.
 
+**HC permission for merge removed (2026-03-25):** Previously: "Ask HC permission → on main: git merge --squash." Adapted from MathTrainer: in Execution mode, review completion is the gate, not a separate HC approval. Similarly, "Ask HC for permission to clean up" replaced with autonomous cleanup — worktree removal is a mechanical step, not a decision point.
+
 **Why "Run tests on main after merge, before commit":** Added `42e2832` (2026-03-07). v0.7.0 didn't test after squash merge, v2.12.0 did. The rule codified the v2.12.0 approach.
 
 ---
@@ -417,15 +485,15 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 **[git → incident → HC rationale]** Introduced `215c27b` (2026-02-25). Ownership refined `42e2832` (2026-03-07) and `4a42ea5` (2026-03-19).
 
-**Three reflection types, three authors, three reasons:**
+**Reflection split adapted from MathTrainer (2026-03-25):** Previously three types (planning, implementation, cycle). Now two per cycle, split by concern:
 
 | Reflection | File pattern | Author | Why this author |
 |---|---|---|---|
 | Planning | `*-planning-*.md` | ORC | Only ORC has the HC dialogue and Codex review context |
-| Implementation | `*-impl-*.md` | IMP | Only IMP has the hands-on implementation experience |
-| Cycle | `*-cycle-*.md` | ORC | Only ORC has the cross-phase picture (planning → review → merge) |
+| Code | `*-cycle-code-*.md` | IMP | What worked technically, what changed from plan, code-level lessons |
+| Process | `*-cycle-process-*.md` | ORC | Plan→impl translation, delegation effectiveness, process improvements |
 
-ORC delegates implementation reflection writing to IMP. ORC writes planning and cycle reflections directly.
+MathTrainer's rationale: ORC and IMP have different perspectives. Combining into one author loses one perspective. IMP knows what was hard to implement; ORC knows how delegation worked. Splitting by concern (code vs process) preserves both.
 
 **Evolution:** Originally (pre-2026-03-19) implementation reflection was written as a `## Reflection` section inside the plan file. Changed to a separate file following the same pattern as other reflections — consistency and independent discoverability.
 
