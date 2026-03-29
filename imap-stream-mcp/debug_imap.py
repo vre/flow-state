@@ -10,32 +10,43 @@ import keyring
 SERVICE_NAME = "imap-stream"
 
 
-def get_credentials():
-    """Get credentials from keychain."""
+def get_credentials(account=None):
+    """Get credentials from keychain.
+
+    Args:
+        account: Account name. None uses default account.
+    """
     accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
     if not accounts_json:
         return None, None, None, None
 
     accounts = json.loads(accounts_json)
-    default = keyring.get_password(SERVICE_NAME, "default_account") or accounts[0]
 
-    server = keyring.get_password(SERVICE_NAME, f"{default}:imap_server")
-    port = keyring.get_password(SERVICE_NAME, f"{default}:imap_port") or "993"
-    username = keyring.get_password(SERVICE_NAME, f"{default}:imap_username")
-    password = keyring.get_password(SERVICE_NAME, f"{default}:imap_password")
+    if account is None:
+        account = keyring.get_password(SERVICE_NAME, "default_account") or accounts[0]
+
+    if account not in accounts:
+        print(f"ERROR: Account '{account}' not found. Available: {', '.join(accounts)}")
+        return None, None, None, None
+
+    server = keyring.get_password(SERVICE_NAME, f"{account}:imap_server")
+    port = keyring.get_password(SERVICE_NAME, f"{account}:imap_port") or "993"
+    username = keyring.get_password(SERVICE_NAME, f"{account}:imap_username")
+    password = keyring.get_password(SERVICE_NAME, f"{account}:imap_password")
 
     return server, port, username, password
 
 
-def debug_connection():
+def debug_connection(account=None):
     """Test IMAP connection step by step."""
     # 1. Get credentials
     print("=" * 50)
     print("1. Checking stored credentials...")
     print("=" * 50)
 
-    server, port, username, password = get_credentials()
+    server, port, username, password = get_credentials(account)
 
+    print(f"   Account: {account or '(default)'}")
     print(f"   Server:   {server}")
     print(f"   Port:     {port}")
     print(f"   Username: {username}")
@@ -146,11 +157,11 @@ def debug_connection():
     print()
 
 
-def test_with_imaplib_debug():
+def test_with_imaplib_debug(account=None):
     """Test with full IMAP debug output."""
     import imaplib
 
-    server, port, username, password = get_credentials()
+    server, port, username, password = get_credentials(account)
 
     print("=" * 50)
     print("IMAP DEBUG MODE (full protocol trace)")
@@ -170,10 +181,15 @@ def test_with_imaplib_debug():
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if len(sys.argv) > 1 and sys.argv[1] == "--debug":
-        test_with_imaplib_debug()
+    parser = argparse.ArgumentParser(description="Debug IMAP connection issues")
+    parser.add_argument("--account", help="Account name (default: use default account)")
+    parser.add_argument("--debug", action="store_true", help="Full IMAP protocol trace")
+    args = parser.parse_args()
+
+    if args.debug:
+        test_with_imaplib_debug(args.account)
     else:
-        debug_connection()
+        debug_connection(args.account)
         print("\nFor full protocol trace, run: python debug_imap.py --debug")

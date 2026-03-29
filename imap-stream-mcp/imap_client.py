@@ -1491,6 +1491,76 @@ def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remo
     return result
 
 
+def move_message(folder: str, message_ids: list[int], destination: str, account: str = None) -> dict:
+    """Move messages from one folder to another.
+
+    Uses IMAP MOVE if supported by server, otherwise falls back to COPY + DELETE.
+
+    Args:
+        folder: Source IMAP folder path
+        message_ids: List of message UIDs to move
+        destination: Destination folder path
+        account: Account name. None uses default.
+
+    Returns:
+        Dict with moved count, source, destination, and failed list
+    """
+    from session import get_session, invalidate_message_cache
+
+    session = get_session(account)
+
+    result = {"moved": 0, "source": folder, "destination": destination, "failed": []}
+
+    if not message_ids:
+        return result
+
+    with session.connection_ctx() as client:
+        try:
+            client.select_folder(folder, readonly=False)
+        except Exception as e:
+            raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
+
+        # Verify destination exists
+        try:
+            folders = [to_str(name) for _, _, name in client.list_folders()]
+            if destination not in folders:
+                raise IMAPError(
+                    f"Destination folder '{destination}' not found. "
+                    f"Use action 'folders' to see available folders."
+                )
+        except IMAPError:
+            raise
+        except Exception as e:
+            raise IMAPError(f"Cannot list folders: {e}") from e
+
+        for msg_id in message_ids:
+            try:
+                # Verify message exists
+                exists = client.search(["UID", msg_id])
+                if not exists:
+                    result["failed"].append({"id": msg_id, "error": "Message not found"})
+                    continue
+
+                # Try MOVE first (RFC 6851), fall back to COPY + flag Deleted
+                try:
+                    client.move([msg_id], destination)
+                except Exception:
+                    client.copy([msg_id], destination)
+                    client.add_flags([msg_id], [b"\\Deleted"])
+                    client.expunge([msg_id])
+
+                result["moved"] += 1
+
+            except Exception as e:
+                result["failed"].append({"id": msg_id, "error": str(e)})
+
+        # Invalidate caches for both folders
+        invalidate_message_cache(session.account, folder)
+        invalidate_message_cache(session.account, destination)
+
+    return result
+
+
 def test_connection():
     """Test IMAP connection with stored credentials."""
     try:

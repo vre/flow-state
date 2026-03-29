@@ -35,6 +35,7 @@ from imap_client import (
     list_messages,
     modify_draft,
     modify_flags,
+    move_message,
     parse_folder_path,
     read_message,
     search_messages,
@@ -201,12 +202,13 @@ class MailAction(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    action: str = Field(..., description="Action: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help")
+    action: str = Field(..., description="Action: list|read|search|draft|edit|flag|move|attachment|cleanup|folders|accounts|help")
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
         description="Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
+    account: str | None = Field(default=None, description="Account name for multi-account setups. None uses default account.")
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
         default=None, description="Include body snippet (~100 chars) in list/search results. Required for list and search actions."
@@ -215,7 +217,7 @@ class MailAction(BaseModel):
     @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {"list", "read", "search", "draft", "edit", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
+        valid = {"list", "read", "search", "draft", "edit", "folders", "help", "attachment", "cleanup", "accounts", "flag", "move"}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -416,6 +418,22 @@ $label1-5 (Thunderbird), or any server-supported keyword
 {action: "flag", folder: "INBOX", payload: "123,124,125:+Deleted"}
 {action: "flag", folder: "INBOX", payload: "123:+$label1"}
 """,
+    "move": """
+# move - Move Messages Between Folders
+
+Move messages from one folder to another.
+
+## Parameters
+- folder: Source folder (where the message currently is)
+- payload: "MSG_ID:DESTINATION" or "MSG_ID1,MSG_ID2:DESTINATION"
+
+## Examples
+{action: "move", folder: "INBOX", payload: "123:INBOX.Archive"}
+{action: "move", folder: "INBOX", payload: "123,124,125:INBOX.Later"}
+{action: "move", folder: "INBOX", payload: "4882:INBOX.Spam"}
+
+Uses IMAP MOVE command if supported by server, otherwise falls back to COPY + DELETE.
+""",
     "attachment": """
 # attachment - Download Attachment
 
@@ -500,9 +518,11 @@ async def use_mail(params: MailAction) -> str:
                 return HELP_TOPICS[topic]
             return f"Unknown topic '{topic}'. Available: {', '.join(HELP_TOPICS.keys())}"
 
+        account = params.account
+
         # Folders
         if action == "folders":
-            folders = list_folders()
+            folders = list_folders(account=account)
             lines = ["# Available Folders", ""]
             for f in folders:
                 flags = " ".join(f["flags"]) if f["flags"] else ""
@@ -549,7 +569,7 @@ uv run --directory {plugin_dir} python setup.py
             if not folder:
                 return "Error: folder required. Example: {action:'list', folder:'INBOX'}"
 
-            messages = list_messages(folder, limit=params.limit, preview=params.preview or False)
+            messages = list_messages(folder, limit=params.limit, account=account, preview=params.preview or False)
 
             if not messages:
                 return f"No messages in '{folder}'"
@@ -601,7 +621,7 @@ uv run --directory {plugin_dir} python setup.py
             except ValueError:
                 return f"Error: payload must be numeric message ID, got '{id_str}'"
 
-            msg = read_message(folder, msg_id, full=full, depth=depth)
+            msg = read_message(folder, msg_id, account=account, full=full, depth=depth)
 
             # Collect header info for wrapped email
             header_lines = [
@@ -686,7 +706,7 @@ uv run --directory {plugin_dir} python setup.py
             if not params.payload:
                 return "Error: payload (search query) required. Use 'help search' for syntax."
 
-            messages = search_messages(folder, params.payload, limit=params.limit, preview=params.preview or False)
+            messages = search_messages(folder, params.payload, limit=params.limit, account=account, preview=params.preview or False)
 
             if not messages:
                 return f"No messages matching '{params.payload}' in '{folder}'"
@@ -740,6 +760,7 @@ uv run --directory {plugin_dir} python setup.py
                 folder=folder,
                 message_id=draft_id,
                 replacements=replacements,
+                account=account,
             )
 
             changes = result.get("changes", [])
@@ -790,6 +811,7 @@ uv run --directory {plugin_dir} python setup.py
                     cc=draft_data.get("cc"),
                     html=html_body,
                     attachments=att_paths,
+                    account=account,
                 )
 
                 reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
@@ -828,6 +850,7 @@ Open Thunderbird → Drafts to review and send."""
                 cc=draft_data.get("cc"),
                 html=html_body,
                 attachments=att_paths,
+                account=account,
             )
 
             att_info = _format_attachment_line(result.get("attachments", []))
@@ -855,7 +878,7 @@ Open Thunderbird → Drafts to review and send."""
             except ValueError:
                 return f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')"
 
-            result = download_attachment(folder, msg_id, att_index)
+            result = download_attachment(folder, msg_id, att_index, account=account)
 
             return f"""# Attachment Downloaded
 
@@ -878,7 +901,7 @@ Use Read tool for images, pdf/docx skills for documents."""
             except ValueError as e:
                 return f"Error: {e}"
 
-            result = modify_flags(folder, msg_ids, add_flags, remove_flags)
+            result = modify_flags(folder, msg_ids, add_flags, remove_flags, account=account)
 
             # Build response
             lines = ["# Flag Operation"]
@@ -898,6 +921,45 @@ Use Read tool for images, pdf/docx skills for documents."""
                         lines.append(f"  - Message {fail['id']}, flag '{fail['flag']}': {fail['error']}")
                     else:
                         lines.append(f"  - Message {fail['id']}: {fail['error']}")
+
+            return "\n".join(lines)
+
+        # Move
+        if action == "move":
+            if not folder:
+                return "Error: folder required (source folder)"
+            if not params.payload:
+                return "Error: payload required. Format: MSG_ID:DESTINATION or MSG_ID1,MSG_ID2:DESTINATION"
+
+            # Parse payload: "123:INBOX.Archive" or "123,456:INBOX.Archive"
+            if ":" not in params.payload:
+                return "Error: payload format is MSG_ID:DESTINATION_FOLDER (e.g., '123:INBOX.Archive')"
+
+            parts = params.payload.rsplit(":", 1)
+            id_part = parts[0].strip()
+            destination = parts[1].strip()
+
+            if not destination:
+                return "Error: destination folder required after ':'"
+
+            try:
+                msg_ids = [int(x.strip()) for x in id_part.split(",")]
+            except ValueError:
+                return "Error: invalid message ID(s). Use comma-separated numbers (e.g., '123' or '123,456')"
+
+            # Resolve folder paths
+            folder = parse_folder_path(folder) if folder.startswith("imap://") else folder
+            destination = parse_folder_path(destination) if destination.startswith("imap://") else destination
+
+            result = move_message(folder, msg_ids, destination, account=account)
+
+            lines = [f"# Moved {result['moved']} message(s)"]
+            lines.append(f"From: **{result['source']}** → **{result['destination']}**")
+
+            if result["failed"]:
+                lines.append(f"\n**Failed:** ({len(result['failed'])})")
+                for fail in result["failed"]:
+                    lines.append(f"  - Message {fail['id']}: {fail['error']}")
 
             return "\n".join(lines)
 
