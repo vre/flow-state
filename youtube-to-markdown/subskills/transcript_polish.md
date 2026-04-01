@@ -30,10 +30,9 @@ Expected schema:
 }
 ```
 
-For each chunk object in `chunks`, launch a parallel `task_tool`:
+For each chunk object in `chunks`, launch a parallel Agent (all in one message):
 - subagent_type: "general-purpose"
 - model: "sonnet"
-- run_in_background: true
 - prompt:
 ```
 INPUT_CHUNK: {chunk_path}

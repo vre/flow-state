@@ -51,12 +51,18 @@ AskUserQuestion:
 
 ## Step 2: Execute modules
 
-Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`. "|" = run concurrently as parallel foreground agents in one message. Never use `run_in_background` — background agents lose Write and Bash permissions (Claude Code bug).
+Based on user's choice, read and follow each subskill instruction in `./subskills/{file}`.
+
+Concurrency: "|" = run concurrently as parallel foreground agents in one message. Never use `run_in_background`.
+
+Delegation: Subagents cannot launch sub-subagents. Modules that need parallel Agent calls (transcript_polish.md) must be read and executed by the orchestrator directly — do NOT delegate them to an Agent. Only leaf modules (no internal Agent calls) can be delegated.
 
 - A: transcript_extract.md → (transcript_summarize.md | comment_extract.md) → comment_summarize.md
-- B: transcript_extract.md → (transcript_summarize.md | transcript_polish.md | comment_extract.md) → comment_summarize.md
+- B: transcript_extract.md → (transcript_summarize.md | **transcript_polish.md** | comment_extract.md) → comment_summarize.md
 - C: transcript_extract.md → transcript_summarize.md
-- D: transcript_extract.md → transcript_polish.md
+- D: transcript_extract.md → **transcript_polish.md**
+
+**Bold** = orchestrator reads and executes directly (not delegated to Agent).
 
 For option B only, create marker file before running modules:
 
