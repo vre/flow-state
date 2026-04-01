@@ -171,6 +171,10 @@ Mode B: Return content in final message:
 Parent agent parses CONTENT: blocks and writes files.
 ```
 
+### Subagents cannot launch sub-subagents
+
+Subagents do not have access to the Agent tool. If a module needs parallel Agent calls (e.g., chunk cleaning), the orchestrator must read and execute that module directly — not delegate it to a subagent. Only leaf modules (no internal Agent calls) can be delegated.
+
 ## Skill Is a Folder
 
 A skill is a folder, not just a markdown file. Use the file system for progressive disclosure — tell Claude what files exist, it reads them when needed:
