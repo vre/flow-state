@@ -28,10 +28,11 @@
 
 ## Latest Release Highlights
 
-- `youtube-to-markdown v2.7.1`
-  - Subagent `Task` prompts now enforce one-line final status output to reduce coordinator context growth
-  - No pipeline/script changes; summary/transcript/comments file generation behavior remains unchanged
-  - Update flow and existing tests remain valid
+- `youtube-to-markdown v2.15.0`
+  - Deterministic paragraph breaks via script (was LLM subagent) — eliminates 100K+ token overhead
+  - Watch guide: HH:MM:SS timestamps, clickable summary table, read-detail links
+  - Transcript ← watch guide crosslinks with ▶ video links
+  - Shorter filenames, standard markdown timestamp links
 
 ## Quick Start
 
@@ -77,7 +78,9 @@ As you don't have any configured yet, it will show you how to set up.
 ### Writing Guides (LLM-optimized, condensed)
 - [Writing CLAUDE.md](docs/writing-claude-agents-md.md) - Condensed CLAUDE.md/AGENTS.md principles
 - [Writing Skills](docs/writing-skills.md) - Condensed SKILL.md principles
-- [MCP Design Principles](docs/mcp-design-principles.md) - API design for LLM consumers
+- [Writing MCP Servers](docs/writing-mcp-servers.md) - MCP server design for LLM consumers
+- [Writing CLI Tools](docs/writing-cli-tools.md) - CLI tool design for humans and LLMs
+- [Writing Model-Specific Prompts](docs/writing-model-specific-prompts.md) - Prompt tuning per model family
 
 ## Examples of Youtube to Markdown Output
 

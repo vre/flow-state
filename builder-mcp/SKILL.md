@@ -16,7 +16,7 @@ allowed-tools:
 
 Python only. Use repo scripts, not custom templates.
 
-Read `docs/Designing MCP Servers.md` sections 4-5 and 8 first.
+Read `docs/writing-mcp-servers.md` first.
 
 ## Step 0: Threshold
 
