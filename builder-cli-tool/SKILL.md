@@ -15,7 +15,7 @@ allowed-tools:
 1. **Gate**: If <50 lines needed, write directly instead
 2. **Discover**: What problem, who uses it, 3-5 core operations
 3. **Scaffold**:
-   - With project-builder: invoke it first (`python3 ./project-builder/project_builder/build_project.py cli ${NAME} <dir>`), then run generate_cli.py on top
+   - With project-builder: invoke it first (`python3 ./builder-project/project_builder/build_project.py cli ${NAME} <dir>`), then run generate_cli.py on top
    - Standalone: `python3 ./scripts/generate_cli.py --name ${NAME} --operations '${OPS_JSON}' --output ${DIR}`
    - Embedded (inside skill): add `--flat` flag. Creates single .py file, no package, no tests.
 4. **Implement**: User fills in action logic. Tests fail until implemented (TDD).
@@ -25,8 +25,10 @@ allowed-tools:
 
 ```
 ${NAME}/
-├── ${NAME}.py        # Core: Result type, ACTIONS dict, dispatch()
-├── cli.py            # Entry: argparse, --format, --quiet, --yes, TTY detection
+├── ${NAME}/
+│   ├── __init__.py
+│   ├── ${NAME}.py    # Core: Result type, ACTIONS dict, dispatch()
+│   └── cli.py        # Entry: argparse, --format, --quiet, --yes, TTY detection
 ├── pyproject.toml    # Entry points, optional [mcp] extra
 └── tests/
     ├── test_core.py  # Per-action failing stubs
