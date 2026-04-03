@@ -89,7 +89,7 @@ results:
 observations:
   - category: semantic-check-model
     finding: "Haiku produced 6/6 false positives. Sonnet found 1 real issue + fewer false positives."
-    action: "RESOLVED — changed to sonnet in skill_only.md"
+    action: "STALE — skill_only.md has no model-selection instruction. Observation from earlier version."
 
   - category: model-comparison
     finding: "Output quality varies significantly by model"

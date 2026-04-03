@@ -279,7 +279,7 @@ def check_test_coverage(skill_dir: Path) -> list[dict]:
     if not scripts_dir.is_dir():
         return []
 
-    skill_dir_name = skill_dir.name
+    skill_dir_name = skill_dir.resolve().name
     test_locations = [
         skill_dir / "tests",
         skill_dir.parent / "tests",
