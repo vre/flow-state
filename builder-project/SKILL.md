@@ -72,4 +72,4 @@ Then scan `${OUTPUT_DIR}` for sibling directories containing `SKILL.md`:
 
 ## Done
 
-Show tree. Suggest: invoke skill-builder / mcp-builder / cli-tool-builder next.
+Show tree. Suggest: invoke building-skills / mcp-builder / cli-tool-builder next.
