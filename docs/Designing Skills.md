@@ -1,1 +1,0 @@
-../builder-skill/references/Designing Skills.md

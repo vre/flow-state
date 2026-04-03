@@ -2,6 +2,18 @@
 
 This document explains WHY each rule in CLAUDE.md exists and why it is worded the way it is. Its purpose is to prevent well-meaning edits from breaking functional rules whose rationale is not obvious from the text alone.
 
+> **Note (2026-04-03 repo split):** This project was split into two repos:
+> - **flow-state** (this repo) — end-user plugins (youtube-to-markdown, imap-stream-mcp)
+> - **flow-jigs** (`~/work/flow-jigs`) — dev-tooling (builder-*, session-*, design/writing guides)
+>
+> References below to files that no longer exist in this repo have moved to flow-jigs:
+> - `docs/Designing *.md`, `docs/writing-*.md` → flow-jigs/docs/
+> - `docs/core/plans/`, `docs/core/reflections/`, `docs/core/research/` → flow-jigs/docs/core/
+> - `session-codex`, `session-sandvault`, `session-claude`, `session-gemini` → flow-jigs skills
+> - `builder-*` (project, skill, mcp, cli-tool) → flow-jigs skills
+>
+> The development process described here applies to both repos — CLAUDE.md is shared (with project-specific context).
+
 ## Lineage
 
 CLAUDE.md evolved through five projects and frameworks:

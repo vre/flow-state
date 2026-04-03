@@ -1,1 +1,0 @@
-../builder-skill/references/writing-skills.md

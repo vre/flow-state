@@ -1,1 +1,0 @@
-../builder-cli-tool/references/writing-cli-tools.md

@@ -1,1 +1,0 @@
-../builder-mcp/references/Designing MCP Servers.md

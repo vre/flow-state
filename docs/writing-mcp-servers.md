@@ -1,1 +1,0 @@
-../builder-mcp/references/writing-mcp-servers.md

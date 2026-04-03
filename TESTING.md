@@ -14,7 +14,6 @@ tests/youtube-to-markdown/
 ├── test_comment_extractor.py (32 tests)
 ├── test_comment_filter.py (17 tests)
 ├── test_content_safety.py (25 tests)
-├── test_merge_tier2.py (24 tests)
 ├── test_file_ops.py (9 tests)
 ├── test_paragraph_breaker.py (20 tests)
 ├── test_prepare_update.py (33 tests)
@@ -29,11 +28,11 @@ tests/youtube-to-markdown/
 
 ```
 tests/imap-stream-mcp/
-├── test_bodystructure.py (33 tests: BODYSTRUCTURE parsing, attachment counting, snippet extraction, charset/encoding)
-├── test_imap_client.py (111 tests: IMAP operations, credentials, folders, attachments, snippet fetch)
-├── test_imap_stream_mcp.py (59 tests: MCP server, action routing, draft attachments, [att:N], snippet preview)
-├── test_markdown_utils.py (25 tests: markdown to HTML conversion)
-└── test_markdown.py (27 tests: draft formatting)
+├── test_bodystructure.py (33 tests)
+├── test_imap_client.py (111 tests)
+├── test_imap_stream_mcp.py (59 tests)
+├── test_markdown_utils.py (25 tests)
+└── test_markdown.py (27 tests)
 ```
 
 ## Running Tests

@@ -24,9 +24,9 @@ ORC does NOT escalate for: implementation details, refactoring, review findings,
 
 ## Project
 
-- Multi-plugin Python project: youtube-to-markdown, imap-stream-mcp, and others
+- End-user plugin project: youtube-to-markdown, imap-stream-mcp
 - Build: `uv sync` per plugin, `uv run pytest` for tests
-- Key docs: `ARCHITECTURE.md`, `TESTING.md`, `docs/<plugin/core>/adrs/`, `docs/<plugin/core>/plans/`, `docs/<plugin/core>/reflections/`
+- Key docs: `TESTING.md`, `docs/<plugin>/adrs/`, `docs/<plugin>/plans/`, `docs/<plugin>/reflections/`
 
 ## THE DEVELOPMENT PROCESS
 
@@ -151,7 +151,7 @@ ORC drives. HC gets results summary.
 
 ## Writing AGENTS.md / CLAUDE.md
 
-Deep rationale: `docs/Designing AGENTS.md.md` · LLM guide: `docs/writing-claude-agents-md.md`
+Deep rationale and LLM guides: see `flow-jigs` repo
 
 Budget: <2000 tokens (~100 lines)
 
@@ -177,7 +177,6 @@ Task instructions:
 
 ## Writing Skills / MCPs / CLI
 
-- Creating/modifying skills → invoke `building-skills` or read `docs/writing-skills.md`
-- Creating/modifying MCP servers → invoke `mcp-builder` or read `docs/Designing MCP Servers.md`
-- Creating/modifying CLI tools → invoke `cli-tool-builder` or read `docs/Designing CLI Tools.md`
-- Deep rationale in `docs/Designing *.md` files, LLM-optimized guides in `docs/writing-*.md`
+- Dev-tooling skills (builders, sessions) are in the `flow-jigs` repo
+- Creating/modifying skills → install `building-skills` from `flow-jigs` marketplace
+- Creating/modifying MCP servers → install `mcp-builder` from `flow-jigs` marketplace

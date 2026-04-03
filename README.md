@@ -68,19 +68,8 @@ As you don't have any configured yet, it will show you how to set up.
 - [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
 - [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
 
-### Design Guides (deep rationale, references)
-- [Designing AGENTS.md](docs/Designing%20AGENTS.md.md) - Behavioral configuration for AI agents
-- [Designing Skills](docs/Designing%20Skills.md) - Skill architecture, categories, distribution
-- [Designing MCP Servers](docs/Designing%20MCP%20Servers.md) - MCP server design for LLM consumption
-- [Designing CLI Tools](docs/Designing%20CLI%20Tools.md) - CLI tools for humans and LLMs
-- [Designing Hooks](docs/Designing%20Hooks.md) - Lifecycle hooks for AI coding agents
-
-### Writing Guides (LLM-optimized, condensed)
-- [Writing CLAUDE.md](docs/writing-claude-agents-md.md) - Condensed CLAUDE.md/AGENTS.md principles
-- [Writing Skills](docs/writing-skills.md) - Condensed SKILL.md principles
-- [Writing MCP Servers](docs/writing-mcp-servers.md) - MCP server design for LLM consumers
-- [Writing CLI Tools](docs/writing-cli-tools.md) - CLI tool design for humans and LLMs
-- [Writing Model-Specific Prompts](docs/writing-model-specific-prompts.md) - Prompt tuning per model family
+### Dev Tooling
+- Design and writing guides have moved to [flow-jigs](https://github.com/vre/flow-jigs)
 
 ## Examples of Youtube to Markdown Output
 
