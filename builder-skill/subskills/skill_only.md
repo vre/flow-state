@@ -11,7 +11,7 @@ AskUserQuestion once:
 3. `Outputs` — files the skill should create
 4. `Flow` — `Sequential` or `Parallel`
 
-Set `${SKILL_NAME}` and `${SKILL_DIR}`.
+Set `${SKILL_NAME}` = Name answer. Set `${SKILL_DIR}` = `./${SKILL_NAME}` (skill directory in repo root).
 Write `${SKILL_DIR}/brief.md` with the exact brief, constraints, and target outputs.
 
 ## Step 2: Generate 3 drafts in parallel

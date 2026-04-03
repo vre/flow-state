@@ -2,7 +2,7 @@
 # Tests the full skill_only.md flow end-to-end
 #
 # Run: cat prompt.txt | claude -p --allowedTools 'Bash,Read,Write,Task'
-# From: skill-builder/ directory
+# From: builder-skill/ directory
 
 name: create-pr-review-skill
 type: end-to-end

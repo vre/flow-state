@@ -1,6 +1,10 @@
 # Edit Skill: Goal-Driven Changes
 
-Flow: read -> define done -> edit -> test -> observe -> refine -> validate
+Flow: identify -> read -> define done -> edit -> test -> observe -> refine -> validate
+
+## Step 0: Identify the skill
+
+Ask: "Which skill directory?" Set `${SKILL_DIR}` to the path and `${SKILL_NAME}` to the directory name (basename of `${SKILL_DIR}`).
 
 ## Step 1: Read the whole skill
 

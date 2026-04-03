@@ -14,14 +14,13 @@ Token usage affects both quality and cost. Larger context means higher pricing a
 
 ## Description Format
 
-The skill description appears in listings and helps Claude decide when to use the skill. It should follow the format:
+The skill description appears in listings and helps Claude decide when to use the skill. Format: trigger conditions only. Do not summarize the process.
 
-"[Use when trigger]. [What it produces]."
+"Use when [trigger condition]"
 
-The trigger tells Claude when this skill applies. The output tells Claude what to expect. Both parts matter:
-
-- "Use when user asks to extract YouTube video content" - clear trigger
-- "Writes video details and transcription into structured markdown file" - clear output
+- "Use when user asks to extract YouTube video content" — clear trigger
+- "Use when creating CLI tools with action dispatcher pattern" — clear trigger
+- NOT "Extracts YouTube videos and writes markdown" — this summarizes the process
 
 This format helps Claude make good decisions about when to invoke the skill without reading the full skill body.
 

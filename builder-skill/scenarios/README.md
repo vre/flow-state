@@ -1,10 +1,10 @@
 # Test Scenarios
 
-Hypothesis-driven test scenarios for the skill-builder.
+Hypothesis-driven test scenarios for the builder-skill.
 
 ## Running a scenario
 
-From `skill-builder/` directory:
+From `builder-skill/` directory:
 
 ```bash
 # Build prompt with skill content inlined

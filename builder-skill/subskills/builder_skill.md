@@ -14,7 +14,7 @@ AskUserQuestion once:
 4. `Scripts` — script names and purpose
 5. `Templates` — template files, if any
 
-Set `${SKILL_NAME}` and `${SKILL_DIR}`.
+Set `${SKILL_NAME}` = Name answer. Set `${SKILL_DIR}` = `./${SKILL_NAME}` (skill directory in repo root).
 Write `${SKILL_DIR}/brief.md` with the brief, outputs, scripts, test cases, and constraints.
 
 ## Step 2: Create the package layout
