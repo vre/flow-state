@@ -204,4 +204,4 @@ The `/init` command creates generic CLAUDE.md content. This is a starting point,
 
 ## Writing Skills
 
-For detailed skill design principles, categories, gotchas patterns, distribution strategies, and references, see `docs/Designing Skills.md` (sections 1–15). The condensed LLM guide is `docs/writing-skills.md`. CLAUDE.md contains trigger lines that point to builder skills (`building-skills`, `mcp-builder`, `cli-tool-builder`) and these guide files.
+Skill writing is owned by `building-skills`. CLAUDE.md contains trigger lines that point to builder skills (`building-skills`, `mcp-builder`, `cli-tool-builder`).

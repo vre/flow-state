@@ -19,22 +19,22 @@ Invoke the `project-builder` skill in Claude Code. It walks through discovery an
 
 ```bash
 # Create a skill project
-python3 project-builder/project_builder/build_project.py skill my-skill /path/to/output
+python3 builder-project/project_builder/build_project.py skill my-skill /path/to/output
 
 # Create a standalone MCP server project
-python3 project-builder/project_builder/build_project.py mcp my-mcp /path/to/output
+python3 builder-project/project_builder/build_project.py mcp my-mcp /path/to/output
 
 # Create a plugin-enabled MCP server project
-python3 project-builder/project_builder/build_project.py mcp my-mcp /path/to/output --plugin
+python3 builder-project/project_builder/build_project.py mcp my-mcp /path/to/output --plugin
 
 # Create a standalone CLI tool project
-python3 project-builder/project_builder/build_project.py cli my-cli /path/to/output
+python3 builder-project/project_builder/build_project.py cli my-cli /path/to/output
 
 # Create a plugin-enabled CLI tool project
-python3 project-builder/project_builder/build_project.py cli my-cli /path/to/output --plugin
+python3 builder-project/project_builder/build_project.py cli my-cli /path/to/output --plugin
 
 # Preview without creating
-python3 project-builder/project_builder/build_project.py --dry-run skill my-skill /path/to/output
+python3 builder-project/project_builder/build_project.py --dry-run skill my-skill /path/to/output
 ```
 
 ### Exit codes

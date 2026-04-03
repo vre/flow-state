@@ -48,7 +48,7 @@ Set `${PLUGIN_FLAG}`:
 ## Step 2: Create project structure
 
 ```bash
-python3 ./project-builder/project_builder/build_project.py ${TYPE} ${NAME} ${OUTPUT_DIR} ${PLUGIN_FLAG}
+python3 ./builder-project/project_builder/build_project.py ${TYPE} ${NAME} ${OUTPUT_DIR} ${PLUGIN_FLAG}
 ```
 
 Creates: full directory tree with template files, git repo, verified tests + lint.
