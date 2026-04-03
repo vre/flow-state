@@ -38,7 +38,7 @@ Then ask:
 - Domain name
 - Transport: `stdio` or `streamable-http`
 - Actions
-- Auth: `none` | `env_var` | `keyring` | `oauth`
+- Auth: `none` | `env_var` (keyring and oauth not yet implemented)
 - Server instructions: one sentence on when to use this server
 
 Set `${DOMAIN}`, `${TRANSPORT}`, `${ACTIONS_JSON}`, `${AUTH_METHOD}`, `${INSTRUCTIONS}` from answers.
