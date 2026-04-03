@@ -37,7 +37,7 @@ Claude prepares worktree, then launches nested Claude:
 Build the command from base + profile settings:
 
 ```bash
-cd .worktrees/${NAME} && unset CLAUDECODE && echo "${PROMPT}" | claude -p --output-format json --settings '${SETTINGS_JSON}' --permission-mode dontAsk --allowedTools "Read" "Edit" "Write" "Glob" "Grep"
+cd .worktrees/${NAME} && unset CLAUDECODE && echo "${PROMPT}" | claude -p --output-format json --settings '${SETTINGS_JSON}' --permission-mode dontAsk --allowedTools "Read" "Edit" "Write" "Glob" "Grep" "Bash"
 ```
 
 Resume: append `-c` (most recent in worktree dir) or `-r ${SESSION_ID}`.

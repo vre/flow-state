@@ -116,7 +116,7 @@ Then re-login: `sv shell` → `claude` → `/login`.
 
 ## Known issues
 
-- `sv build` overwrites `.sb` profile — rerun `setup-profile-patch.sh` after brew upgrade
+- `sv build` overwrites `.sb` profile — reapply profile patch after brew upgrade (see Option A setup)
 - `sv shell -c` means `--clone`, not shell `-c`. Commands go after `--`: `sv shell -- zsh -c "..."`
 - Brew upgrade bumps version — `buildhome` script retains old Cellar paths. Fix: `sv -r shell`
 - After brew upgrade of claude/codex: must run once on HOST first to accept update. Inside sandvault the first-run acceptance crashes.

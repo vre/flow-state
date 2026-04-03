@@ -11,12 +11,12 @@ allowed-tools:
 
 First run:
 ```bash
-codex exec --json --full-auto "prompt"
+codex exec --json -s workspace-write -c 'approval_policy="never"' "prompt"
 ```
 
 Following runs:
 ```bash
-codex exec resume --json --full-auto ${THREAD_ID} "follow-up prompt"
+codex exec resume --json -c 'approval_policy="never"' ${THREAD_ID} "follow-up prompt"
 ```
 
 ## Worktree (implementation — sandboxed with git)
