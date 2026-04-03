@@ -153,7 +153,7 @@ Your final message must be ONLY one of:
 
 This reduces TaskOutput from ~30K to ~40-130 chars. The subagent still writes full output to files — only the status message is constrained.
 
-See `docs/writing-model-specific-prompts.md` for model-specific formatting differences (Haiku copies instruction format literally).
+Note: Haiku copies instruction format literally — keep formatting tight for small models.
 
 ### Background agent permissions may be unreliable
 
@@ -179,7 +179,7 @@ Subagents do not have access to the Agent tool. If a module needs parallel Agent
 
 A skill is a folder, not just a markdown file. Use the file system for progressive disclosure — tell Claude what files exist, it reads them when needed:
 
-- `references/api.md` — detailed function signatures
+- `references/` — domain-specific reference docs (API signatures, design rationale)
 - `assets/template.md` — output templates to copy
 - `scripts/` — helper scripts Claude executes
 - `config.json` — user-specific configuration (see Setup below)
