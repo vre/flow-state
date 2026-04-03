@@ -44,7 +44,7 @@ ${DIR}/${NAME}.py    # All-in-one: Result, actions, dispatch, argparse
 - POSIX: `-v` `-q` `--format json|table` `--yes`
 - Exit codes: 0=ok, 1=error, 2=usage, 3=not found, 4=permission, 5=network
 - Errors suggest fix: `"Unknown 'x'. Valid: list, get, help"`
-- See: [writing-cli-tools.md](../../docs/writing-cli-tools.md), [writing-mcp-servers.md](../../docs/writing-mcp-servers.md)
+- See: `./references/writing-cli-tools.md`
 
 ## Stop
 
