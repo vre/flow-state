@@ -25,7 +25,7 @@ Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies
 ### 2. Start the daemon
 
 ```bash
-scripts/chromectl.py --auto-connect daemon
+scripts/chromectl.py daemon
 ```
 
 Chrome will show a permission dialog — click Allow. The daemon keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
@@ -101,7 +101,7 @@ Traditional mode (`start`/`stop`) has none of these limitations — it uses a se
 
 | Command | Mode | Description |
 |---------|------|-------------|
-| `--auto-connect daemon` | auto | Start daemon, connect to running Chrome |
+| `daemon` | auto | Start daemon, connect to running Chrome |
 | `send <cmd> [opts]` | auto | Send one command to running daemon |
 | `start [--headless]` | trad | Launch Chrome with separate profile |
 | `stop` | both | Stop daemon (if running) and chromectl Chrome instances |

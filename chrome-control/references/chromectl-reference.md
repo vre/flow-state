@@ -6,7 +6,7 @@ Complete reference for the chromectl.py script used in Chrome debugging workflow
 
 - `start` - Launch Chrome with remote debugging (traditional mode)
 - `stop` - Stop daemon and/or chromectl-managed Chrome instances
-- `--auto-connect daemon` - Start background daemon on Unix socket
+- `daemon` - Start background daemon on Unix socket
 - `send <cmd>` - Send command to running daemon
 - `list` - List all open tabs/targets
 - `open <url>` - Open a new tab and get its target ID

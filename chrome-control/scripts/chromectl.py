@@ -795,11 +795,11 @@ async def make_dispatcher(args) -> tuple[Dispatcher, BrowserConnection | None]:
 async def cmd_daemon(args):
     """Daemon: browser connection on Unix socket. netcat-compatible.
 
-    Start:  chromectl --auto-connect daemon
+    Start:  chromectl daemon
     Use:    echo '{"cmd":"list"}' | nc -U /tmp/chromectl-<uid>.sock
-    Stop:   echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-<uid>.sock
-            or: chromectl daemon-stop
+    Stop:   chromectl stop
     """
+    args.auto_connect = True
     dispatcher, bc = await make_dispatcher(args)
 
     # Clean stale socket
@@ -894,7 +894,7 @@ async def cmd_daemon(args):
 async def cmd_send(args):
     """Send a single command to running daemon. For quick CLI use."""
     if not os.path.exists(SOCKET_PATH):
-        print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl --auto-connect daemon", file=sys.stderr)
+        print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl daemon", file=sys.stderr)
         sys.exit(1)
     # Build request from subcommand args
     req: dict = {"cmd": args.send_cmd}
