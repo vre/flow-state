@@ -180,3 +180,12 @@ Task instructions:
 - Dev-tooling skills (builders, sessions) are in the `flow-jigs` repo
 - Creating/modifying skills → install `building-skills` from `flow-jigs` marketplace
 - Creating/modifying MCP servers → install `mcp-builder` from `flow-jigs` marketplace
+
+
+## qmd
+
+Search prior research, decisions, plans, and docs across all projects:
+
+- `qmd query "search terms"`
+
+Check qmd before starting new research — it may already have relevant findings.

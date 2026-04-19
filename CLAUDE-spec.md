@@ -96,7 +96,7 @@ Evidence quality markers:
 
 **Why "No unnecessary jargon. Use analogies and explain domain-specific concepts":** This is a general instruction written for a cross-domain assistant. The user works across scientific, technical, and other domains where they are not always a specialist. The instruction ensures the model makes complex topics accessible without requiring the user to first learn domain-specific terminology. Originally written as a system prompt instruction for a general-purpose conversational assistant, then carried into CLAUDE.md.
 
-**Why "Reply in user's language":** Present from initial commit. Almost accidentally deleted in a 2026-03-14 session — another agent removed it thinking it was a duplicate, not understanding that it serves a specific function: the user communicates in both Finnish and English, and the LLM must match.
+**Why "Reply in user's language":** Present from initial commit. Almost accidentally deleted in a 2026-03-18 session — another agent removed it thinking it was a duplicate, not understanding that it serves a specific function: the user communicates in both Finnish and English, and the LLM must match.
 
 **Why two language rules in one line:** "Reply in user's language" = dialogue language follows HC. "Write text in English unless file is in other language" = file content defaults to English. These are different scopes (conversation vs. file output) and both are needed.
 
@@ -212,7 +212,7 @@ Evidence quality markers:
 
 **Why prohibited:** Claude Code's `EnterPlanMode` writes to `.claude/plans/` — a tool-specific location that is not version-controlled, not self-contained, not reviewable by external agents, and not organized by plugin. The custom process requires plans in `docs/<plugin/core>/plans/` as committed deliverables. Agent Plan Mode would bypass the entire plan-as-deliverable workflow.
 
-**Why alternative was added (2026-03-14):** The writing guide says every prohibition needs an alternative. Original form had none. Updated to: "write plans to `docs/<plugin/core>/plans/` files instead."
+**Why alternative was added (2026-03-18):** The writing guide says every prohibition needs an alternative. Original form had none. Updated to: "write plans to `docs/<plugin/core>/plans/` files instead."
 
 ---
 
@@ -335,7 +335,7 @@ Evidence quality markers:
 
 ## Lines 56-58: PRE-IMPLEMENTATION GATE
 
-**[git → inferred]** Originally part of "IMPLEMENTATION START" in `215c27b` (2026-02-25). Promoted to separate gate (2026-03-14) based on the insight that LLMs think inside the box — they patch incrementally and do not spontaneously question whether the approach itself is right.
+**[git → inferred]** Originally part of "IMPLEMENTATION START" in `215c27b` (2026-02-25). Promoted to separate gate (2026-03-18) based on the insight that LLMs think inside the box — they patch incrementally and do not spontaneously question whether the approach itself is right.
 
 **Why a separate gate:** Knowledge instructions ("consider alternatives") do not produce behavior. A process gate — a mandatory step before any code is written — forces evaluation. See `docs/writing-claude-agents-md.md`, "LLMs Think Inside the Box".
 
@@ -425,7 +425,7 @@ Repeated emphasis on conciseness because earlier Claude models had a serious pro
 
 ## Line 73: "Repeated friction or workarounds = wrong direction"
 
-**[inferred]** Added 2026-03-14 based on the "LLMs Think Inside the Box" insight.
+**[inferred]** Added 2026-03-18 based on the "LLMs Think Inside the Box" insight.
 
 **Why:** LLMs do not spontaneously change direction. They accumulate workarounds until the structure collapses. This rule names the signal (repeated friction) and prescribes the action (STOP and evaluate). Without it, the LLM will keep patching.
 
@@ -517,7 +517,7 @@ MathTrainer's rationale: ORC and IMP have different perspectives. Combining into
 
 **[git]** Introduced `215c27b` (2026-02-25).
 
-**Line 93 — Implementation reflection:** Delegated to IMP via `session-codex`. Originally written as `## Reflection` inside the plan file. Changed to separate `*-impl-*.md` file (2026-03-19) for consistency with planning and cycle reflections. See Line 103 for full reflection ownership model.
+**Line 93 — Implementation reflection:** Delegated to IMP via `session-codex`. Originally written as `## Reflection` inside the plan file. Changed to separate `*-impl-*.md` file (2026-03-19), then renamed to `*-cycle-code-*.md` (2026-03-27) in the Framing/Execution restructuring. See Line 103 for full reflection ownership model.
 
 **Lines 95-98 — Documentation updates:** Checklist of files to update on every release. Explicit list prevents the LLM from forgetting documentation that isn't in the diff. ADR creation gated on "architectural decision with tradeoffs" — not every change needs one.
 
@@ -537,7 +537,7 @@ MathTrainer's rationale: ORC and IMP have different perspectives. Combining into
 
 **Line 119 — "Critical rules at beginning":** Research shows beginning-of-prompt instructions receive stronger attention. As context fills during conversation, middle/end instructions lose attention. Beginning remains stable.
 
-**Line 122 — "Every prohibition needs alternative":** "Don't use pip" leaves the LLM stuck. "Don't use pip, use uv instead" gives a path forward. This rule was itself violated by line 30 until 2026-03-14 when the alternative was added.
+**Line 122 — "Every prohibition needs alternative":** "Don't use pip" leaves the LLM stuck. "Don't use pip, use uv instead" gives a path forward. This rule was itself violated by line 30 until 2026-03-18 when the alternative was added.
 
 **Line 128 — "No code style rules - use linters":** Linters are deterministic. LLM instruction-following is probabilistic. Using tokens for formatting rules that a linter enforces is waste.
 
@@ -545,7 +545,7 @@ MathTrainer's rationale: ORC and IMP have different perspectives. Combining into
 
 ## Lines 132-137: Writing Skills / MCPs / CLI (trigger lines)
 
-**[git → refactored 2026-03-19]** Originally three separate inline sections (~30 lines) with condensed rules for writing skills, MCPs, and CLI tools. Replaced with 4 trigger lines pointing to builder skills and guide files.
+**[git → refactored 2026-03-18]** Originally three separate inline sections (~30 lines) with condensed rules for writing skills, MCPs, and CLI tools. Replaced with 4 trigger lines pointing to builder skills and guide files.
 
 **Why replaced:** Progressive disclosure — these rules consumed context on every session but were only needed when actually writing skills/MCPs/CLI tools. The builder skills (`building-skills`, `mcp-builder`, `cli-tool-builder`) already exist and contain the workflow. The guide files (`docs/writing-skills.md`, `docs/Designing MCP Servers.md`, `docs/Designing CLI Tools.md`) contain the principles.
 
