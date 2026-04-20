@@ -1038,8 +1038,7 @@ def create_draft(
         # Build email message
         msg = email.message.EmailMessage()
 
-        # Get username for From header
-        _, _, username, _ = get_credentials()
+        _, _, username, _ = get_credentials(account)
         msg["From"] = username
         msg["To"] = to
         msg["Subject"] = subject
@@ -1191,7 +1190,7 @@ def modify_draft(
         # Build new message
         new_msg = email.message.EmailMessage()
 
-        _, _, username, _ = get_credentials()
+        _, _, username, _ = get_credentials(account)
         new_msg["From"] = username
         new_msg["To"] = to if to else ", ".join(original_to)
         new_msg["Subject"] = subject if subject else original_subject

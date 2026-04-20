@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-SCRIPT_PATH = Path(__file__).parent.parent / "scripts" / "run.py"
+SCRIPT_PATH = Path(__file__).parent.parent.parent / "youtube-to-markdown" / "scripts" / "run.py"
 
 
 def _load_module() -> Any:

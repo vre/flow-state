@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-SCRIPT_PATH = Path(__file__).parent.parent / "scripts" / "33_split_for_cleaning.py"
+SCRIPT_PATH = Path(__file__).parent.parent.parent / "youtube-to-markdown" / "scripts" / "33_split_for_cleaning.py"
 
 
 def _load_module() -> Any:

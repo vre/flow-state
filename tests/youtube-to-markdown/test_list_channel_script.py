@@ -7,7 +7,7 @@ from pathlib import Path
 
 def _load_list_channel_module():
     """Load scripts/22_list_channel.py as a module."""
-    script_path = Path(__file__).parent.parent / "scripts" / "22_list_channel.py"
+    script_path = Path(__file__).parent.parent.parent / "youtube-to-markdown" / "scripts" / "22_list_channel.py"
     spec = importlib.util.spec_from_file_location("list_channel_script", script_path)
     assert spec is not None
     assert spec.loader is not None

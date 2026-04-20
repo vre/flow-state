@@ -441,7 +441,7 @@ class TestReadActionWrapping:
 
         await use_mail(MailAction(action="read", folder="INBOX", payload="123:full"))
 
-        mock_read.assert_called_once_with("INBOX", 123, full=True, depth=0)
+        mock_read.assert_called_once_with("INBOX", 123, account=None, full=True, depth=0)
 
     @patch("imap_stream_mcp.read_message")
     async def test_read_payload_numeric_modifier_calls_read_message_with_depth(self, mock_read):
@@ -465,7 +465,7 @@ class TestReadActionWrapping:
 
         await use_mail(MailAction(action="read", folder="INBOX", payload="123:1"))
 
-        mock_read.assert_called_once_with("INBOX", 123, full=False, depth=1)
+        mock_read.assert_called_once_with("INBOX", 123, account=None, full=False, depth=1)
 
     async def test_read_payload_unknown_modifier_returns_error(self):
         """Unknown read payload modifier should return guided error."""

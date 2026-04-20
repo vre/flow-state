@@ -1381,7 +1381,7 @@ Original body content.
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email, flags=[b"\\Draft"])
 
         mock_create.return_value = mock_client
         session._sessions.clear()
@@ -1422,7 +1422,7 @@ Reply body.
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email, flags=[b"\\Draft"])
 
         mock_create.return_value = mock_client
         session._sessions.clear()
@@ -1455,7 +1455,7 @@ Body.
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email, flags=[b"\\Draft"])
 
         mock_create.return_value = mock_client
         session._sessions.clear()
@@ -1486,7 +1486,7 @@ Plain text.
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=original_email, flags=[b"\\Draft"])
 
         mock_create.return_value = mock_client
         session._sessions.clear()
@@ -1751,7 +1751,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1776,7 +1776,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1802,7 +1802,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1831,7 +1831,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1857,7 +1857,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"r", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1902,7 +1902,7 @@ class TestModifyDraftWithAttachments:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"r", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1974,7 +1974,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -1999,7 +1999,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2029,7 +2029,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2048,7 +2048,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2067,7 +2067,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2090,7 +2090,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2125,7 +2125,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2155,7 +2155,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2170,7 +2170,7 @@ class TestEditDraft:
 
         edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}], account="default")
 
-        assert fetch_calls == [("RFC822", "ENVELOPE")]
+        assert fetch_calls == [("RFC822", "ENVELOPE", "FLAGS")]
 
     @patch("session._create_connection")
     @patch("imap_client.get_credentials")
@@ -2184,7 +2184,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 
@@ -2206,7 +2206,7 @@ class TestEditDraft:
             from_=[MockAddress(mailbox=b"user", host=b"example.com")],
             to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
         )
-        mock_client.add_message("Drafts", 1, envelope, raw_email=raw)
+        mock_client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
         mock_create.return_value = mock_client
         session._sessions.clear()
 

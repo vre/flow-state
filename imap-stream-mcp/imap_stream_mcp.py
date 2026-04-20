@@ -211,6 +211,9 @@ class MailAction(BaseModel):
     preview: bool | None = Field(
         default=None, description="Include body snippet (~100 chars) in list/search results. Required for list and search actions."
     )
+    account: str | None = Field(
+        default=None, description="Account name for multi-account setups. Use 'accounts' action to list. Default account used if omitted."
+    )
 
     @field_validator("action")
     @classmethod
@@ -502,7 +505,7 @@ async def use_mail(params: MailAction) -> str:
 
         # Folders
         if action == "folders":
-            folders = list_folders()
+            folders = list_folders(account=params.account)
             lines = ["# Available Folders", ""]
             for f in folders:
                 flags = " ".join(f["flags"]) if f["flags"] else ""
@@ -549,7 +552,7 @@ uv run --directory {plugin_dir} python setup.py
             if not folder:
                 return "Error: folder required. Example: {action:'list', folder:'INBOX'}"
 
-            messages = list_messages(folder, limit=params.limit, preview=params.preview or False)
+            messages = list_messages(folder, limit=params.limit, account=params.account, preview=params.preview or False)
 
             if not messages:
                 return f"No messages in '{folder}'"
@@ -601,7 +604,7 @@ uv run --directory {plugin_dir} python setup.py
             except ValueError:
                 return f"Error: payload must be numeric message ID, got '{id_str}'"
 
-            msg = read_message(folder, msg_id, full=full, depth=depth)
+            msg = read_message(folder, msg_id, account=params.account, full=full, depth=depth)
 
             # Collect header info for wrapped email
             header_lines = [
@@ -686,7 +689,7 @@ uv run --directory {plugin_dir} python setup.py
             if not params.payload:
                 return "Error: payload (search query) required. Use 'help search' for syntax."
 
-            messages = search_messages(folder, params.payload, limit=params.limit, preview=params.preview or False)
+            messages = search_messages(folder, params.payload, limit=params.limit, account=params.account, preview=params.preview or False)
 
             if not messages:
                 return f"No messages matching '{params.payload}' in '{folder}'"
@@ -740,6 +743,7 @@ uv run --directory {plugin_dir} python setup.py
                 folder=folder,
                 message_id=draft_id,
                 replacements=replacements,
+                account=params.account,
             )
 
             changes = result.get("changes", [])
@@ -790,6 +794,7 @@ uv run --directory {plugin_dir} python setup.py
                     cc=draft_data.get("cc"),
                     html=html_body,
                     attachments=att_paths,
+                    account=params.account,
                 )
 
                 reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
@@ -828,6 +833,7 @@ Open Thunderbird → Drafts to review and send."""
                 cc=draft_data.get("cc"),
                 html=html_body,
                 attachments=att_paths,
+                account=params.account,
             )
 
             att_info = _format_attachment_line(result.get("attachments", []))
@@ -855,7 +861,7 @@ Open Thunderbird → Drafts to review and send."""
             except ValueError:
                 return f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')"
 
-            result = download_attachment(folder, msg_id, att_index)
+            result = download_attachment(folder, msg_id, att_index, account=params.account)
 
             return f"""# Attachment Downloaded
 
@@ -878,7 +884,7 @@ Use Read tool for images, pdf/docx skills for documents."""
             except ValueError as e:
                 return f"Error: {e}"
 
-            result = modify_flags(folder, msg_ids, add_flags, remove_flags)
+            result = modify_flags(folder, msg_ids, add_flags, remove_flags, account=params.account)
 
             # Build response
             lines = ["# Flag Operation"]

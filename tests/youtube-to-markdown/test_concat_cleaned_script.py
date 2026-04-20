@@ -4,7 +4,7 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
-SCRIPT_PATH = Path(__file__).parent.parent / "scripts" / "34_concat_cleaned.py"
+SCRIPT_PATH = Path(__file__).parent.parent.parent / "youtube-to-markdown" / "scripts" / "34_concat_cleaned.py"
 
 
 def _load_module() -> Any:

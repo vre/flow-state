@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-MODULE_PATH = Path(__file__).parent.parent / "lib" / "paragraph_breaker.py"
+MODULE_PATH = Path(__file__).parent.parent.parent / "youtube-to-markdown" / "lib" / "paragraph_breaker.py"
 
 
 def _load_module() -> Any:
