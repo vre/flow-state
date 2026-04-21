@@ -22,15 +22,24 @@ You are a deep expert in your subject area. Your goal is what is best for the us
 
 ORC does NOT escalate for: implementation details, refactoring, review findings, test strategy, code style, naming.
 
+**Mode detection**: When HC is actively conversing — asking questions, giving feedback, proposing changes, or debugging together — you are NOT in autonomous Execution. Default to Framing or Iterative: propose, wait for confirmation, then act. Only enter autonomous Execution after explicit "go" for a defined scope.
+
 ## Project
 
 - End-user plugin project: youtube-to-markdown, imap-stream-mcp
 - Build: `uv sync` per plugin, `uv run pytest` for tests
+- Tests: ALL tests go in `tests/<plugin>/`, never in `<plugin>/tests/`. Run: `cd tests && uv run pytest <plugin>/`
 - Key docs: `TESTING.md`, `docs/<plugin>/adrs/`, `docs/<plugin>/plans/`, `docs/<plugin>/reflections/`
 
 ## THE DEVELOPMENT PROCESS
 
-Move to Framing if the user request requires more than 5 tool calls or file changes to implement.
+**Worktree rule**: Any file modification → worktree. `git worktree add .worktrees/<name> -b <name> main`. Never modify files on main or existing branches directly.
+
+**Process levels** — choose based on scope, HC overrides:
+
+- **Simple** (≤5 tool calls, single clear goal): worktree → implement → commit per completed step → self-review ("with clear mind") → cross-model review → merge
+- **Iterative** (exploratory, experimental, or HC wants involvement): short cycles with HC. Each cycle may include framing, planning, or direct experimentation — whatever the iteration needs. Every cycle ends with: self-review → cross-model review (`session-codex`) → reflection. HC checkpoint between cycles to steer next direction. Implementation by ORC or delegated to IMP. Uses Implementation Rules and Review/Merge conventions from Framing process below.
+- **Framing** (large scope, multiple cuts, architecture decisions): full process below — Framing → Plan → Implement → Review → Merge
 
 ### Process Rules
 
@@ -50,7 +59,7 @@ Socratic exploration before any plan exists. Goal: understand the need, shape th
 - No commitment to solutions yet — this is divergent thinking. Multiple options on the table.
 - **Discovery belongs here, not in Plan Phase**: design mockups (CLI output, menus, interaction flows, response formats), interface iteration (3-5 designs with HC), prototype experiments. These shape the *what* and must happen before commitment to an approach. In Plan Phase, discovery becomes confirmation bias.
 - Framing document is a living document: ORC creates `docs/<plugin/core>/plans/<yyyy-mm-dd>-frame-<short-name>.md` at START of framing and updates it continuously as decisions are made. Do not wait until framing ends — the document must reflect current state at all times so context survives session boundaries. Each update overwrites stale sections with current decisions.
-- Read-only discovery (grep, read, experiments without output) can happen on main. Writing a file (research, prototype, mockup) → `git worktree add .worktrees/<name> -b <name> main`. Name not known yet? Use topic name (e.g., `research-auth`). Rename later with `git branch -m`. Do not switch branches in project root — use worktrees for isolation.
+- Read-only discovery (grep, read, experiments without output) can happen on main. Writing a file → worktree per top-level rule. Name not known yet? Use topic name (e.g., `research-auth`). Rename later with `git branch -m`.
 - Multiple worktrees OK when scope requires parallel tracks.
 - Framing ends when HC and ORC have shared understanding of: problem, scope, approach, and key risks.
 - HC decides when framing is done and whether to proceed to Plan Phase.
@@ -76,8 +85,9 @@ ORC translates the framed problem into a shippable technical plan for the NEXT c
 - Implementation is delegated to an agent who has only the plan as context — plan must be self-contained
 
 3. PLANNING END:
-- Self-review: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
-- Delegate plan review via `session-codex`. Iterate until reviewer passes — fix and re-submit, no intermediate reports to HC.
+- After writing the plan: DO NOT propose execution. Run PLANNING END steps first.
+- Self-review: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives. Repeat until no issues found.
+- Delegate plan review via `session-codex`. Iterate until reviewer passes — fix, re-run self-review, and re-submit using the same session (`continue`). No intermediate reports to HC.
 - ORC writes planning reflection: `docs/<plugin/core>/reflections/<yyyy-mm-dd>-planning-<short-name>.md`
 - If HC requested review for this cut (via plan review gate): present plan, wait for approval. Otherwise: proceed to execution.
 
@@ -114,7 +124,7 @@ ORC sets up, IMP executes. HC gets brief status at phase boundaries.
 - For every completed todo `git add` new files, `git commit -a -m "<minimal description, no co-auth>"`
 
 5. IMPLEMENTATION END
-- Self-review: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives.
+- Self-review: `With clear mind take role of a skeptic and validate what was created` - fix omissions, ask about alternatives. Repeat until no issues found.
 - Return to ORC for Review Phase. Report: what was done, what changed from plan, open questions.
 
 ### 3. Review Phase (EXECUTION — autonomous)
@@ -180,7 +190,6 @@ Task instructions:
 - Dev-tooling skills (builders, sessions) are in the `flow-jigs` repo
 - Creating/modifying skills → install `building-skills` from `flow-jigs` marketplace
 - Creating/modifying MCP servers → install `mcp-builder` from `flow-jigs` marketplace
-
 
 ## qmd
 
