@@ -40,6 +40,7 @@ Individual task speed matters less than total throughput across concurrent work.
 - Core idea: one plain sentence providing context. Reader should understand the section topic without reading bullets
 - Bullets: 3-5 per section, front-loaded (important words first). Concrete evidence, data points, quotes
 - Implication: one plain sentence answering "so what" — why this matters or what follows from it
-- Section count: typically 5-8 per video, driven by content not quota
+- Section count: typically 5-8 per video, driven by content not quota. **Max 8** — merge aggressively beyond that.
+- If conversation is too diffuse or rambling for claim-based structure, fall back to flat-bullets
 - No labels (no "Core idea:", "Evidence:", "So what:")
 - No bold in core idea or implication lines

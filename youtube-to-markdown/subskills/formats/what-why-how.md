@@ -30,4 +30,5 @@ Four labeled fields per content unit. Structured knowledge extraction for concep
 - All four labels mandatory: What, Why, How, What Then
 - Each field: 1-2 sentences, no more
 - What Then: omit only if content unit has no actionable implications
-- Works best with 2-5 content units per video. Beyond 7 units, merge related topics to reduce count
+- **Max 3 content units** — hard limit. Merge aggressively. Reader fatigue sets in beyond 3 labeled blocks.
+- Prefer fewer deep units over many shallow ones
