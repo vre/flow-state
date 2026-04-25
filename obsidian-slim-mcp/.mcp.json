@@ -1,0 +1,14 @@
+{
+  "obsidian-slim-mcp": {
+    "command": "uv",
+    "args": [
+      "--directory",
+      "${CLAUDE_PLUGIN_ROOT}",
+      "run",
+      "obsidian-slim-mcp"
+    ],
+    "env": {
+      "OBSIDIAN_API_KEY": "YOUR_API_KEY_HERE"
+    }
+  }
+}
