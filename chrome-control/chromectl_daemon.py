@@ -25,7 +25,7 @@ def _default_socket_path() -> str:
     return f"/tmp/chromectl-{os.getuid()}.sock"
 
 
-_STREAM_LIMIT = 16 * 1024 * 1024  # 16MB — Teams chats with images can produce large eval results
+_STREAM_LIMIT = 16 * 1024 * 1024  # 16MB — large eval results (e.g. full DOM snapshots)
 
 
 async def send_command(req: dict, socket_path: str | None = None) -> dict:
@@ -95,7 +95,7 @@ async def ensure_daemon_running(socket_path: str | None = None, timeout: float =
         raise RuntimeError(f"chromectl not found at {CHROMECTL}")
 
     subprocess.Popen(
-        ["uv", "run", CHROMECTL, "--auto-connect", "daemon"],
+        ["uv", "run", CHROMECTL, "start"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -136,7 +136,7 @@ class daemon_context:
             sys.exit(1)
 
         self._proc = subprocess.Popen(
-            ["uv", "run", CHROMECTL, "--auto-connect", "daemon"],
+            ["uv", "run", CHROMECTL, "start"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

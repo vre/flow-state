@@ -5,19 +5,21 @@
 #   "aiohttp>=3.9",
 # ]
 # ///
-"""chromectl — drive a local Chrome debugging instance via CDP using a uv-only, single-file script.
+"""chromectl — control Chrome via CDP from the command line.
 
-Supports both traditional HTTP-based CDP discovery and Chrome M144+ auto-connect
-via DevToolsActivePort file (chrome://inspect/#remote-debugging).
+Connects to your running Chrome session via DevToolsActivePort
+(chrome://inspect/#remote-debugging). All tabs, cookies, and logins accessible.
 
 Commands:
-  start                Launch a new Chrome with remote debugging enabled (macOS)
-  stop                 Stop all chromectl-managed Chrome instances
+  start                Connect to Chrome daemon on Unix socket
+  stop                 Stop daemon and/or launched Chrome instances
+  send <cmd>           Send command to running daemon
   list                 List open tabs/targets
-  open <url>           Open a new tab at URL, print its targetId
-  eval  --id <id>  -e <js>         Evaluate JavaScript in the target context
-  screenshot --id <id> [-o file]   Capture a PNG screenshot of the page
-  console-tail --id <id> [--for SECONDS]   Stream console/log messages
+  open <url>           Open a new tab, print its targetId
+  eval  --id <id>  -e <js>         Evaluate JavaScript in a target
+  screenshot --id <id> [-o file]   Capture a PNG screenshot
+  console-tail --id <id> [--for S] Stream console/log messages
+  launch               Launch a separate Chrome instance (legacy)
 """
 
 import argparse
@@ -307,7 +309,7 @@ class _TraditionalSession:
 # --- Commands ---
 
 
-async def cmd_start(args):
+async def cmd_launch(args):
     chrome_app = args.chrome_app or "Google Chrome"
     user_data_dir = args.user_data_dir or os.path.expanduser("~/chromectl-profile")
     os.makedirs(user_data_dir, exist_ok=True)
@@ -792,12 +794,12 @@ async def make_dispatcher(args) -> tuple[Dispatcher, BrowserConnection | None]:
     return Dispatcher(host, port, ws_path, bc, user_data_dir), bc
 
 
-async def cmd_daemon(args):
-    """Daemon: browser connection on Unix socket. netcat-compatible.
+async def cmd_start(args):
+    """Connect to Chrome and listen on Unix socket. netcat-compatible.
 
-    Start:  chromectl daemon
-    Use:    echo '{"cmd":"list"}' | nc -U /tmp/chromectl-<uid>.sock
-    Stop:   chromectl stop
+    Usage:  chromectl start
+            chromectl send list
+            chromectl stop
     """
     args.auto_connect = True
     dispatcher, bc = await make_dispatcher(args)
@@ -894,7 +896,7 @@ async def cmd_daemon(args):
 async def cmd_send(args):
     """Send a single command to running daemon. For quick CLI use."""
     if not os.path.exists(SOCKET_PATH):
-        print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl daemon", file=sys.stderr)
+        print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl start", file=sys.stderr)
         sys.exit(1)
     # Build request from subcommand args
     req: dict = {"cmd": args.send_cmd}
@@ -929,15 +931,21 @@ def build_parser():
     p.add_argument("--user-data-dir", default=None, help="Chrome user data directory (default: auto-detected for platform)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sp = sub.add_parser("start", help="Launch Chrome with remote debugging (macOS convenience)")
-    sp.add_argument("--chrome-app", default="Google Chrome", help="macOS app name")
-    sp.add_argument("--user-data-dir", default=None, help="Custom Chrome profile directory")
-    sp.add_argument("--port", type=int, default=DEFAULT_PORT, help="Remote debugging port")
-    sp.add_argument("--headless", action="store_true", help="Launch with --headless=new")
+    sp = sub.add_parser("start", help="Connect to running Chrome and listen on Unix socket")
     sp.set_defaults(func=cmd_start)
 
-    sp = sub.add_parser("stop", help="Stop daemon and/or chromectl-managed Chrome instances")
+    sp = sub.add_parser("stop", help="Stop daemon and/or launched Chrome instances")
     sp.set_defaults(func=cmd_stop)
+
+    sp = sub.add_parser("send", help="Send command to running daemon")
+    sp.add_argument("send_cmd", metavar="CMD", help="Command: list, eval, screenshot, open, console-tail")
+    sp.add_argument("--id", dest="send_id", help="Target id")
+    sp.add_argument("-e", "--expr", dest="send_expr", help="JS expression (for eval)")
+    sp.add_argument("--url", dest="send_url", help="URL (for open)")
+    sp.add_argument("-o", "--output", dest="send_output", help="Output file (for screenshot)")
+    sp.add_argument("--full-page", dest="send_full_page", action="store_true")
+    sp.add_argument("--for", dest="send_for", help="Duration in seconds (for console-tail)")
+    sp.set_defaults(func=cmd_send)
 
     sp = sub.add_parser("list", help="List open tabs/targets")
     sp.set_defaults(func=cmd_list)
@@ -962,18 +970,12 @@ def build_parser():
     sp.add_argument("--for", dest="for_seconds", default="10", help="Seconds to stream (default: 10)")
     sp.set_defaults(func=cmd_console_tail)
 
-    sp = sub.add_parser("daemon", help="Start background daemon on Unix socket")
-    sp.set_defaults(func=cmd_daemon)
-
-    sp = sub.add_parser("send", help="Send command to running daemon")
-    sp.add_argument("send_cmd", metavar="CMD", help="Command: list, eval, screenshot, open, console-tail")
-    sp.add_argument("--id", dest="send_id", help="Target id")
-    sp.add_argument("-e", "--expr", dest="send_expr", help="JS expression (for eval)")
-    sp.add_argument("--url", dest="send_url", help="URL (for open)")
-    sp.add_argument("-o", "--output", dest="send_output", help="Output file (for screenshot)")
-    sp.add_argument("--full-page", dest="send_full_page", action="store_true")
-    sp.add_argument("--for", dest="send_for", help="Duration in seconds (for console-tail)")
-    sp.set_defaults(func=cmd_send)
+    sp = sub.add_parser("launch", help="Launch a separate Chrome instance with its own profile (legacy)")
+    sp.add_argument("--chrome-app", default="Google Chrome", help="macOS app name")
+    sp.add_argument("--user-data-dir", default=None, help="Custom Chrome profile directory")
+    sp.add_argument("--port", type=int, default=DEFAULT_PORT, help="Remote debugging port")
+    sp.add_argument("--headless", action="store_true", help="Launch with --headless=new")
+    sp.set_defaults(func=cmd_launch)
 
     return p
 
