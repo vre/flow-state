@@ -53,3 +53,12 @@ tmp/
 
 # Large model files
 ggml-model-fi-large-v3.bin
+
+# Qualitative test outputs (extracted videos)
+tests/youtube-to-markdown/qualitative/videos/
+
+# YTM intermediate work files (kept with --debug)
+examples/youtube_*
+
+# Serena MCP
+.serena/

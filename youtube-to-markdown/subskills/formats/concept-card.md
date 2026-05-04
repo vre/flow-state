@@ -1,6 +1,6 @@
 # Concept Card
 
-Status: active
+Status: archive
 Content type: INTERVIEW
 
 Claim heading + core idea sentence + evidence bullets + implication sentence. Four visual layers let the reader choose reading depth per section.

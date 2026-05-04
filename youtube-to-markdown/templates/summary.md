@@ -2,6 +2,4 @@
 
 {metadata}
 
-## Summary
-
 {summary}

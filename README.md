@@ -6,12 +6,13 @@
 > Transform streaming content into storagable knowledge as Markdown.
 > Drop into Obsidian, Notion, or any note-taking system.
 
-- ✨ **TL;DR + structured summary**: Core insights with four content specific summarization formats
-- 💎 **Hidden Gems**: Collects insights that normal summarization loses
-- 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, or Comments only.
+- ✨ **TL;DR + claim-bullets summary**: Bold claims with evidence — scannable, proportional to video length
+- 💎 **Hidden Gems**: Tangents and details that normal summarization loses
+- 🎛️ **Modular**: Choose output from Everything to Summary only, Transcript only, or Comments only
 - 🧹 **Cleaned transcript**: Broken into chapters and paragraphs with topic headings into own file
 - 🏷️ **Timestamp links**: Jump back to specific moments in the original video from the transcript
 - 💬 **Comment analysis**: Curates and cross-analyzes comments against the summary
+- 📐 **Adaptive formats**: Claim-bullets (default), themed-claims (long interviews), step-list (tutorials), flat-bullets (ultra-short)
 
 ## **IMAP Stream MCP Server**
 
@@ -28,11 +29,13 @@
 
 ## Latest Release Highlights
 
-- `youtube-to-markdown v2.15.0`
-  - Deterministic paragraph breaks via script (was LLM subagent) — eliminates 100K+ token overhead
-  - Watch guide: HH:MM:SS timestamps, clickable summary table, read-detail links
-  - Transcript ← watch guide crosslinks with ▶ video links
-  - Shorter filenames, standard markdown timestamp links
+- `youtube-to-markdown v2.16.0`
+  - Summary format overhaul: claim-bullets default, themed-claims for long interviews, archived concept-card and what-why-how
+  - Proportional byte budget enforced (<5KB→flat, 5-15KB→15%, >15KB→10%)
+  - Single-speaker classification fix (opinions→TIPS, explanations→EDUCATIONAL)
+  - Hidden Gems in all formats
+
+- `imap-stream-mcp v0.7.2` — Multi-account fix: `account` parameter now works across all actions
 
 ## Quick Start
 
@@ -68,22 +71,18 @@ As you don't have any configured yet, it will show you how to set up.
 - [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
 - [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
 
-### Dev Tooling
-- Design and writing guides have moved to [flow-jigs](https://github.com/vre/flow-jigs)
-
 ## Examples of Youtube to Markdown Output
 
-All examples are CC-licensed videos with full summary and comment analysis.
+All examples are CC-licensed videos with summary and transcript.
 
-| Type | Summary | Links |
+| Format | Summary | Links |
 | ----- | ------- | ----- |
-| Tutorial | [Faro Shuffle Tutorial!](examples/2017-08-17%20-%20youtube%20-%20Faro%20Shuffle%20Tutorial!%20(RXhNA0xLRgY).md) | [transcript](examples/2017-08-17%20-%20youtube%20-%20Faro%20Shuffle%20Tutorial!%20-%20transcript%20(RXhNA0xLRgY).md) · [video](https://www.youtube.com/watch?v=RXhNA0xLRgY) |
-| Educational | [Brain: Parts & functions](examples/2019-09-13%20-%20youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20(DtkRGbTp1s8).md) | [transcript](examples/2019-09-13%20-%20youtube%20-%20Brain%20Parts%20%26%20functions%20(Fore,%20mid%20%26%20hind)%20Control%20%26%20-%20transcript%20(DtkRGbTp1s8).md) · [video](https://www.youtube.com/watch?v=DtkRGbTp1s8) |
-| Educational | [Happiness is all in your mind](examples/2014-06-15%20-%20youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20(xnLoToJVQH4).md) | [transcript](examples/2014-06-15%20-%20youtube%20-%20Happiness%20is%20all%20in%20your%20mind%20Gen%20Kelsang%20Nyema%20at%20-%20transcript%20(xnLoToJVQH4).md) · [video](https://www.youtube.com/watch?v=xnLoToJVQH4) |
-| Tips | [How to Become a Great Software Developer](examples/2024-02-19%20-%20youtube%20-%20How%20to%20Become%20a%20Great%20Software%20Developer%20—%20Best%20Advice%20from%20(suATPK45sjk).md) | [transcript](examples/2024-02-19%20-%20youtube%20-%20How%20to%20Become%20a%20Great%20Software%20Developer%20—%20Best%20Advice%20from%20-%20transcript%20(suATPK45sjk).md) · [video](https://www.youtube.com/watch?v=suATPK45sjk) |
-| Tips | [Sourdough vs Normal Bread](examples/2022-04-07%20-%20youtube%20-%20Sourdough%20vs%20Normal%20Bread%20-%20Whats%20the%20Difference%20(NieQHjCHnxg).md) | [transcript](examples/2022-04-07%20-%20youtube%20-%20Sourdough%20vs%20Normal%20Bread%20-%20Whats%20the%20Difference%20-%20transcript%20(NieQHjCHnxg).md) · [video](https://www.youtube.com/watch?v=NieQHjCHnxg) |
-| Interview | [Chris Rock on starting standup](examples/2020-10-28%20-%20youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20(M6rBiCnntng).md) | [transcript](examples/2020-10-28%20-%20youtube%20-%20Chris%20Rock%20on%20starting%20standup%20How%20Neal%20Feel%20podcast%20(Ep%2077)%20-%20transcript%20(M6rBiCnntng).md) · [video](https://www.youtube.com/watch?v=M6rBiCnntng) |
-| Interview | [Interview with Senior JS Developer](examples/2022-01-31%20-%20youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20(Uo3cL4nrGOk).md) | [transcript](examples/2022-01-31%20-%20youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20transcript%20(Uo3cL4nrGOk).md) · [comments](examples/2022-01-31%20-%20youtube%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20comments%20(Uo3cL4nrGOk).md) · [video](https://www.youtube.com/watch?v=Uo3cL4nrGOk) |
+| Flat bullets + comments | [Sourdough vs Normal Bread](examples/2022-04-07%20-%20Sourdough%20vs.%20%E2%80%9CNormal%E2%80%9D%20Bread.%20What%E2%80%99s%20the%20Difference%20(NieQHjCHnxg).md) | [comments](examples/2022-04-07%20-%20Sourdough%20vs.%20%E2%80%9CNormal%E2%80%9D%20Bread.%20What%E2%80%99s%20the%20Difference%20-%20comments%20(NieQHjCHnxg).md) · [transcript](examples/2022-04-07%20-%20Sourdough%20vs.%20%E2%80%9CNormal%E2%80%9D%20Bread.%20What%E2%80%99s%20the%20Difference%20-%20transcript%20(NieQHjCHnxg).md) · [video](https://www.youtube.com/watch?v=NieQHjCHnxg) |
+| Flat bullets | [Interview with Senior JS Developer](examples/2022-01-31%20-%20Interview%20with%20Senior%20JS%20Developer%20(Uo3cL4nrGOk).md) | [transcript](examples/2022-01-31%20-%20Interview%20with%20Senior%20JS%20Developer%20-%20transcript%20(Uo3cL4nrGOk).md) · [video](https://www.youtube.com/watch?v=Uo3cL4nrGOk) |
+| Step list + comments | [Faro Shuffle Tutorial!](examples/2017-08-17%20-%20Faro%20Shuffle%20Tutorial!%20(RXhNA0xLRgY).md) | [comments](examples/2017-08-17%20-%20Faro%20Shuffle%20Tutorial!%20-%20comments%20(RXhNA0xLRgY).md) · [transcript](examples/2017-08-17%20-%20Faro%20Shuffle%20Tutorial!%20-%20transcript%20(RXhNA0xLRgY).md) · [video](https://www.youtube.com/watch?v=RXhNA0xLRgY) |
+| Claim bullets | [Brain: Parts & functions](examples/2019-09-13%20-%20Brain%20Parts%20%26%20functions%20Control%20%26%20Coordination%20Class%2010%20(DtkRGbTp1s8).md) | [transcript](examples/2019-09-13%20-%20Brain%20Parts%20%26%20functions%20Control%20%26%20Coordination%20Class%2010%20-%20transcript%20(DtkRGbTp1s8).md) · [video](https://www.youtube.com/watch?v=DtkRGbTp1s8) |
+| Themed claims | [Blake Griffin — Blocks Podcast](examples/2025-04-03%20-%20Blake%20Griffin%20Blocks%20Podcast%20w%20Neal%20Brennan%20(0lYUIwLCuHs).md) | [transcript](examples/2025-04-03%20-%20Blake%20Griffin%20Blocks%20Podcast%20w%20Neal%20Brennan%20-%20transcript%20(0lYUIwLCuHs).md) · [video](https://www.youtube.com/watch?v=0lYUIwLCuHs) |
+| Hybrid (claims + steps) | [Chef Eric Theiss — interview + cooking demo](examples/2020-09-29%20-%20Chief%20Chat%20Episode%2061%20Chef%20Eric%20Theiss%20(_qsUOPuX2FU).md) | [transcript](examples/2020-09-29%20-%20Chief%20Chat%20Episode%2061%20Chef%20Eric%20Theiss%20-%20transcript%20(_qsUOPuX2FU).md) · [video](https://www.youtube.com/watch?v=_qsUOPuX2FU) |
 
 ## The Backstory
 

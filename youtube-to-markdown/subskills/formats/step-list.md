@@ -33,3 +33,5 @@ Numbered steps with outcomes. Prerequisites at top, result at bottom. For step-b
 - Result: one sentence describing what the viewer has after completing all steps
 - Keep steps sequential — each depends on the previous one
 - Include commands verbatim when the video shows them
+- Multi-part tutorials (multiple recipes, several projects): use `### [Part title]` heading per part, each with its own prerequisites/steps/result block
+- End with `## Hidden Gems` if the tutorial contains useful tips, gotchas, or tangents outside the main steps. 1-3 bullets. Omit only if nothing qualifies.

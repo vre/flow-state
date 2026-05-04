@@ -8,31 +8,49 @@ Tests are organized in `tests/` directory by project type.
 
 ```
 tests/youtube-to-markdown/
-├── test_assembler.py (40 tests)
-├── test_channel_listing.py (33 tests)
-├── test_check_existing.py (12 tests)
-├── test_comment_extractor.py (32 tests)
-├── test_comment_filter.py (17 tests)
-├── test_content_safety.py (25 tests)
-├── test_file_ops.py (9 tests)
-├── test_paragraph_breaker.py (20 tests)
-├── test_prepare_update.py (33 tests)
-├── test_shared_types.py (17 tests)
-├── test_transcript_extractor.py (10 tests)
-├── test_update_metadata.py (7 tests)
-├── test_vtt_deduplicator.py (10 tests)
-└── test_youtube_extractor.py (9 tests)
+├── test_assembler.py
+├── test_channel_listing.py
+├── test_check_existing.py
+├── test_check_view_growth.py
+├── test_checkbox_parsing.py
+├── test_comment_extractor.py
+├── test_comment_filter.py
+├── test_comment_filter_tiers.py
+├── test_concat_cleaned_script.py
+├── test_content_safety.py
+├── test_file_ops.py
+├── test_heatmap.py
+├── test_insert_headings_from_json_script.py
+├── test_list_channel_script.py
+├── test_merge_tier2.py
+├── test_paragraph_breaker.py
+├── test_paragraph_breaker_regression.py
+├── test_paragraph_break_planner.py
+├── test_parse_channel_entry.py
+├── test_prepare_update.py
+├── test_run_dispatcher.py
+├── test_shared_types.py
+├── test_split_for_cleaning_script.py
+├── test_transcript_extractor.py
+├── test_update_metadata.py
+├── test_vtt_deduplicator.py
+├── test_watch_guide.py
+└── test_youtube_extractor.py
 ```
 
 ### MCP Servers
 
 ```
 tests/imap-stream-mcp/
-├── test_bodystructure.py (33 tests)
-├── test_imap_client.py (111 tests)
-├── test_imap_stream_mcp.py (59 tests)
-├── test_markdown_utils.py (25 tests)
-└── test_markdown.py (27 tests)
+├── test_account_param.py
+├── test_bodystructure.py
+├── test_flag_parsing.py
+├── test_imap_client.py
+├── test_imap_stream_mcp.py
+├── test_markdown_utils.py
+├── test_markdown.py
+├── test_search_flags.py
+└── test_session.py
 ```
 
 ## Running Tests

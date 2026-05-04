@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from lib.content_safety import unwrap_untrusted_content
 from lib.intermediate_files import (
     get_all_work_files,
     get_comments_work_files,
@@ -42,6 +43,26 @@ class Finalizer:
             stripped = stripped[len(header) :].lstrip()
         return stripped
 
+    @staticmethod
+    def _merge_summary_heading(summary: str) -> str:
+        """Merge summary's own ## heading into the template's ## Summary heading.
+
+        If summary starts with '## Title here', the template would produce:
+            ## Summary
+            ## Title here
+        This merges them into:
+            ## Summary: Title here
+        and removes the duplicate heading from the body.
+        """
+        if not summary.startswith("## "):
+            return summary
+        first_newline = summary.find("\n")
+        if first_newline == -1:
+            return summary
+        heading_text = summary[3:first_newline].strip()
+        rest = summary[first_newline + 1 :].lstrip()
+        return f"## Summary: {heading_text}\n\n{rest}"
+
     def get_filenames(self, base_name: str, output_dir: Path) -> tuple[str | None, str, str | None]:
         """Get cleaned title, video ID, and upload date for filename generation."""
         title_path = output_dir / f"{base_name}_title.txt"
@@ -79,10 +100,11 @@ class Finalizer:
 
         quick_summary = self.strip_leading_header(quick_summary, "## Quick Summary")
         summary = self.strip_leading_header(summary, "## Summary")
+        summary = self._merge_summary_heading(summary.strip())
 
         final_content = template.replace("{quick_summary}", quick_summary.strip())
         final_content = final_content.replace("{metadata}", metadata.strip())
-        final_content = final_content.replace("{summary}", summary.strip())
+        final_content = final_content.replace("{summary}", summary)
 
         return final_content
 
@@ -93,11 +115,13 @@ class Finalizer:
         Note: Description is pre-wrapped in safety delimiters at extraction time.
         """
         description = self.read_component_or_empty(output_dir / f"{base_name}_description.md")
+        description = unwrap_untrusted_content(description)
         transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript.md")
         if not transcription.strip():
             transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript_dedup.md")
         if not transcription.strip():
             transcription = self.read_component_or_empty(output_dir / f"{base_name}_transcript_no_timestamps.txt")
+        transcription = unwrap_untrusted_content(transcription)
 
         transcript_content = template.replace("{description}", description.strip())
         transcript_content = transcript_content.replace("{transcription}", transcription.strip())
