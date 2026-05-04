@@ -37,6 +37,82 @@ def _mock_client(response):
     return mock
 
 
+class TestParseLinks:
+    def test_wikilink(self):
+        assert client.parse_links("[[target]]") == [{"target": "target", "type": "wikilink"}]
+
+    def test_wikilink_alias(self):
+        assert client.parse_links("[[target|Alias]]") == [{"target": "target", "type": "wikilink", "alias": "Alias"}]
+
+    def test_wikilink_heading(self):
+        assert client.parse_links("[[target#Heading]]") == [{"target": "target", "type": "wikilink", "heading": "Heading"}]
+
+    def test_wikilink_heading_alias(self):
+        assert client.parse_links("[[target#Heading|Alias]]") == [
+            {
+                "target": "target",
+                "type": "wikilink",
+                "heading": "Heading",
+                "alias": "Alias",
+            }
+        ]
+
+    def test_wikilink_embed(self):
+        assert client.parse_links("![[embed.png]]") == [{"target": "embed.png", "type": "wikilink", "embed": True}]
+
+    def test_markdown_link(self):
+        assert client.parse_links("[text](relative/path.md)") == [{"target": "relative/path.md", "type": "markdown"}]
+
+    def test_excludes_external_urls(self):
+        assert client.parse_links("[site](https://example.com) [plain](http://example.com)") == []
+
+    def test_excludes_markdown_images(self):
+        assert client.parse_links("![alt](image.png)") == []
+
+    def test_mixed_content_preserves_order(self):
+        assert client.parse_links("[one](one.md) [[two]]") == [
+            {"target": "one.md", "type": "markdown"},
+            {"target": "two", "type": "wikilink"},
+        ]
+
+    def test_empty_and_same_file_heading(self):
+        assert client.parse_links("[[]] [[#Heading]] []()") == []
+
+
+class TestResolveWikilink:
+    def test_unique_match(self):
+        assert client.resolve_wikilink("foo", "notes/bar.md", ["notes/foo.md"]) == "notes/foo.md"
+
+    def test_proximity_tiebreaker(self):
+        assert client.resolve_wikilink("foo", "notes/bar.md", ["notes/foo.md", "archive/foo.md"]) == "notes/foo.md"
+
+    def test_shortest_path_fallback(self):
+        assert client.resolve_wikilink("foo", "other/bar.md", ["notes/foo.md", "archive/deep/foo.md"]) == "notes/foo.md"
+
+    def test_exact_suffix(self):
+        assert client.resolve_wikilink("notes/foo", "x.md", ["notes/foo.md", "other/foo.md"]) == "notes/foo.md"
+
+    def test_no_match(self):
+        assert client.resolve_wikilink("bar", "x.md", ["notes/foo.md"]) is None
+
+    def test_with_extension(self):
+        assert client.resolve_wikilink("foo.md", "x.md", ["foo.md"]) == "foo.md"
+
+
+class TestResolveRelativePath:
+    def test_parent_dir(self):
+        assert client.resolve_relative_path("../foo.md", "notes/sub/bar.md") == "notes/foo.md"
+
+    def test_sibling(self):
+        assert client.resolve_relative_path("sibling.md", "notes/bar.md") == "notes/sibling.md"
+
+    def test_current_dir(self):
+        assert client.resolve_relative_path("./local.md", "bar.md") == "local.md"
+
+    def test_root_level(self):
+        assert client.resolve_relative_path("local.md", "bar.md") == "local.md"
+
+
 class TestListDirs:
     @pytest.mark.asyncio
     async def test_list_root(self):
@@ -114,6 +190,45 @@ class TestListDirs:
         assert result["nonexistent/"]["error"].startswith("ERROR: ")
 
 
+class TestListVaultFiles:
+    @pytest.mark.asyncio
+    async def test_recursive(self):
+        async def fake_list_dirs(paths):
+            listings = {
+                "/": {"files": ["index.md", "notes/", "attachments/"]},
+                "notes/": {"files": ["foo.md"]},
+                "attachments/": {"files": ["image.png"]},
+            }
+            return {path: listings[path] for path in paths}
+
+        with patch.object(client, "list_dirs", side_effect=fake_list_dirs):
+            result = await client.list_vault_files("/")
+        assert result == ["index.md", "notes/foo.md", "attachments/image.png"]
+
+    @pytest.mark.asyncio
+    async def test_normalizes_path(self):
+        async def fake_list_dirs(paths):
+            assert paths == ["notes/"]
+            return {"notes/": {"files": ["foo.md"]}}
+
+        with patch.object(client, "list_dirs", side_effect=fake_list_dirs):
+            result = await client.list_vault_files("notes")
+        assert result == ["notes/foo.md"]
+
+    @pytest.mark.asyncio
+    async def test_skips_subdirectory_error(self):
+        async def fake_list_dirs(paths):
+            listings = {
+                "/": {"files": ["index.md", "broken/"]},
+                "broken/": {"error": "ERROR: 404"},
+            }
+            return {path: listings[path] for path in paths}
+
+        with patch.object(client, "list_dirs", side_effect=fake_list_dirs):
+            result = await client.list_vault_files("/")
+        assert result == ["index.md"]
+
+
 class TestReadFiles:
     @pytest.mark.asyncio
     async def test_read_markdown(self):
@@ -172,6 +287,95 @@ class TestReadFiles:
             result = await client.read_files(["good.md", "bad.md"])
         assert result["good.md"] == "good content"
         assert result["bad.md"].startswith("ERROR: ")
+
+
+class TestGraphOperations:
+    @pytest.mark.asyncio
+    async def test_outlinks_resolves_targets(self):
+        with (
+            patch.object(
+                client,
+                "list_vault_files",
+                new_callable=AsyncMock,
+                return_value=["index.md", "notes/target.md", "local.md", "attachments/image.png"],
+            ),
+            patch.object(
+                client,
+                "read_files",
+                new_callable=AsyncMock,
+                return_value={"index.md": "[[target|Alias]] [local](local.md) ![[image.png]] [[missing]]"},
+            ),
+        ):
+            result = await client.outlinks("index.md")
+        assert result == [
+            {"target": "notes/target.md", "type": "wikilink", "alias": "Alias"},
+            {"target": "local.md", "type": "markdown"},
+            {"target": "attachments/image.png", "type": "wikilink", "embed": True},
+            {"target": "missing", "type": "wikilink"},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_outlinks_read_error_raises(self):
+        with (
+            patch.object(client, "list_vault_files", new_callable=AsyncMock, return_value=["index.md"]),
+            patch.object(
+                client,
+                "read_files",
+                new_callable=AsyncMock,
+                return_value={"index.md": "ERROR: 404"},
+            ),
+        ):
+            with pytest.raises(ValueError, match="ERROR: 404"):
+                await client.outlinks("index.md")
+
+    @pytest.mark.asyncio
+    async def test_backlinks_finds_reverse_links_with_context(self):
+        files = ["target.md", "source.md", "folder/source2.md", "skip.txt"]
+
+        async def fake_read_files(paths):
+            contents = {
+                "source.md": "before " + ("x" * 60) + " [[target]] after",
+                "folder/source2.md": "see [target](../target.md)",
+            }
+            return {path: contents[path] for path in paths}
+
+        with (
+            patch.object(client, "list_vault_files", new_callable=AsyncMock, return_value=files),
+            patch.object(client, "read_files", side_effect=fake_read_files),
+        ):
+            result = await client.backlinks("target.md")
+        assert result[0]["source"] == "source.md"
+        assert result[0]["type"] == "wikilink"
+        assert "[[target]]" in result[0]["context"]
+        assert result[1] == {
+            "source": "folder/source2.md",
+            "type": "markdown",
+            "context": "see [target](../target.md)",
+        }
+
+    @pytest.mark.asyncio
+    async def test_broken_links_detects_missing_targets(self):
+        files = ["index.md", "exists.md", "folder/ok.md", "folder/scan.md"]
+
+        async def fake_read_files(paths):
+            contents = {
+                "index.md": "[[missing]] [[exists]] [bad](missing.md)",
+                "exists.md": "",
+                "folder/ok.md": "",
+                "folder/scan.md": "[ok](ok.md) [bad](bad.md)",
+            }
+            return {path: contents[path] for path in paths}
+
+        with (
+            patch.object(client, "list_vault_files", new_callable=AsyncMock, return_value=files),
+            patch.object(client, "read_files", side_effect=fake_read_files),
+        ):
+            result = await client.broken_links("/")
+        assert result == [
+            {"source": "index.md", "target": "missing", "type": "wikilink"},
+            {"source": "index.md", "target": "missing.md", "type": "markdown"},
+            {"source": "folder/scan.md", "target": "bad.md", "type": "markdown"},
+        ]
 
 
 class TestWriteFile:
@@ -399,3 +603,60 @@ class TestServerStatus:
         with patch.object(client, "_client", return_value=mock):
             result = await client.server_status()
         assert result["status"] == "OK"
+
+
+# --- Frontmatter validation ---
+
+
+class TestValidateFrontmatter:
+    def test_no_frontmatter_passes(self):
+        assert client.validate_frontmatter("# Just a heading\nSome text") is None
+
+    def test_valid_frontmatter_passes(self):
+        content = "---\ntitle: Test\ntags: [a, b]\n---\n# Content"
+        assert client.validate_frontmatter(content) is None
+
+    def test_empty_frontmatter_passes(self):
+        assert client.validate_frontmatter("---\n---\n# Content") is None
+
+    def test_unclosed_frontmatter(self):
+        result = client.validate_frontmatter("---\ntitle: Test\n# No closing")
+        assert result is not None
+        assert "closing" in result.lower()
+
+    def test_invalid_yaml(self):
+        content = "---\ntitle: [unclosed\n---\n"
+        result = client.validate_frontmatter(content)
+        assert result is not None
+        assert "invalid yaml" in result.lower()
+
+    def test_non_mapping_frontmatter(self):
+        content = "---\n- just a list\n- not a mapping\n---\n"
+        result = client.validate_frontmatter(content)
+        assert result is not None
+        assert "mapping" in result.lower()
+
+    def test_complex_valid_frontmatter(self):
+        content = "---\ntitle: Test\ntags:\n  - a\n  - b\nnested:\n  key: value\n---\n"
+        assert client.validate_frontmatter(content) is None
+
+
+class TestWriteFileValidation:
+    @pytest.mark.asyncio
+    async def test_write_rejects_invalid_frontmatter(self):
+        with pytest.raises(ValueError, match="Frontmatter validation failed"):
+            await client.write_file("test.md", "---\ntitle: [broken\n---\n")
+
+    @pytest.mark.asyncio
+    async def test_write_skips_validation_for_non_md(self):
+        """Non-markdown files skip frontmatter validation."""
+        with patch.object(client, "_client") as mock_client:
+            mock_response = MagicMock()
+            mock_response.raise_for_status = MagicMock()
+            mock_ctx = AsyncMock()
+            mock_ctx.__aenter__ = AsyncMock(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AsyncMock(return_value=False)
+            mock_ctx.put = AsyncMock(return_value=mock_response)
+            mock_client.return_value = mock_ctx
+            result = await client.write_file("data.json", "---\nnot: [valid\n---")
+            assert result["status"] == "ok"

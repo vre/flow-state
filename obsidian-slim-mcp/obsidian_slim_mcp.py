@@ -37,6 +37,7 @@ class ObsidianAction(BaseModel):
         ...,
         description=(
             "Action: list|read|write|append|patch|delete|search|search_advanced"
+            "|outlinks|backlinks|broken_links"
             "|tags|commands|command_run|open|active_read|active_write"
             "|periodic_read|periodic_write|periodic_append|help"
         ),
@@ -53,12 +54,15 @@ class ObsidianAction(BaseModel):
             "active_read",
             "active_write",
             "append",
+            "backlinks",
+            "broken_links",
             "command_run",
             "commands",
             "delete",
             "help",
             "list",
             "open",
+            "outlinks",
             "patch",
             "periodic_append",
             "periodic_read",
@@ -88,6 +92,9 @@ HELP_TOPICS = {
 - **delete** — Delete a file
 - **search** — Simple text search
 - **search_advanced** — Dataview DQL or JsonLogic search
+- **outlinks** — Parse outgoing links from a file
+- **backlinks** — Find all files linking to a given file
+- **broken_links** — Find broken links in vault or directory
 - **tags** — List all tags with counts
 - **commands** — List available Obsidian commands
 - **command_run** — Execute an Obsidian command
@@ -182,6 +189,38 @@ Default type is "dataview".
 ## Examples
 {action: "search_advanced", payload: '{"query":"TABLE file.mtime FROM \\"projects\\""}'}
 {action: "search_advanced", payload: '{"query":"{\\"glob\\": [\\"*.md\\"]}","type":"jsonlogic"}'}
+""",
+    "outlinks": """# outlinks — Parse outgoing links
+
+## Payload
+File path.
+
+## Example
+{action: "outlinks", payload: "index.md"}
+
+Returns list of {target, type, alias?, heading?, embed?}.
+""",
+    "backlinks": """# backlinks — Find incoming links
+
+## Payload
+File path.
+
+## Example
+{action: "backlinks", payload: "topics/knowledge-management.md"}
+
+Returns list of {source, type, context}.
+Note: scans entire vault (O(n)). Fine for vaults < 5000 files.
+""",
+    "broken_links": """# broken_links — Find broken links
+
+## Payload
+Optional directory path (default: entire vault).
+
+## Examples
+{action: "broken_links"} — scan entire vault
+{action: "broken_links", payload: "projects/"} — scan one directory
+
+Returns list of {source, target, type}.
 """,
     "tags": """# tags — List all tags
 
@@ -289,7 +328,7 @@ def _parse_json_payload(payload: str | None, required_fields: list[str] | None =
     },
 )
 async def use_obsidian(params: ObsidianAction) -> str:
-    """Obsidian vault operations via Local REST API. Actions: list|read|write|append|patch|delete|search|search_advanced|tags|commands|command_run|open|active_read|active_write|periodic_read|periodic_write|periodic_append|help.
+    """Obsidian vault operations via Local REST API. Actions: list|read|write|append|patch|delete|search|search_advanced|outlinks|backlinks|broken_links|tags|commands|command_run|open|active_read|active_write|periodic_read|periodic_write|periodic_append|help.
 
     Examples:
       {action:"help"} — show available actions
@@ -392,6 +431,23 @@ async def use_obsidian(params: ObsidianAction) -> str:
                 query=data["query"],
                 query_type=data.get("type", "dataview"),
             )
+            return json.dumps(results, indent=2)
+
+        # --- Graph ---
+        elif action == "outlinks":
+            if not payload:
+                return 'Payload required: file path. Try: {action: "outlinks", payload: "index.md"}'
+            results = await api.outlinks(payload)
+            return json.dumps(results, indent=2)
+
+        elif action == "backlinks":
+            if not payload:
+                return 'Payload required: file path. Try: {action: "backlinks", payload: "index.md"}'
+            results = await api.backlinks(payload)
+            return json.dumps(results, indent=2)
+
+        elif action == "broken_links":
+            results = await api.broken_links(payload or "/")
             return json.dumps(results, indent=2)
 
         # --- Tags ---

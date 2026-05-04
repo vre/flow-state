@@ -2,10 +2,10 @@
 
 ## Graph & link support
 
-- [ ] `backlinks` action — list files linking to a given file
-- [ ] `outlinks` action — list wikilinks/markdown links in a file
-- [ ] `broken_links` action — find links pointing to non-existent files
-- [ ] `rename` action — rename/move file with backlink update (REST API has no native rename; must read backlinks, write new file, update all referencing files, delete old file)
+- [x] `backlinks` action — list files linking to a given file
+- [x] `outlinks` action — list wikilinks/markdown links in a file
+- [x] `broken_links` action — find links pointing to non-existent files
+- [ ] `rename` action — rename/move file with backlink update (Cut 2, depends on backlinks)
 
 ### Context
 

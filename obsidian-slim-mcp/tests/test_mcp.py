@@ -32,6 +32,9 @@ class TestActionValidator:
             "delete",
             "search",
             "search_advanced",
+            "outlinks",
+            "backlinks",
+            "broken_links",
             "tags",
             "commands",
             "command_run",
@@ -55,6 +58,9 @@ class TestHelp:
         assert "Obsidian Vault Tool" in result
         assert "list" in result
         assert "search" in result
+        assert "outlinks" in result
+        assert "backlinks" in result
+        assert "broken_links" in result
 
     @pytest.mark.asyncio
     async def test_help_specific_topic(self):
@@ -76,6 +82,15 @@ class TestHelp:
     async def test_help_read_documents_multipath(self):
         result = await use_obsidian(ObsidianAction(action="help", payload="read"))
         assert "Multiple paths" in result
+
+    @pytest.mark.asyncio
+    async def test_help_graph_topics(self):
+        outlinks = await use_obsidian(ObsidianAction(action="help", payload="outlinks"))
+        backlinks = await use_obsidian(ObsidianAction(action="help", payload="backlinks"))
+        broken_links = await use_obsidian(ObsidianAction(action="help", payload="broken_links"))
+        assert "Parse outgoing links" in outlinks
+        assert "Find incoming links" in backlinks
+        assert "Find broken links" in broken_links
 
 
 class TestListAction:
@@ -211,6 +226,52 @@ class TestDeleteAction:
     async def test_delete_no_payload(self):
         result = await use_obsidian(ObsidianAction(action="delete"))
         assert "Payload required" in result
+
+
+class TestGraphActions:
+    @pytest.mark.asyncio
+    async def test_outlinks(self):
+        with patch("obsidian_client.outlinks", new_callable=AsyncMock) as mock:
+            mock.return_value = [{"target": "target.md", "type": "wikilink"}]
+            result = await use_obsidian(ObsidianAction(action="outlinks", payload="index.md"))
+        parsed = json.loads(result)
+        assert parsed == [{"target": "target.md", "type": "wikilink"}]
+        mock.assert_called_once_with("index.md")
+
+    @pytest.mark.asyncio
+    async def test_outlinks_no_payload(self):
+        result = await use_obsidian(ObsidianAction(action="outlinks"))
+        assert "Payload required" in result
+
+    @pytest.mark.asyncio
+    async def test_backlinks(self):
+        with patch("obsidian_client.backlinks", new_callable=AsyncMock) as mock:
+            mock.return_value = [{"source": "source.md", "type": "wikilink", "context": "[[index]]"}]
+            result = await use_obsidian(ObsidianAction(action="backlinks", payload="index.md"))
+        parsed = json.loads(result)
+        assert parsed[0]["source"] == "source.md"
+        mock.assert_called_once_with("index.md")
+
+    @pytest.mark.asyncio
+    async def test_backlinks_no_payload(self):
+        result = await use_obsidian(ObsidianAction(action="backlinks"))
+        assert "Payload required" in result
+
+    @pytest.mark.asyncio
+    async def test_broken_links_default(self):
+        with patch("obsidian_client.broken_links", new_callable=AsyncMock) as mock:
+            mock.return_value = [{"source": "source.md", "target": "missing.md", "type": "markdown"}]
+            result = await use_obsidian(ObsidianAction(action="broken_links"))
+        parsed = json.loads(result)
+        assert parsed[0]["target"] == "missing.md"
+        mock.assert_called_once_with("/")
+
+    @pytest.mark.asyncio
+    async def test_broken_links_payload(self):
+        with patch("obsidian_client.broken_links", new_callable=AsyncMock) as mock:
+            mock.return_value = []
+            await use_obsidian(ObsidianAction(action="broken_links", payload="projects/"))
+        mock.assert_called_once_with("projects/")
 
 
 class TestParseJsonPayload:
