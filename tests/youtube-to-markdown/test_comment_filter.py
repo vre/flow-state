@@ -152,16 +152,20 @@ class TestFormatComments:
         comments = [{"author": "user1", "likes": 42, "text": "Test comment"}]
         result = format_comments(comments)
 
+        import re
+
         # Content present
         assert "### 1. @user1 (42 likes)" in result
         assert "Test comment" in result
-        # Safety wrappers present (warning before tags)
-        assert "UNTRUSTED" in result
-        assert "<untrusted_comments_content>" in result
-        assert "</untrusted_comments_content>" in result
+        # Spotlight wrappers present (warning before markers)
+        assert "{{UNTRUSTED CONTENT" in result
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_START\]", result)
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_END\]", result)
 
     def test_format_multiple_comments(self):
         """Test formatting multiple comments with safety wrappers."""
+        import re
+
         comments = [
             {"author": "user1", "likes": 100, "text": "First"},
             {"author": "user2", "likes": 50, "text": "Second"},
@@ -170,7 +174,8 @@ class TestFormatComments:
 
         assert "### 1. @user1 (100 likes)" in result
         assert "### 2. @user2 (50 likes)" in result
-        assert "<untrusted_comments_content>" in result
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_START\]", result)
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_END\]", result)
 
     def test_format_empty_list(self):
         """Test formatting empty list returns empty (no wrapper)."""
@@ -190,4 +195,5 @@ class TestFormatComments:
         result = format_comments(comments, wrap_safe=False)
 
         assert "### 1. @user1 (42 likes)" in result
-        assert "<untrusted_comments_content>" not in result
+        assert "[EXTERNAL_COMMENTS_" not in result
+        assert "{{UNTRUSTED" not in result

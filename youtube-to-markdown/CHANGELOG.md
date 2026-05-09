@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.16.0] - 2026-05-09
+
+### Injection defense hardening for content_safety
+- Three-layer defense replaces escape-and-XML-tag pattern (CyberSecEval 2: 26–41% → <2% attack success rate target)
+- Layer 1: NFKC normalization + Unicode Format-category strip — neutralizes zero-width chars, RTL overrides, BOM, tag chars (U+E0020–U+E007F)
+- Layer 2: iterative regex stripping of chat-template tokens (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>`, role XML) — catches nested patterns, false-positive-safe (`<systemd>`, `<system-design>`, `[INTRO]` preserved)
+- Layer 3: per-call randomized spotlight delimiters via `secrets.token_hex(8)` (64-bit nonce) — replaces predictable `<untrusted_*>` XML tags
+- `unwrap_untrusted_content` is now structural: whole-string match with nonce backreferences; no-op on raw text matching marker shapes
+- Idempotent re-wrap: double-wrap collapses to single canonical form, unwrap recovers original
+- Public API removed: `INJECTION_DETECTED_NOTICE`, `contains_injection_patterns`, `sanitize_for_delimiters` (dead external API)
+- Added `POTENTIAL_INJECTION_NOTICE` constant; notice text is "Potential injection — patterns stripped"
+- 78 new content_safety tests; 4 sibling test files updated for new wrapper format
+
 ## [2.15.0] - 2026-03-27
 
 ### Deterministic paragraph breaks + watch guide improvements

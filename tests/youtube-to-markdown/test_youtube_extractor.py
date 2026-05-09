@@ -86,12 +86,14 @@ class TestYouTubeDataExtractor:
 
         assert output_path == Path("/output/youtube_test123_description.md")
         content = mock_fs.read_text(output_path)
+        import re
+
         # Content present
         assert "Test video description" in content
-        # Safety wrappers present (warning before tags)
-        assert "UNTRUSTED" in content
-        assert "<untrusted_description_content>" in content
-        assert "</untrusted_description_content>" in content
+        # Spotlight wrappers present (warning before markers)
+        assert "{{UNTRUSTED CONTENT" in content
+        assert re.search(r"\[EXTERNAL_DESCRIPTION_[0-9a-f]{16}_START\]", content)
+        assert re.search(r"\[EXTERNAL_DESCRIPTION_[0-9a-f]{16}_END\]", content)
 
     def test_create_chapters_file(self, mock_fs, mock_cmd, sample_video_data):
         """Test creating chapters file."""

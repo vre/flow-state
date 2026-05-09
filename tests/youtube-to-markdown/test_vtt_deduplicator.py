@@ -135,13 +135,15 @@ Same text
 
         # Check plain output - wrapped in safety delimiters
         plain_content = mock_fs.read_text(no_timestamps_path)
+        import re
+
         # Content present
         assert "First line of text" in plain_content
         assert "Second line of text" in plain_content
         assert "Third line of text" in plain_content
-        # Safety wrappers present (warning before tags)
-        assert "UNTRUSTED" in plain_content
-        assert "<untrusted_transcript_content>" in plain_content
-        assert "</untrusted_transcript_content>" in plain_content
-        # Verify no timestamps in plain output
+        # Spotlight wrappers present (warning before markers)
+        assert "{{UNTRUSTED CONTENT" in plain_content
+        assert re.search(r"\[EXTERNAL_TRANSCRIPT_[0-9a-f]{16}_START\]", plain_content)
+        assert re.search(r"\[EXTERNAL_TRANSCRIPT_[0-9a-f]{16}_END\]", plain_content)
+        # Verify no transcript timestamps in plain output
         assert "[00:00:" not in plain_content

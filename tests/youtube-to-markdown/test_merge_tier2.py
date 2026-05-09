@@ -125,19 +125,24 @@ class TestMergeKeptComments:
 
 class TestSafetyWrapperIntegration:
     def test_merged_content_wrapped_in_safety_tags(self) -> None:
+        import re
+
         prefiltered = "### 1. @alice (10 likes)\n\nHello\n"
         candidates = [{"index": 5, "author": "bob", "likes": 2, "text": "World"}]
         result = merge_kept_comments(prefiltered, candidates, [5])
         wrapped = wrap_untrusted_content(result, "comments")
-        assert "<untrusted_comments_content>" in wrapped
-        assert "</untrusted_comments_content>" in wrapped
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_START\]", wrapped)
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_END\]", wrapped)
         assert "### 1. @alice" in wrapped
         assert "### 2. @bob" in wrapped
 
     def test_empty_keep_wrapped_in_safety_tags(self) -> None:
+        import re
+
         prefiltered = "### 1. @alice (10 likes)\n\nHello\n"
         wrapped = wrap_untrusted_content(prefiltered, "comments")
-        assert "<untrusted_comments_content>" in wrapped
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_START\]", wrapped)
+        assert re.search(r"\[EXTERNAL_COMMENTS_[0-9a-f]{16}_END\]", wrapped)
         assert "@alice" in wrapped
 
 

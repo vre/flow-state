@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.3] - 2026-05-08
+
+### Security
+- New `injection_defense.py` module: NFKC normalization, invisible/BIDI strip, expanded marker coverage (chat-template tokens, Llama markers, system markers, role XML), randomized nonce wrapper
+- Defense applied to all untrusted text reaching LLM: subject, from, body, snippet, attachment filename + content_type, folder names, account names
+- Wrapper switched from fixed `<untrusted_email_content>` XML tags to per-call randomized `[EXTERNAL_EMAIL_<8hex>_START]` / `[EXTERNAL_EMAIL_<8hex>_END]` delimiters (defeats pre-computable boundary attacks)
+- Banner aggregation in list/search/folders/accounts: shown once at top when any row triggers
+- `use_mail` docstring (FastMCP tool description) explicitly tells the LLM that content inside the markers is untrusted
+
+### Removed
+- `_contains_injection_patterns`, `_sanitize_for_delimiters`, `_wrap_email`, `UNTRUSTED_WARNING` (replaced by new module)
+
 ## [0.7.2] - 2026-04-20
 
 ### Fixed
