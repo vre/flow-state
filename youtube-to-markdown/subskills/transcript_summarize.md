@@ -15,7 +15,7 @@ INPUT: <output_directory>/${BASE_NAME}_transcript_no_timestamps.txt
 OUTPUT: <output_directory>/${BASE_NAME}_summary.md
 TRANSCRIPT_BYTES: <size of transcript file in bytes>
 ROUTING: ./summary_formats.md
-FORMATS_DIR: ./formats/
+FORMATS_DIR: ../formats/
 
 1. Read ROUTING file. Note the length budget table (section 3) — it sets a hard ceiling based on TRANSCRIPT_BYTES.
 

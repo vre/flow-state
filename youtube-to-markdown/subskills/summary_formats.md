@@ -37,19 +37,8 @@ Read the format file. Apply its template and rules to produce the summary.
 
 | Transcript size | Max summary ratio | Format constraint |
 |---|---|---|
-| < 8000 bytes | 30% | Use flat-bullets override: ## heading + TL;DR + flat bullet list (max 5-8 bullets). Exception: TUTORIAL always uses step-list regardless of size. |
+| < 8000 bytes | 30% | Override: read flat-bullets.md (max 5-8 bullets). Exception: TUTORIAL always uses step-list regardless of size. |
 | 8000-15000 bytes | 15% | Use format but max 2-3 sections/units. |
 | > 15000 bytes | 10% | Normal format rules. |
 
 This is a hard ceiling, not a suggestion. If output exceeds the ratio, cut sections or compress bullets until it fits.
-
-## 4. Cross-cutting rules
-
-Apply to ALL formats, in addition to format-specific rules:
-
-- Start headers from ## level (no H1)
-- First element: `## [Main heading for the entire video]` — one sentence, informative
-- Second element: `**TL;DR**: [1 sentence synthesis]` — mandatory, never remove
-- Last section (optional): `## Hidden Gems` — valuable tangents/side narratives outside main structure
-- No language switching: output in the language the video is spoken in
-- Preserve structural elements specific to each format (Prerequisites, Result, What/Why/How)

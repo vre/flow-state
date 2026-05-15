@@ -50,7 +50,7 @@ def main() -> None:
 
     base_name = args[0]
     output_dir = Path(args[1]) if len(args) > 1 else Path(".")
-    template_dir = Path(__file__).parent.parent / "templates"
+    template_dir = Path(__file__).parent / "templates"
 
     try:
         finalizer = Finalizer()
