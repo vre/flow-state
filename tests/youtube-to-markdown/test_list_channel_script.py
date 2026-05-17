@@ -122,7 +122,7 @@ def test_list_channel_default_limit_is_50(tmp_path: Path, monkeypatch, capsys) -
         },
     )
     monkeypatch.setattr(module, "find_output_dir", lambda base_dir, channel_id: None)
-    monkeypatch.setattr(module, "suggest_output_dir", lambda base_dir, channel_name, channel_id: None)
+    monkeypatch.setattr(module, "suggest_output_dir", lambda base_dir, channel_name, channel_id: base_dir / "suggested")
     monkeypatch.setattr(
         module.sys,
         "argv",
@@ -172,7 +172,7 @@ def test_list_channel_custom_limit_and_offset(tmp_path: Path, monkeypatch, capsy
         },
     )
     monkeypatch.setattr(module, "find_output_dir", lambda base_dir, channel_id: None)
-    monkeypatch.setattr(module, "suggest_output_dir", lambda base_dir, channel_name, channel_id: None)
+    monkeypatch.setattr(module, "suggest_output_dir", lambda base_dir, channel_name, channel_id: base_dir / "suggested")
     monkeypatch.setattr(
         module.sys,
         "argv",
@@ -193,3 +193,32 @@ def test_list_channel_custom_limit_and_offset(tmp_path: Path, monkeypatch, capsy
     assert output["page"]["offset"] == 100
     assert output["page"]["count"] == 10
     assert output["page"]["has_more"] is True
+
+
+def test_no_suggestion_when_suggested_dir_already_exists(tmp_path: Path, monkeypatch, capsys) -> None:
+    """output_dir_suggestion is not emitted when the suggested directory already exists."""
+    module = _load_list_channel_module()
+
+    existing_channel_dir = tmp_path / "Test Channel (UC123)"
+    existing_channel_dir.mkdir()
+
+    monkeypatch.setattr(module, "list_channel_videos", lambda *a, **kw: [{"id": "raw1"}])
+    monkeypatch.setattr(
+        module,
+        "parse_channel_metadata",
+        lambda entry: {"name": "Test Channel", "id": "UC123", "url": "", "total_videos": 1, "verified": False},
+    )
+    monkeypatch.setattr(
+        module,
+        "parse_channel_entry",
+        lambda entry: {"video_id": "abc123", "title": "V", "views": "1K", "view_count": 1000, "duration": "1:00", "url": ""},
+    )
+    monkeypatch.setattr(module, "find_output_dir", lambda base_dir, channel_id: None)
+    monkeypatch.setattr(module, "match_existing_videos", lambda videos, output_dir: (videos, []))
+    monkeypatch.setattr(module, "suggest_output_dir", lambda base_dir, name, id: existing_channel_dir)
+    monkeypatch.setattr(module.sys, "argv", ["22_list_channel.py", "https://youtube.com/@test", str(tmp_path)])
+
+    module.main()
+    output = json.loads(capsys.readouterr().out)
+
+    assert "output_dir_suggestion" not in output

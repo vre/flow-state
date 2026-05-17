@@ -82,10 +82,12 @@ def main() -> None:
     else:
         new_videos, existing_videos = videos, []
 
-    # Build suggestion if no existing videos found anywhere
+    # Build suggestion only when directory doesn't exist yet
     suggestion = None
     if not existing_videos and channel_meta["name"] and channel_meta["id"]:
-        suggestion = str(suggest_output_dir(output_dir, channel_meta["name"], channel_meta["id"]))
+        suggested = suggest_output_dir(output_dir, channel_meta["name"], channel_meta["id"])
+        if not suggested.exists():
+            suggestion = str(suggested)
 
     # has_more: if we got exactly limit entries, there's likely more
     has_more = len(videos) == limit

@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.17.0] - 2026-05-17
+
+### Skill architecture cleanup
+- Format templates now show complete output structure: `## heading`, `**TL;DR**`, body, and `## Hidden Gems` are in each format file's Template section — no cross-referencing required
+- `flat-bullets.md`: explicit rule that Hidden Gems is omitted (TIPS content is fully enumerable by category)
+- Cross-cutting rules section removed from `summary_formats.md` — rules are now co-located with each format
+- Short-content routing in `summary_formats.md` §3 references `flat-bullets.md` instead of inline description
+- 5 archived format files removed: `claim-first`, `concept-card`, `dialogue-essence`, `interview-prose`, `what-why-how`
+- Directory restructure: `subskills/formats/` → `formats/` at skill root; `templates/` → `scripts/templates/` (assembler templates co-located with assembler)
+
 ## [2.16.0] - 2026-05-09
 
 ### Injection defense hardening for content_safety
