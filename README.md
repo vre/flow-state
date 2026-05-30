@@ -31,7 +31,7 @@
 
 - `youtube-to-markdown v3.0.0` — Summary format overhaul: claim-bullets as default (TL;DR + claim list + Hidden Gems), themed-claims for long interviews, step-list for tutorials, flat-bullets for tips/short content. Prompt injection defense hardened to three layers. Bug fixes: channel dir prompt, N/A view counts hidden.
 
-- `imap-stream-mcp v0.7.3` — Injection defense module: NFKC normalization + invisible/BIDI strip, randomized nonce delimiters on all untrusted content reaching the LLM.
+- `imap-stream-mcp v1.0.0` — Multi-account fix: `account` parameter now works across all actions. Injection defense module: NFKC normalization + invisible/BIDI strip, randomized nonce delimiters on all untrusted content reaching the LLM.
 
 ## Quick Start
 

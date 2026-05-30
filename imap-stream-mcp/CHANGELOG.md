@@ -1,6 +1,13 @@
 # Changelog
 
-## [0.7.3] - 2026-05-08
+## [1.0.0] - 2026-05-30
+
+### Fixed
+- Multi-account support: `account` parameter now wired through `use_mail()` to all 9 imap_client calls
+- Draft From header uses correct account credentials instead of always defaulting
+
+### Added
+- `account` field on `MailAction` for multi-account selection
 
 ### Security
 - New `injection_defense.py` module: NFKC normalization, invisible/BIDI strip, expanded marker coverage (chat-template tokens, Llama markers, system markers, role XML), randomized nonce wrapper
@@ -11,15 +18,6 @@
 
 ### Removed
 - `_contains_injection_patterns`, `_sanitize_for_delimiters`, `_wrap_email`, `UNTRUSTED_WARNING` (replaced by new module)
-
-## [0.7.2] - 2026-04-20
-
-### Fixed
-- Multi-account support: `account` parameter now wired through `use_mail()` to all 9 imap_client calls
-- Draft From header uses correct account credentials instead of always defaulting
-
-### Added
-- `account` field on `MailAction` for multi-account selection
 
 ## [0.7.1] - 2026-03-09
 
