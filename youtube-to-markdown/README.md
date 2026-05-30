@@ -6,6 +6,12 @@ Transform YouTube videos into storable knowledge as Markdown.
 - **Hidden Gems** - Insights that normal summarization loses
 - **Modular output** - Choose from summary, transcript, comments, or all
 
+## Latest Release Highlights
+
+**v3.0.0** — Summary format overhaul: claim-bullets as default (TL;DR + claim list + Hidden Gems), themed-claims for long multi-theme interviews, step-list for tutorials, flat-bullets for tips. Each format defines its complete output structure — no cross-referencing. Prompt injection defense hardened to three layers: NFKC normalization + Unicode Cf-strip, iterative role-token stripping, randomized 64-bit nonce delimiters. Channel browser: fixed spurious "create directory?" prompt on existing folders; view counts hidden when unavailable (yt-dlp regression [#13879](https://github.com/yt-dlp/yt-dlp/issues/13879)).
+
+**v2.15.0** — Paragraph break detection moved to script (eliminates 100K+ token improvised Python); deterministic transcript structure. Watch guide: HH:MM:SS timestamps, WATCH/SKIM/READ-ONLY gate, clickable summary table, cross-links to transcript.
+
 ## Features
 
 - **Summary** - TL;DR + structured summary with four content-specific formats (Tips, Interview, Educational, Tutorial)
@@ -21,7 +27,7 @@ Transform YouTube videos into storable knowledge as Markdown.
 
 ## Security
 
-Defends against prompt injection in YouTube content. User-generated content (descriptions, comments, transcripts) is wrapped in `<untrusted_xxx_content>` XML tags with warnings, and injection patterns are escaped.
+Defends against prompt injection in YouTube content (descriptions, comments, transcripts). Three layers: NFKC normalization + Unicode format-character strip, iterative stripping of chat-template tokens (`<|im_start|>`, `[INST]`, `<<SYS>>`, role tags), and per-call randomized spotlight delimiters with 64-bit nonce. Content is wrapped and labeled as untrusted so the model treats it as data, not instructions.
 
 ## Installation for Claude Code
 
@@ -94,9 +100,10 @@ scripts/             # CLI entry points (numbered by pipeline order)
   40_backup.py
   41_update_metadata.py
   50_assemble.py
+  templates/         # Markdown assembly templates (used by 50_assemble.py)
 lib/                 # Importable library modules
-templates/           # Markdown output templates
-subskills/           # LLM instructions for Claude
+formats/             # Summary format definitions (claim-bullets, step-list, ...)
+subskills/           # LLM pipeline module instructions
 SKILL.md             # Main skill definition
 ```
 

@@ -29,13 +29,9 @@
 
 ## Latest Release Highlights
 
-- `youtube-to-markdown v2.16.0`
-  - Summary format overhaul: claim-bullets default, themed-claims for long interviews, archived concept-card and what-why-how
-  - Proportional byte budget enforced (<5KB→flat, 5-15KB→15%, >15KB→10%)
-  - Single-speaker classification fix (opinions→TIPS, explanations→EDUCATIONAL)
-  - Hidden Gems in all formats
+- `youtube-to-markdown v3.0.0` — Summary format overhaul: claim-bullets as default (TL;DR + claim list + Hidden Gems), themed-claims for long interviews, step-list for tutorials, flat-bullets for tips/short content. Prompt injection defense hardened to three layers. Bug fixes: channel dir prompt, N/A view counts hidden.
 
-- `imap-stream-mcp v0.7.2` — Multi-account fix: `account` parameter now works across all actions
+- `imap-stream-mcp v0.7.3` — Injection defense module: NFKC normalization + invisible/BIDI strip, randomized nonce delimiters on all untrusted content reaching the LLM.
 
 ## Quick Start
 

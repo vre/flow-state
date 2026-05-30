@@ -80,13 +80,15 @@ AskUserQuestion:
 - header: "Videos"
 - multiSelect: true
 - options:
-  - New video label: `"NEW: {title} ({views}, {duration}) ({video_id})"`
+  - New video label: `"NEW: {title} ({views}, {duration}) ({video_id})"` — if views is "N/A", omit it: `"NEW: {title} ({duration}) ({video_id})"`
     description: Haiku summary from Step 2
   - Growth video label: `"GROWTH: {title} — views: {stored} → {current} (+{pct}%) ({video_id})"`
 
 ### IF total > 4
 
 Write `<output_directory>/channel_selection.md`:
+
+When writing video entries: omit `{views}` and the preceding comma-space when views is "N/A".
 
 ```markdown
 # Channel: {name} — {n} new videos

@@ -1,27 +1,30 @@
 # Changelog
 
-## [2.17.0] - 2026-05-17
+## [3.0.0] - 2026-05-30
 
-### Skill architecture cleanup
-- Format templates now show complete output structure: `## heading`, `**TL;DR**`, body, and `## Hidden Gems` are in each format file's Template section — no cross-referencing required
-- `flat-bullets.md`: explicit rule that Hidden Gems is omitted (TIPS content is fully enumerable by category)
-- Cross-cutting rules section removed from `summary_formats.md` — rules are now co-located with each format
-- Short-content routing in `summary_formats.md` §3 references `flat-bullets.md` instead of inline description
+### Summary format overhaul
+- claim-bullets as default format: flat bullet list with claim sentences and supporting detail — no section headers
+- themed-claims for long multi-theme interviews: `### Theme` sections each with claim-bullets body
+- step-list for tutorials: numbered steps with Prerequisites and Result blocks
+- flat-bullets for tips/tools: category groupings, fully enumerable content
+- Proportional byte budgets per format; short content (< 8000 bytes) routes to flat-bullets
+- TL;DR and Hidden Gems defined inline per format — each format file shows its complete output structure
+- Cross-cutting rules removed from `summary_formats.md` — co-located with each format instead
 - 5 archived format files removed: `claim-first`, `concept-card`, `dialogue-essence`, `interview-prose`, `what-why-how`
-- Directory restructure: `subskills/formats/` → `formats/` at skill root; `templates/` → `scripts/templates/` (assembler templates co-located with assembler)
 
-## [2.16.0] - 2026-05-09
-
-### Injection defense hardening for content_safety
-- Three-layer defense replaces escape-and-XML-tag pattern (CyberSecEval 2: 26–41% → <2% attack success rate target)
+### Security
+- Three-layer injection defense replaces escape-and-XML-tag pattern (CyberSecEval 2: 26–41% → <2% attack success rate target)
 - Layer 1: NFKC normalization + Unicode Format-category strip — neutralizes zero-width chars, RTL overrides, BOM, tag chars (U+E0020–U+E007F)
 - Layer 2: iterative regex stripping of chat-template tokens (`<|im_start|>`, `[INST]`, `<<SYS>>`, `<start_of_turn>`, role XML) — catches nested patterns, false-positive-safe (`<systemd>`, `<system-design>`, `[INTRO]` preserved)
 - Layer 3: per-call randomized spotlight delimiters via `secrets.token_hex(8)` (64-bit nonce) — replaces predictable `<untrusted_*>` XML tags
-- `unwrap_untrusted_content` is now structural: whole-string match with nonce backreferences; no-op on raw text matching marker shapes
-- Idempotent re-wrap: double-wrap collapses to single canonical form, unwrap recovers original
-- Public API removed: `INJECTION_DETECTED_NOTICE`, `contains_injection_patterns`, `sanitize_for_delimiters` (dead external API)
-- Added `POTENTIAL_INJECTION_NOTICE` constant; notice text is "Potential injection — patterns stripped"
-- 78 new content_safety tests; 4 sibling test files updated for new wrapper format
+- Idempotent re-wrap: double-wrap collapses to single canonical form
+
+### Internal
+- Directory restructure: `subskills/formats/` → `formats/` at skill root; `templates/` → `scripts/templates/` (assembler templates co-located with assembler)
+
+### Bug fixes
+- Channel browser: no spurious "create directory?" prompt when channel folder already exists
+- Channel browser: view counts hidden when unavailable (yt-dlp regression [#13879](https://github.com/yt-dlp/yt-dlp/issues/13879)) — view growth tracking will resume when fixed
 
 ## [2.15.0] - 2026-03-27
 
