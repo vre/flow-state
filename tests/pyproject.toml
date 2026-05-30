@@ -5,16 +5,25 @@ description = "Tests for flow-state skills and MCP servers"
 requires-python = ">=3.11"
 dependencies = [
     "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
     "imap-stream-mcp",
+    "obsidian-slim-mcp",
 ]
 
 [tool.uv.sources]
 imap-stream-mcp = { path = "../imap-stream-mcp" }
+obsidian-slim-mcp = { path = "../obsidian-slim-mcp" }
 
 [tool.pytest.ini_options]
 testpaths = [
     "youtube-to-markdown",
     "imap-stream-mcp",
+    "obsidian-slim-mcp",
+]
+pythonpath = [
+    "../youtube-to-markdown",
+    "../imap-stream-mcp",
+    "../obsidian-slim-mcp",
 ]
 python_files = "test_*.py"
 python_functions = "test_*"

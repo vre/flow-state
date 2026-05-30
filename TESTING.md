@@ -47,10 +47,16 @@ tests/imap-stream-mcp/
 ├── test_flag_parsing.py
 ├── test_imap_client.py
 ├── test_imap_stream_mcp.py
+├── test_injection_defense.py
 ├── test_markdown_utils.py
 ├── test_markdown.py
 ├── test_search_flags.py
 └── test_session.py
+
+tests/obsidian-slim-mcp/
+├── test_cli.py
+├── test_client.py
+└── test_mcp.py
 ```
 
 ## Running Tests
@@ -62,6 +68,7 @@ cd tests && uv run pytest
 # Run specific project tests
 cd tests && uv run pytest youtube-to-markdown/
 cd tests && uv run pytest imap-stream-mcp/
+cd tests && uv run pytest obsidian-slim-mcp/
 
 # Common options
 uv run pytest -v              # Verbose
@@ -69,13 +76,13 @@ uv run pytest -x              # Stop on first failure
 uv run pytest -k "pattern"    # Run tests matching pattern
 ```
 
-## Release Validation (youtube-to-markdown v2.10.0)
+## Release Validation (youtube-to-markdown)
 
 ```bash
 # From plugin directory
 cd youtube-to-markdown
 uv run pytest -q
-uv run ruff check lib scripts tests
+uv run ruff check lib scripts formats subskills
 
 # Optional manual smoke test (network required)
 uv run python3 ./scripts/22_list_channel.py "https://www.youtube.com/channel/UCPjNBjflYl0-HQtUvOx0Ibw" /tmp/channel-test --limit 50
@@ -86,9 +93,10 @@ uv run python3 ./scripts/22_list_channel.py "https://www.youtube.com/channel/UCP
 # - Run update flow: Re-extract transcript on existing extraction
 
 # Summary format routing checks (interactive)
-# - Run INTERVIEW video: verify Concept Card output (claim headings, core+bullets+implication)
-# - Run TIPS video: verify flat-bullets output
-# - Run EDUCATIONAL video: verify what-why-how output
+# - Run TIPS video: verify flat-bullets output (category groupings, no Hidden Gems)
+# - Run TUTORIAL video: verify step-list output (numbered steps, Prerequisites, Result)
+# - Run long multi-theme INTERVIEW: verify themed-claims output (### Theme sections)
+# - Run default/EDUCATIONAL video: verify claim-bullets output (TL;DR + claim list + Hidden Gems)
 # - Verify Step 1 reports [TYPE] in status message
 ```
 

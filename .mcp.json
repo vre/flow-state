@@ -10,6 +10,20 @@
         "imap-stream"
       ],
       "env": {}
+    },
+    "obsidian-slim-mcp": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "--directory",
+        "./obsidian-slim-mcp",
+        "run",
+        "obsidian-slim-mcp"
+      ],
+      "env": {
+        "OBSIDIAN_API_KEY": "",
+        "OBSIDIAN_API_URL": "http://127.0.0.1:27123"
+      }
     }
   }
 }
