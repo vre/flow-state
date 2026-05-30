@@ -60,5 +60,12 @@ tests/youtube-to-markdown/qualitative/videos/
 # YTM intermediate work files (kept with --debug)
 examples/youtube_*
 
+# Screenshots
+*.png
+
+# Chrome test profiles
+chromectl-profile/
+chromectl-test*/
+
 # Serena MCP
 .serena/

@@ -59,6 +59,15 @@ tests/obsidian-slim-mcp/
 └── test_mcp.py
 ```
 
+### Browser Automation
+
+```
+tests/chrome-control/
+├── test_chromectl.py       # 84 unit tests (mocked CDP, no Chrome needed)
+├── test_integration.sh     # Integration tests against real Chrome
+└── test_idle_shutdown.sh   # Daemon idle timeout tests (real Chrome)
+```
+
 ## Running Tests
 
 ```bash
@@ -69,6 +78,13 @@ cd tests && uv run pytest
 cd tests && uv run pytest youtube-to-markdown/
 cd tests && uv run pytest imap-stream-mcp/
 cd tests && uv run pytest obsidian-slim-mcp/
+
+# chrome-control
+cd tests && uv run pytest chrome-control/
+
+# chrome-control integration (requires Chrome with remote debugging enabled)
+cd tests/chrome-control && bash test_integration.sh
+cd tests/chrome-control && bash test_idle_shutdown.sh
 
 # Common options
 uv run pytest -v              # Verbose

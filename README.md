@@ -27,7 +27,26 @@
 - 🛡️ **Content Safety**: Encapsulates email content to avoid context poisoning
 - 🏢 **Multi-account**: Multiple account support with named switching
 
+## **Chrome Control**
+
+> **Your Browser, Your Agent's Eyes and Hands.**
+> LLM agents can build deterministic shell scripts that drive your real browser — no Puppeteer, no Playwright, no separate profile. One CLI, your existing Chrome session, your cookies and logins.
+
+- 🤖 **Scriptable by agents**: CLI commands compose into shell scripts — the LLM writes `chromectl` pipelines, not fragile browser automation code
+- 🔗 **Auto-connect**: Connects to your running Chrome session (M144+) — all tabs, cookies, logins
+- 🔌 **Daemon mode**: Single persistent WebSocket, Unix socket interface, no repeated permission dialogs
+- 🧩 **DOM helpers**: get-text, get-html, exists, count, click, fill, scroll, wait — no boilerplate JS
+- 📸 **Screenshots**: Viewport or full-page PNG capture
+- 📋 **Console monitoring**: Stream live console output for a duration
+- 🛠️ **Standalone CLI**: Works without an LLM too — `chromectl.py start` and go
+
 ## Latest Release Highlights
+
+- **NEW** `chrome-control v1.0.0` — Chrome DevTools Protocol CLI and skill
+  - Auto-connect to your running Chrome (M144+) — no separate profile needed
+  - Daemon mode with persistent WebSocket and Unix socket interface
+  - DOM helper commands: get-text, exists, count, click, fill, wait, and more
+  - Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill)
 
 - `youtube-to-markdown v3.0.0` — Summary format overhaul: claim-bullets as default (TL;DR + claim list + Hidden Gems), themed-claims for long interviews, step-list for tutorials, flat-bullets for tips/short content. Prompt injection defense hardened to three layers. Bug fixes: channel dir prompt, N/A view counts hidden.
 
@@ -43,6 +62,7 @@ Add the marketplace and install:
 
 /plugin install youtube-to-markdown@flow-state
 /plugin install imap-stream-mcp@flow-state
+/plugin install chrome-control@flow-state
 ```
 
 ### Usage
@@ -66,6 +86,7 @@ As you don't have any configured yet, it will show you how to set up.
 ### Plugins
 - [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
 - [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
+- [chrome-control](chrome-control/README.md) - Chrome automation via CDP, CLI reference
 
 ## Examples of Youtube to Markdown Output
 
@@ -83,6 +104,8 @@ All examples are CC-licensed videos with summary and transcript.
 ## The Backstory
 
 I have been thinking a while to extract YouTube transcripts into Markdown format for my Obsidian vault. I knew of yt-dlp, but I wanted something more that would clean, format, summarize, analyze etc. LocalLlama was one option but never got the time.. Finally as checking out Claude Code skills in wild I thought that maybe there would be something already Done for Me. Well there was not, but I found one youtube skill to build upon. Four months later I added IMAP email access as well, as I wanted to have email reading and drafting capabilities in Claude Code in lightweight manner.
+
+An LLM occasionally needs eyes and hands on the web — most existing browser automation solutions are fat (Puppeteer, Playwright, full MCP servers). After a bit of discovery I found [pengelbrecht's chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill), a clean single-file CDP client, and modernized it for Chrome M144+ auto-connect and daemon mode.
 
 Many ideas for the future - maybe knowledge work, context management, and productivity tools for Claude Code and beyond. Let's see where this goes and is there time for it..
 

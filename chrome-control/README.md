@@ -1,26 +1,16 @@
-# chrome-control — CLI and Skill to Control Chrome over DevTools Protocol
+# CLI and Skill to Control Chrome over DevTools Protocol
 
-Control Chrome programmatically via CDP (Chrome DevTools Protocol) — the same protocol that powers Chrome's built-in DevTools (F12). Inspect pages, run JavaScript, take screenshots, and monitor console output across all your tabs, cookies, and logged-in sessions.
+Control Chrome programmatically via CDP (Chrome DevTools Protocol). That is the same protocol that powers Chrome's built-in DevTools (F12). Inspect pages, run JavaScript, take screenshots, and monitor console output across all your tabs, cookies, and logged-in sessions.
 
 Built for two audiences:
-- **Claude Code skill** — Claude debugs web apps through your real browser session
-- **Standalone CLI** — command-line Chrome automation via `chromectl.py`
-
-## Why this exists
-
-Chrome 136–146 progressively locked down remote debugging on the default profile to prevent cookie theft. The traditional approach — launching Chrome with `--remote-debugging-port` and a separate `--user-data-dir` — still works but requires a separate profile (no cookies, no logins, no extensions).
-
-Chrome 144 (November 2025) introduced an alternative: enable remote debugging from inside a running browser via `chrome://inspect/#remote-debugging`. This enables CDP access to **your existing session** — all profiles, all cookies, all logged-in sites. The tradeoff: each new WebSocket connection triggers a permission dialog.
-
-chrome-control handles both modes:
-- **Auto-connect** (Chrome 144+): connects to your running Chrome via `DevToolsActivePort`, keeps one persistent connection to avoid repeated permission prompts
-- **Legacy** (`launch`): starts a separate Chrome instance with full CDP access and a separate profile
+- **Skill**: Use your LLM to debug web apps through your real browser session with Claude or other skillful LLM
+- **Standalone CLI**: Use for command-line script automation via `chromectl.py`
 
 ## Quick start
 
 ### 1. Enable remote debugging in Chrome
 
-Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles. Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
+Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles simultaneously . Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
 
 ### 2. Start chromectl
 
@@ -30,7 +20,7 @@ Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies
 
 (Requires [uv](https://github.com/astral-sh/uv) — the script's shebang handles dependencies automatically.)
 
-Chrome will show a permission dialog — click Allow. chromectl keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
+Chrome will show a permission dialog, click Allow. chromectl keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
 
 ### 3. Use it
 
@@ -76,13 +66,13 @@ JavaScript evaluation is the universal tool — anything you can do in the DevTo
 # Extract structured data
 ./chromectl.py send eval --id $ID -e "({title: document.title, url: location.href})"
 
-# Await async operations
-./chromectl.py send eval --id $ID -e "fetch('/api/data').then(r => r.json())"
+# Await async operations (top-level await supported)
+./chromectl.py send eval --id $ID -e "await fetch('/api/data').then(r => r.json())"
 ```
 
 (`$ID` is a target ID from `./chromectl.py send list` output.)
 
-## What you can't do (Chrome 144+ limitations)
+## What you can't do (Chrome M144+ limitations)
 
 - **No HTTP discovery API** — `/json`, `/json/version` return 404. chromectl uses `Target.getTargets()` over WebSocket instead.
 - **No direct page WebSocket** — `ws://.../devtools/page/<id>` returns 403. All page interaction goes through flat sessions multiplexed over the browser WebSocket.
@@ -94,42 +84,56 @@ Legacy mode (`launch`) has none of these limitations — it uses a separate prof
 ## How it works
 
 ```
-                  ┌─────────────────────────────┐
+                  ┌──────────────────────────────┐
                   │  Chrome (user's session)     │
                   │  chrome://inspect enabled    │
-                  └──────────┬──────────────────┘
+                  └──────────┬───────────────────┘
                              │ WebSocket (one persistent connection)
-                  ┌──────────┴──────────────────┐
+                  ┌──────────┴───────────────────┐
                   │  chromectl daemon            │
                   │  Unix socket + auto-reconnect│
                   │  idle shutdown after 5 min   │
-                  └──────────┬──────────────────┘
+                  └──────────┬───────────────────┘
                              │ JSON line protocol
-              ┌──────────────┼──────────────────┐
+              ┌──────────────┼───────────────────┐
               │              │                   │
           nc -U sock    chromectl send      Python script
                                           (chromectl_daemon.py)
 ```
 
-**Flat sessions**: Chrome 144+ blocks direct page WebSocket URLs. chromectl maintains a single browser-level WebSocket and multiplexes page sessions using `Target.attachToTarget` with `flatten=true`. Each page gets a `sessionId`; CDP commands and events are routed by this ID over the shared connection.
+**Flat sessions**: Chrome M144+ blocks direct page WebSocket URLs. chromectl maintains a single browser-level WebSocket and multiplexes page sessions using `Target.attachToTarget` with `flatten=true`. Each page gets a `sessionId`; CDP commands and events are routed by this ID over the shared connection.
 
 ## Install
 
-### Claude Code (marketplace)
+### Claude Code
 
 ```bash
-/plugin install chrome-control@vre
+claude plugin marketplace add vre/flow-state
+claude plugin install chrome-control
 ```
 
-### Clone manually
+### Other coding agents
+
+Clone the repo and point your agent at the `SKILL.md` file:
 
 ```bash
-git clone https://github.com/vre/chrome-control.git
-cd chrome-control
+git clone https://github.com/vre/flow-state.git
+```
+
+The skill definition is in `chrome-control/SKILL.md`. How to load it depends on the agent:
+
+- **GitHub Copilot** — copy SKILL.md content into `.github/copilot-instructions.md`
+- **OpenAI Codex** — copy SKILL.md content into `AGENTS.md` or pass via `--instructions`
+- **Cursor / Windsurf** — copy SKILL.md content into `.cursorrules` or equivalent
+
+### Standalone CLI (no LLM needed)
+
+```bash
+git clone https://github.com/vre/flow-state.git
+cd flow-state/chrome-control
 chmod +x chromectl.py
+./chromectl.py start
 ```
-
-For Claude Code skill use, clone into `~/.claude/skills/` and restart Claude Code.
 
 ## Commands
 
@@ -143,6 +147,10 @@ For Claude Code skill use, clone into `~/.claude/skills/` and restart Claude Cod
 | `send eval --id <id> -e <expr>` | Run JavaScript in a tab |
 | `send screenshot --id <id> [-o file]` | Capture PNG screenshot |
 | `send console-tail --id <id> [--for N]` | Stream console messages |
+| `send targets` | List all targets (pages, workers, iframes) |
+| `send status` | Show daemon connection status |
+| `send cdp --method <method>` | Send raw CDP command (auto-connect only) |
+| `send worker-eval --id <id> -e <expr>` | Run JavaScript in a service worker |
 | `launch [--headless]` | Launch a separate Chrome instance (legacy) |
 
 ### Socket protocol
@@ -161,12 +169,15 @@ echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-$(id -u).sock
 For scripts that need chromectl access programmatically:
 
 ```python
-from chromectl_daemon import daemon_context, send_command
+from chromectl_daemon import daemon_context, send_command, ensure_daemon_running
 
 async with daemon_context() as socket_path:
     result = await send_command({"cmd": "list"}, socket_path)
     for tab in result["targets"]:
         print(tab["title"])
+
+# Or for mid-run recovery (starts daemon if needed, idempotent):
+socket_path = await ensure_daemon_running()
 ```
 
 ## Legacy mode
@@ -185,12 +196,23 @@ TARGET=$(./chromectl.py open https://example.com | jq -r .id)
 
 - **Python 3.11+**
 - **[uv](https://github.com/astral-sh/uv)** (the script's shebang uses `uv run`)
-- **Google Chrome** (Chrome 144+ for auto-connect, any version for legacy mode)
+- **Google Chrome** (Chrome M144+ for auto-connect, any version for legacy mode)
 - **macOS or Linux** (Unix socket requires POSIX)
+
+## Why this exists
+
+Chrome M136 (April 2025) through M146 progressively locked down remote debugging on the default profile to prevent cookie theft. The traditional approach of launching Chrome with `--remote-debugging-port` and a separate `--user-data-dir`  still works but requires a separate profile (no cookies, no logins, no extensions).
+
+Chrome M144 (January 2026) introduced an alternative: enable remote debugging from inside a running browser via `chrome://inspect/#remote-debugging`. This enables CDP access to **your existing session** with all profiles, all cookies, all logged-in sites. The tradeoff is that each new WebSocket connection triggers a permission dialog.
+
+chrome-control handles both modes:
+
+- **Auto-connect** (Chrome M144+): connects to your running Chrome via `DevToolsActivePort`, keeps one persistent connection to avoid repeated permission prompts
+- **Legacy** (`launch`): starts a separate Chrome instance with full CDP access and a separate profile
 
 ## Fork history
 
-Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill). Additions: Chrome 144+ auto-connect, daemon mode, flat session multiplexing, reconnect handling, liveness probes.
+Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill). Additions: Chrome M144+ auto-connect, daemon mode, flat session multiplexing, reconnect handling, liveness probes.
 
 ## License
 

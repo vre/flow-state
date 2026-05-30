@@ -26,7 +26,13 @@ This setup ensures:
 - No reinstall needed after changes
 - Same pattern for both skills and MCP servers
 
-Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation.
+**Browser automation** (`chrome-control/`):
+```
+chrome-control/chromectl.py    (standalone CLI, uv inline deps)
+chrome-control/SKILL.md        (Claude Code skill definition)
+```
+
+Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation. chrome-control has no MCP server — it's a CLI tool and skill.
 
 ## Dev Skills from flow-jigs
 

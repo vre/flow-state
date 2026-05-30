@@ -26,6 +26,15 @@
       "version": "1.0.0",
       "category": "productivity",
       "keywords": ["email", "imap", "mcp"]
+    },
+    {
+      "name": "chrome-control",
+      "source": "./chrome-control",
+      "description": "Control Chrome via CDP — debug web apps, run JavaScript, take screenshots, monitor console. Connects to your running Chrome session (M144+) or launches a separate instance.",
+      "version": "1.0.0",
+      "category": "browser-automation",
+      "keywords": ["chrome", "cdp", "devtools", "debugging", "screenshots", "browser"],
+      "skills": ["./"]
     }
   ]
 }

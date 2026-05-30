@@ -35,7 +35,7 @@ async def send_command(req: dict, socket_path: str | None = None) -> dict:
     try:
         writer.write(json.dumps(req).encode() + b"\n")
         await writer.drain()
-        response = await reader.readline()
+        response = await asyncio.wait_for(reader.readline(), timeout=60)
     finally:
         writer.close()
         await writer.wait_closed()
@@ -150,6 +150,6 @@ class daemon_context:
             await _send_quit(self.socket_path)
             if self._proc:
                 try:
-                    self._proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
+                    await asyncio.wait_for(asyncio.to_thread(self._proc.wait), timeout=5)
+                except (asyncio.TimeoutError, subprocess.TimeoutExpired):
                     self._proc.kill()

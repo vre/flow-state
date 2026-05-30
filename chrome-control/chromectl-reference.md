@@ -4,17 +4,26 @@ Complete reference for `chromectl.py` — the CLI for chrome-control.
 
 ## Command Overview
 
-**Daemon mode (Chrome 144+):**
+**Top-level commands:**
 - `start` — Connect to running Chrome, listen on Unix socket
 - `stop` — Stop daemon and any launched Chrome instances
-- `send <cmd>` — Send command to running daemon
-
-**Commands** (via `send` in daemon mode, or direct in legacy mode):
-- `list` — List all open tabs/targets
+- `list` — List open tabs (pages only)
 - `open <url>` — Open a new tab
-- `eval --id <id> -e <expr>` — Execute JavaScript in a tab
-- `screenshot --id <id> [-o file]` — Capture screenshot
-- `console-tail --id <id> [--for N]` — Stream console messages
+- `status` — Show daemon connection status
+- `targets` — List all targets (pages, workers, iframes)
+- `helpers` — List DOM helper commands
+- `cdp <method>` — Raw CDP command (auto-connect only)
+
+**Target commands** — `chromectl TARGET <command> [args]`:
+- `eval <expr>` — Execute JavaScript in a tab
+- `screenshot [-o file] [--full-page]` — Capture screenshot
+- `console-tail [--for N]` — Stream console messages
+- `worker-eval <expr>` — Execute JavaScript in a worker
+- `navigate <url>` — Navigate tab to URL
+- `reload` / `back` / `forward` — Navigation
+- 30+ DOM helpers — see `chromectl helpers`
+
+Target IDs come from `list` or `open` output. Prefix match OK (e.g. `ABC1` instead of full 32-char ID).
 
 **Legacy mode:**
 - `launch [--headless]` — Launch a separate Chrome instance with full CDP access
@@ -28,7 +37,7 @@ Complete reference for `chromectl.py` — the CLI for chrome-control.
 
 Place global options BEFORE the command:
 ```bash
-./chromectl.py --port 9223 send list
+./chromectl.py --port 9223 list
 ```
 
 ## start — Connect to Chrome
@@ -44,7 +53,7 @@ The daemon keeps one persistent WebSocket connection to Chrome and multiplexes p
 Auto-shuts down after 5 minutes of inactivity or when Chrome closes.
 
 **Prerequisites:**
-- Chrome Chrome 144+ with remote debugging enabled: `chrome://inspect/#remote-debugging` → toggle on
+- Chrome M144+ (January 2026+) with remote debugging enabled: `chrome://inspect/#remote-debugging` → toggle on
 - Applies to all profiles once enabled
 
 ## stop — Stop daemon and Chrome
@@ -55,23 +64,15 @@ Auto-shuts down after 5 minutes of inactivity or when Chrome closes.
 
 Sends quit to the daemon (if socket exists), then terminates any Chrome processes launched by chromectl in legacy mode (identified by chromectl profile directories).
 
-## send — Send command to daemon
-
-```bash
-./chromectl.py send <command> [options]
-```
-
-Routes a command through the daemon's Unix socket. All commands below can be used with `send`.
-
 ## list — List Targets
 
 ```bash
-./chromectl.py send list
+./chromectl.py list
 ```
 
 Returns JSON objects (one per line) for each target:
 ```json
-{"id": "ABC123", "type": "page", "title": "Page Title", "url": "https://...", "attached": null}
+{"id": "ABC123", "type": "page", "title": "Page Title", "url": "https://..."}
 ```
 
 **Target types:** page, background_page, service_worker, iframe
@@ -79,7 +80,7 @@ Returns JSON objects (one per line) for each target:
 ## open — Open New Tab
 
 ```bash
-./chromectl.py send open <url>
+./chromectl.py open <url>
 ```
 
 Returns JSON with target ID:
@@ -89,7 +90,7 @@ Returns JSON with target ID:
 
 **Extract target ID:**
 ```bash
-TARGET=$(./chromectl.py send open https://example.com | jq -r .id)
+TARGET=$(./chromectl.py open https://example.com | jq -r .id)
 ```
 
 **Supported URLs:**
@@ -99,49 +100,29 @@ TARGET=$(./chromectl.py send open https://example.com | jq -r .id)
 ## eval — Execute JavaScript
 
 ```bash
-./chromectl.py send eval --id <target-id> -e <expression>
+./chromectl.py TARGET eval <expression>
 ```
 
 **Features:**
-- Automatically awaits promises
+- Top-level `await` supported (REPL mode)
 - Returns JSON-serialized values
-- REPL mode enabled
 
 **Common patterns:**
 
 ```bash
-# Page inspection
-send eval --id $ID -e "document.title"
-send eval --id $ID -e "window.location.href"
-send eval --id $ID -e "document.readyState"
-
-# DOM queries
-send eval --id $ID -e "document.querySelector('h1').innerText"
-send eval --id $ID -e "document.querySelectorAll('a').length"
-
-# Return structured data
-send eval --id $ID -e "({title: document.title, url: location.href})"
-
-# Async operations
-send eval --id $ID -e "fetch('/api/data').then(r => r.json())"
-
-# Page interaction
-send eval --id $ID -e "document.querySelector('button#submit').click()"
-send eval --id $ID -e "window.scrollTo(0, document.body.scrollHeight)"
-
-# Navigate
-send eval --id $ID -e "window.location.href = 'https://example.com'"
-
-# Check for errors
-send eval --id $ID -e "window.onerror"
-send eval --id $ID -e "typeof myFunction"
+./chromectl.py $ID eval "document.title"
+./chromectl.py $ID eval "document.readyState"
+./chromectl.py $ID eval "({title: document.title, url: location.href})"
+./chromectl.py $ID eval "await fetch('/api/data').then(r => r.json())"
 ```
+
+Most common eval patterns have helper commands — see `./chromectl.py helpers`. Use eval for complex or custom JS.
 
 **Advanced patterns:**
 
 ```bash
 # Performance timing — page load breakdown (Navigation Timing L2)
-send eval --id $ID -e "
+./chromectl.py $ID eval "
 (() => { const n = performance.getEntriesByType('navigation')[0];
   return { dns: n.domainLookupEnd - n.domainLookupStart,
     tcp: n.connectEnd - n.connectStart,
@@ -150,10 +131,10 @@ send eval --id $ID -e "
     load: n.loadEventEnd - n.startTime }; })()"
 
 # React component state (works with React 18 createRoot and 19)
-send eval --id $ID -e "
+./chromectl.py $ID eval "
 (() => { const el = document.querySelector('#root') || document.querySelector('#app');
   if (!el) return 'no root element';
-  const key = Object.keys(el).find(k => k.startsWith('__reactFiber$') || k.startsWith('__reactContainer$'));
+  const key = Object.keys(el).find(k => k.startsWith('__reactFiber\$') || k.startsWith('__reactContainer\$'));
   if (!key) return 'no React fiber found';
   const fiber = el[key];
   const states = [];
@@ -166,7 +147,7 @@ send eval --id $ID -e "
 ## screenshot — Capture Screenshot
 
 ```bash
-./chromectl.py send screenshot --id <target-id> [-o output.png] [--full-page]
+./chromectl.py TARGET screenshot [-o output.png] [--full-page]
 ```
 
 **Options:**
@@ -175,14 +156,14 @@ send eval --id $ID -e "
 
 **Examples:**
 ```bash
-./chromectl.py send screenshot --id $ID -o page.png
-./chromectl.py send screenshot --id $ID -o full.png --full-page
+./chromectl.py $ID screenshot -o page.png
+./chromectl.py $ID screenshot -o full.png --full-page
 ```
 
 ## console-tail — Stream Console
 
 ```bash
-./chromectl.py send console-tail --id <target-id> [--for SECONDS]
+./chromectl.py TARGET console-tail [--for SECONDS]
 ```
 
 **Options:**
@@ -195,19 +176,102 @@ send eval --id $ID -e "
 {"t": "+2.011s", "console": "log", "args": ["Message text"]}
 {"t": "+2.015s", "console": "warning", "args": ["Warning text"]}
 {"t": "+2.020s", "console": "error", "args": ["Error message"]}
-{"t": "+5.123s", "log": {"level": "error", "source": "javascript", "text": "Error details"}}
+{"t": "+5.123s", "level": "error", "source": "javascript", "text": "Error details"}
 ```
 
 **Usage pattern for debugging:**
 ```bash
 # Start monitoring in background
-./chromectl.py send console-tail --id $ID --for 30 &
+./chromectl.py $ID console-tail --for 30 &
 
 # Trigger actions
-./chromectl.py send eval --id $ID -e "myFunction()"
+./chromectl.py $ID eval "myFunction()"
 
 # Wait for console-tail to complete
 wait
+```
+
+## targets — List All Targets
+
+```bash
+./chromectl.py targets
+```
+
+Like `list`, but returns all target types (pages, service workers, iframes) without filtering.
+
+## status — Daemon Status
+
+```bash
+./chromectl.py status
+```
+
+Returns daemon connection info:
+```json
+{"connected": true, "mode": "auto-connect", "port": 9222, "sessions": 2, "pid": 12345}
+```
+
+**Fields:**
+- `mode` — `auto-connect` (Chrome M144+ via DevToolsActivePort) or `http` (legacy)
+- `sessions` — number of active flat sessions (attached targets)
+
+## cdp — Raw CDP Command
+
+```bash
+./chromectl.py cdp <method>
+```
+
+Send a raw Chrome DevTools Protocol method at the browser level. Auto-connect mode only.
+
+```bash
+./chromectl.py cdp Browser.getVersion
+```
+
+Via socket protocol (with params):
+```bash
+echo '{"cmd":"cdp","method":"Target.getTargets"}' | nc -U /tmp/chromectl-$(id -u).sock
+```
+
+## worker-eval — Evaluate JS in a Worker
+
+```bash
+./chromectl.py TARGET worker-eval <expression>
+```
+
+Like `eval`, but attaches to service worker or background targets. Use `targets` (not `list`) to find worker target IDs.
+
+**Note:** Worker attachment can be unstable on some Chrome versions — the WebSocket connection may drop. This is a known Chrome bug.
+
+## DOM Helpers
+
+Shorthands for common eval patterns. CSS selectors for element targeting.
+
+```
+chromectl.py TARGET click/check/uncheck/highlight SELECTOR
+chromectl.py TARGET submit/clear FORM
+chromectl.py TARGET type SELECTOR TEXT
+chromectl.py TARGET select SELECTOR VALUE
+chromectl.py TARGET get-text/get-html/get-value/exists/count/get-texts SELECTOR
+chromectl.py TARGET get-attr SELECTOR ATTR
+chromectl.py TARGET scroll-to/wait-for/wait-hidden SELECTOR
+chromectl.py TARGET wait-text SELECTOR TEXT
+chromectl.py TARGET navigate URL
+chromectl.py TARGET wait-url PATTERN
+chromectl.py TARGET scroll-up/scroll-down [PIXELS]
+chromectl.py TARGET scroll-by X Y
+chromectl.py TARGET inject-css CSS
+chromectl.py TARGET reload/back/forward/get-title/get-url/scroll-top/scroll-bottom
+```
+
+Wait commands accept `--timeout N` (default 10s).
+
+**Examples:**
+```bash
+./chromectl.py $ID click "button.submit"
+./chromectl.py $ID type "input[name=q]" "search query"
+./chromectl.py $ID get-text ".result-count"
+./chromectl.py $ID wait-for ".loaded" --timeout 30
+./chromectl.py $ID scroll-down 500
+./chromectl.py $ID navigate "https://example.com"
 ```
 
 ## Workflows
@@ -219,13 +283,13 @@ wait
 ./chromectl.py start
 
 # 2. Find or open target
-./chromectl.py send list
-TARGET=$(./chromectl.py send open https://myapp.com | jq -r .id)
+./chromectl.py list
+TARGET=$(./chromectl.py open https://myapp.com | jq -r .id)
 
 # 3. Monitor + inspect
-./chromectl.py send console-tail --id $TARGET --for 60 &
-./chromectl.py send screenshot --id $TARGET -o initial.png
-./chromectl.py send eval --id $TARGET -e "document.readyState"
+./chromectl.py $TARGET console-tail --for 60 &
+./chromectl.py $TARGET screenshot -o initial.png
+./chromectl.py $TARGET get-text ".status"
 
 # 4. Stop
 ./chromectl.py stop
@@ -234,11 +298,11 @@ TARGET=$(./chromectl.py send open https://myapp.com | jq -r .id)
 ### Multiple Targets
 
 ```bash
-ID1=$(./chromectl.py send open https://page1.com | jq -r .id)
-ID2=$(./chromectl.py send open https://page2.com | jq -r .id)
+ID1=$(./chromectl.py open https://page1.com | jq -r .id)
+ID2=$(./chromectl.py open https://page2.com | jq -r .id)
 
-./chromectl.py send screenshot --id $ID1 -o page1.png
-./chromectl.py send screenshot --id $ID2 -o page2.png
+./chromectl.py $ID1 screenshot -o page1.png
+./chromectl.py $ID2 screenshot -o page2.png
 ```
 
 ## Legacy Mode
@@ -255,13 +319,11 @@ Launch a separate Chrome instance with full CDP access (HTTP discovery, direct p
 - `--chrome-app NAME` — macOS app name (default: "Google Chrome")
 - `--user-data-dir PATH` — Custom profile directory (default: ~/chromectl-profile)
 
-In legacy mode, commands are used directly (no `send`):
-
 ```bash
 ./chromectl.py launch --headless
 TARGET=$(./chromectl.py open https://example.com | jq -r .id)
-./chromectl.py eval --id $TARGET -e "document.title"
-./chromectl.py screenshot --id $TARGET -o page.png
+./chromectl.py $TARGET eval "document.title"
+./chromectl.py $TARGET screenshot -o page.png
 ./chromectl.py stop
 ```
 
@@ -274,7 +336,7 @@ TARGET=$(./chromectl.py open https://example.com | jq -r .id)
 
 **"Target not found":**
 - Tab was closed or ID is incorrect
-- Run `./chromectl.py send list` to get current IDs
+- Run `./chromectl.py list` to get current IDs
 
 **Daemon died unexpectedly:**
 - Chrome closed or went to sleep — restart with `./chromectl.py start`
@@ -286,12 +348,13 @@ TARGET=$(./chromectl.py open https://example.com | jq -r .id)
 
 ## Socket Protocol
 
-The daemon accepts JSON commands over its Unix socket, one per line:
+The daemon accepts one JSON command per connection (request-response, then close):
 
 ```bash
 echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"eval","id":"TARGET_ID","expr":"document.title"}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"screenshot","id":"TARGET_ID","output":"shot.png"}' | nc -U /tmp/chromectl-$(id -u).sock
+echo '{"cmd":"cdp","method":"Browser.getVersion"}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-$(id -u).sock
 ```
 

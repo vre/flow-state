@@ -11,15 +11,14 @@ Connects to your running Chrome session via DevToolsActivePort
 (chrome://inspect/#remote-debugging). All tabs, cookies, and logins accessible.
 
 Commands:
-  start                Connect to Chrome daemon on Unix socket
-  stop                 Stop daemon and/or launched Chrome instances
-  send <cmd>           Send command to running daemon
-  list                 List open tabs/targets
-  open <url>           Open a new tab, print its targetId
-  eval  --id <id>  -e <js>         Evaluate JavaScript in a target
-  screenshot --id <id> [-o file]   Capture a PNG screenshot
-  console-tail --id <id> [--for S] Stream console/log messages
-  launch               Launch a separate Chrome instance (legacy)
+  start                   Connect to Chrome daemon on Unix socket
+  stop                    Stop daemon and/or launched Chrome instances
+  list                    List open tabs
+  open <url>              Open a new tab
+  status                  Daemon connection status
+  <id> <cmd> [args]       Run command on a target (eval, click, type, ...)
+  helpers                 List DOM helper commands
+  launch                  Launch a separate Chrome instance (legacy)
 """
 
 import argparse
@@ -28,6 +27,7 @@ import base64
 import json
 import os
 import platform
+import signal
 import sys
 import time
 from typing import Any
@@ -67,10 +67,11 @@ class CDPError(RuntimeError):
 
 
 class BrowserConnection:
-    """Browser-level CDP connection via WebSocket (M144+ auto-connect).
+    """Browser-level CDP connection via WebSocket.
 
+    Since Chrome M144 (January 2026), direct page WebSocket URLs are blocked.
     Uses Target.attachToTarget with flatten=True to multiplex page sessions
-    over the single browser WebSocket — M144 blocks direct page WS URLs.
+    over a single browser-level WebSocket.
     """
 
     def __init__(self, host: str, port: int, ws_path: str):
@@ -133,12 +134,6 @@ class FlatSession:
         self._conn.set_session_event_handler(self._session_id, handler)
 
 
-async def http_get_json(session: aiohttp.ClientSession, url: str) -> Any:
-    async with session.get(url) as resp:
-        resp.raise_for_status()
-        return await resp.json()
-
-
 async def list_targets_http(host: str, port: int) -> Any:
     async with aiohttp.ClientSession() as session:
         async with session.get(f"http://{host}:{port}/json") as resp:
@@ -169,34 +164,44 @@ class CDPConnection:
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        self._recv_task.cancel()
+        try:
+            await self._recv_task
+        except asyncio.CancelledError:
+            pass
         if self._ws is not None:
             await self._ws.close()
         await self._http_session.close()
 
     async def _recv_loop(self):
         assert self._ws is not None
-        async for msg in self._ws:
-            if msg.type == aiohttp.WSMsgType.TEXT:
-                data = json.loads(msg.data)
-                if "id" in data:
-                    fut = self._pending.pop(data["id"], None)
-                    if fut and not fut.done():
-                        fut.set_result(data)
-                elif "method" in data:
-                    session_id = data.get("sessionId")
-                    if session_id and session_id in self._session_event_handlers:
-                        await self._session_event_handlers[session_id](data)
-                    elif self._event_handler:
-                        await self._event_handler(data)
-            elif msg.type == aiohttp.WSMsgType.ERROR:
-                break
+        try:
+            async for msg in self._ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    data = json.loads(msg.data)
+                    if "id" in data:
+                        fut = self._pending.pop(data["id"], None)
+                        if fut and not fut.done():
+                            fut.set_result(data)
+                    elif "method" in data:
+                        session_id = data.get("sessionId")
+                        if session_id and session_id in self._session_event_handlers:
+                            await self._session_event_handlers[session_id](data)
+                        elif self._event_handler:
+                            await self._event_handler(data)
+                elif msg.type == aiohttp.WSMsgType.ERROR:
+                    break
+        finally:
+            for fut in self._pending.values():
+                if not fut.done():
+                    fut.set_exception(ConnectionError("WebSocket closed"))
 
     async def send(self, method: str, params: dict[str, Any] | None = None) -> Any:
         self._id += 1
         msg: dict[str, Any] = {"id": self._id, "method": method}
-        if params:
+        if params is not None:
             msg["params"] = params
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._pending[self._id] = fut
         assert self._ws is not None
@@ -210,9 +215,9 @@ class CDPConnection:
         """Send a CDP command scoped to a flat session."""
         self._id += 1
         msg: dict[str, Any] = {"id": self._id, "method": method, "sessionId": session_id}
-        if params:
+        if params is not None:
             msg["params"] = params
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         fut = loop.create_future()
         self._pending[self._id] = fut
         assert self._ws is not None
@@ -226,7 +231,10 @@ class CDPConnection:
         self._event_handler = handler
 
     def set_session_event_handler(self, session_id: str, handler):
-        self._session_event_handlers[session_id] = handler
+        if handler is None:
+            self._session_event_handlers.pop(session_id, None)
+        else:
+            self._session_event_handlers[session_id] = handler
 
 
 def resolve_connection(args) -> tuple[str, int, str | None]:
@@ -306,7 +314,512 @@ class _TraditionalSession:
             await self._conn.__aexit__(exc_type, exc, tb)
 
 
-# --- Commands ---
+# --- Helper JS generation ---
+
+
+def _js(s: str) -> str:
+    """Escape a Python string as a JS string literal."""
+    return json.dumps(s)
+
+
+_WAIT_COMMANDS = {"wait-for", "wait-text", "wait-url", "wait-hidden"}
+
+_HELPER_COMMANDS = {
+    "click",
+    "check",
+    "uncheck",
+    "highlight",
+    "submit",
+    "clear",
+    "type",
+    "select",
+    "get-text",
+    "get-html",
+    "get-value",
+    "get-attr",
+    "exists",
+    "count",
+    "get-texts",
+    "scroll-to",
+    "scroll-up",
+    "scroll-down",
+    "scroll-top",
+    "scroll-bottom",
+    "scroll-by",
+    "back",
+    "forward",
+    "get-title",
+    "get-url",
+    "inject-css",
+}
+
+
+def _build_helper_js(cmd: str, req: dict) -> str | None:
+    """Build JS expression for a helper command. Returns None if not a helper."""
+    sel = req.get("selector", "")
+    s = _js(sel)
+
+    if cmd == "click":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.click();return true}})()"
+    if cmd == "check":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});if(!e.checked)e.click();return e.checked}})()"
+    if cmd == "uncheck":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});if(e.checked)e.click();return!e.checked}})()"
+    if cmd == "highlight":
+        return f"(()=>{{const a=document.querySelectorAll({s});if(!a.length)throw new Error('No elements: '+{s});a.forEach(e=>e.style.outline='2px solid red');return a.length}})()"
+    if cmd == "submit":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No form: '+{s});e.submit();return true}})()"
+    if cmd == "clear":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No form: '+{s});e.reset();return true}})()"
+    if cmd == "type":
+        t = _js(req.get("text", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.focus();e.value={t};e.dispatchEvent(new InputEvent('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "select":
+        v = _js(req.get("value", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.value={v};e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "get-text":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.innerText}})()"
+    if cmd == "get-html":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.innerHTML}})()"
+    if cmd == "get-value":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.value}})()"
+    if cmd == "get-attr":
+        a = _js(req.get("attr", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.getAttribute({a})}})()"
+    if cmd == "exists":
+        return f"document.querySelector({s})!==null"
+    if cmd == "count":
+        return f"document.querySelectorAll({s}).length"
+    if cmd == "get-texts":
+        return f"[...document.querySelectorAll({s})].map(e=>e.innerText)"
+    if cmd == "scroll-to":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.scrollIntoView({{behavior:'smooth',block:'center'}});return true}})()"
+    if cmd == "scroll-up":
+        try:
+            px = int(req["pixels"]) if "pixels" in req else None
+        except (ValueError, TypeError):
+            return None
+        return f"window.scrollBy(0,-{px})" if px else "window.scrollBy(0,-window.innerHeight)"
+    if cmd == "scroll-down":
+        try:
+            px = int(req["pixels"]) if "pixels" in req else None
+        except (ValueError, TypeError):
+            return None
+        return f"window.scrollBy(0,{px})" if px else "window.scrollBy(0,window.innerHeight)"
+    if cmd == "scroll-top":
+        return "window.scrollTo(0,0)"
+    if cmd == "scroll-bottom":
+        return "window.scrollTo(0,document.body.scrollHeight)"
+    if cmd == "scroll-by":
+        try:
+            x, y = int(req.get("x", 0)), int(req.get("y", 0))
+        except (ValueError, TypeError):
+            return None
+        return f"window.scrollBy({x},{y})"
+    if cmd == "back":
+        return "history.back()"
+    if cmd == "forward":
+        return "history.forward()"
+    if cmd == "get-title":
+        return "document.title"
+    if cmd == "get-url":
+        return "location.href"
+    if cmd == "inject-css":
+        c = _js(req.get("css", ""))
+        return f"(()=>{{const s=document.createElement('style');s.textContent={c};document.head.appendChild(s);return true}})()"
+    return None
+
+
+def _build_wait_js(cmd: str, req: dict) -> str:
+    """Build JS check expression for a wait command."""
+    sel = req.get("selector", "")
+    s = _js(sel)
+
+    if cmd == "wait-for":
+        return f"document.querySelector({s})!==null"
+    if cmd == "wait-hidden":
+        return f"(()=>{{const e=document.querySelector({s});return!e||e.offsetParent===null||getComputedStyle(e).display==='none'}})()"
+    if cmd == "wait-text":
+        t = _js(req.get("text", ""))
+        return f"(()=>{{const e=document.querySelector({s});return e&&e.innerText.includes({t})}})()"
+    if cmd == "wait-url":
+        p = _js(req.get("pattern", ""))
+        return f"location.href.includes({p})"
+    return "false"
+
+
+# --- Dispatcher ---
+
+
+class Dispatcher:
+    """Shared command dispatch for daemon and direct modes.
+
+    Handles reconnection to Chrome when the browser WS drops.
+    """
+
+    DISPATCH_TIMEOUT = 30
+    RECONNECT_DELAY = 1
+    MAX_RECONNECT = 5
+    IDLE_TIMEOUT = int(os.environ.get("CHROMECTL_IDLE_TIMEOUT", 300))
+
+    def __init__(self, host: str, port: int, ws_path: str | None, bc: BrowserConnection | None, user_data_dir: str | None = None):
+        self.host = host
+        self.port = port
+        self.ws_path = ws_path
+        self.bc = bc
+        self.sessions: dict[str, FlatSession] = {}
+        self._session_lock = asyncio.Lock()
+        self._user_data_dir = user_data_dir
+        self._connected = bc is not None
+        self._last_success = time.time()
+        self._last_request = time.time()
+        self._dead = False
+
+    async def close(self):
+        for session in self.sessions.values():
+            if isinstance(session, CDPConnection):
+                try:
+                    await session.__aexit__(None, None, None)
+                except Exception:
+                    pass
+        self.sessions.clear()
+
+    async def _reconnect(self) -> bool:
+        if not self._user_data_dir:
+            return False
+        for attempt in range(1, self.MAX_RECONNECT + 1):
+            try:
+                if self.bc:
+                    try:
+                        await self.bc.__aexit__(None, None, None)
+                    except Exception:
+                        pass
+                try:
+                    port, ws_path = read_devtools_active_port(self._user_data_dir)
+                except FileNotFoundError:
+                    port, ws_path = self.port, "/devtools/browser"
+                self.port = port
+                self.ws_path = ws_path
+                self.bc = BrowserConnection(self.host, port, ws_path)
+                await self.bc.__aenter__()
+                self.sessions.clear()
+                self._connected = True
+                print(f"reconnected to Chrome (attempt {attempt})", flush=True)
+                return True
+            except Exception as e:
+                print(f"reconnect attempt {attempt}/{self.MAX_RECONNECT} failed: {e}", flush=True)
+                if attempt < self.MAX_RECONNECT:
+                    await asyncio.sleep(self.RECONNECT_DELAY)
+        self._connected = False
+        return False
+
+    async def get_session(self, target_id: str):
+        async with self._session_lock:
+            if self.ws_path and self.bc:
+                if target_id not in self.sessions:
+                    self.sessions[target_id] = await self.bc.attach_to_target(target_id)
+                return self.sessions[target_id]
+            if target_id not in self.sessions:
+                ws_url = await find_ws_for_target_http(self.host, self.port, target_id)
+                conn = CDPConnection(ws_url)
+                await conn.__aenter__()
+                self.sessions[target_id] = conn
+            return self.sessions[target_id]
+
+    async def _resolve_target(self, partial_id: str) -> str:
+        """Resolve partial target ID prefix to full 32-char ID."""
+        if len(partial_id) >= 32:
+            return partial_id.upper()
+        partial_upper = partial_id.upper()
+        if self.ws_path and self.bc:
+            targets = await self.bc.list_targets()
+            matches = [t["targetId"] for t in targets if t["targetId"].startswith(partial_upper)]
+        else:
+            targets = await list_targets_http(self.host, self.port)
+            matches = [t["id"] for t in targets if t["id"].startswith(partial_upper)]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            raise CDPError(f"No target matching '{partial_id}'")
+        raise CDPError(f"Ambiguous: '{partial_id}' matches {len(matches)} targets")
+
+    async def dispatch_safe(self, req: dict) -> dict:
+        try:
+            result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
+            self._last_success = time.time()
+            return result
+        except (asyncio.TimeoutError, CDPError, aiohttp.ClientError, ConnectionError, OSError) as e:
+            err_type = type(e).__name__
+            if isinstance(e, asyncio.TimeoutError) or "close" in str(e).lower() or "connect" in str(e).lower():
+                self.sessions.clear()
+                if await self._reconnect():
+                    try:
+                        result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
+                        self._last_success = time.time()
+                        return result
+                    except Exception as e2:
+                        self._dead = True
+                        return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
+                else:
+                    self._dead = True
+            return {"error": f"{err_type}: {e}"}
+
+    async def dispatch(self, req: dict) -> dict:
+        cmd = req.get("cmd", "")
+
+        # --- No target needed ---
+
+        if cmd in ("list", "targets"):
+            return await self._dispatch_list(req, cmd)
+        if cmd == "open":
+            return await self._dispatch_open(req)
+        if cmd == "status":
+            return self._dispatch_status()
+        if cmd == "cdp":
+            return await self._dispatch_cdp(req)
+
+        # --- Target commands ---
+
+        raw_id = req.get("id")
+        if not raw_id:
+            return {"error": "Missing target ID"}
+        try:
+            target_id = await self._resolve_target(raw_id)
+        except CDPError as e:
+            return {"error": str(e)}
+
+        if cmd == "eval":
+            return await self._dispatch_eval(req, target_id)
+        if cmd == "screenshot":
+            return await self._dispatch_screenshot(req, target_id)
+        if cmd == "console-tail":
+            return await self._dispatch_console_tail(req, target_id)
+        if cmd == "worker-eval":
+            return await self._dispatch_worker_eval(req, target_id)
+        if cmd == "navigate":
+            return await self._dispatch_navigate(req, target_id)
+        if cmd == "reload":
+            return await self._dispatch_reload(target_id)
+        if cmd in _WAIT_COMMANDS:
+            return await self._dispatch_wait(req, target_id)
+        if cmd in _HELPER_COMMANDS:
+            js = _build_helper_js(cmd, req)
+            if js is not None:
+                return await self._eval_helper(target_id, js)
+            return {"error": f"Invalid arguments for {cmd}"}
+
+        return {"error": f"Unknown command: {cmd}. Run 'chromectl helpers' for available commands."}
+
+    # --- Dispatch methods ---
+
+    async def _dispatch_list(self, req: dict, cmd: str) -> dict:
+        if self.ws_path and self.bc:
+            targets = await self.bc.list_targets()
+            results = []
+            for t in targets:
+                if cmd == "list" and t.get("type") not in ("page", "webview"):
+                    continue
+                results.append(
+                    {
+                        "id": t.get("targetId"),
+                        "type": t.get("type"),
+                        "title": t.get("title"),
+                        "url": t.get("url"),
+                    }
+                )
+        else:
+            targets = await list_targets_http(self.host, self.port)
+            results = [{"id": t.get("id"), "type": t.get("type"), "title": t.get("title"), "url": t.get("url")} for t in targets]
+        return {"targets": results}
+
+    async def _dispatch_open(self, req: dict) -> dict:
+        url = req.get("url", "about:blank")
+        if self.ws_path and self.bc:
+            return await self.bc.create_target(url)
+        res = await new_tab_http(self.host, self.port, url)
+        return {"id": res.get("id"), "url": res.get("url")}
+
+    def _dispatch_status(self) -> dict:
+        return {
+            "connected": self._connected,
+            "mode": "auto-connect" if self.ws_path else "http",
+            "port": self.port,
+            "sessions": len(self.sessions),
+            "pid": os.getpid(),
+        }
+
+    async def _dispatch_cdp(self, req: dict) -> dict:
+        method = req.get("method", "")
+        params = req.get("params")
+        if not method:
+            return {"error": "Missing 'method'"}
+        if self.bc and self.bc._conn:
+            result = await self.bc._conn.send(method, params)
+            return {"result": result}
+        return {"error": "No browser connection (auto-connect only)"}
+
+    async def _dispatch_eval(self, req: dict, target_id: str) -> dict:
+        session = await self.get_session(target_id)
+        await session.send("Runtime.enable")
+        result = await session.send(
+            "Runtime.evaluate",
+            {
+                "expression": req.get("expr", ""),
+                "returnByValue": True,
+                "awaitPromise": True,
+                "replMode": True,
+            },
+        )
+        if "exceptionDetails" in result:
+            return {"error": result["exceptionDetails"]}
+        r = result.get("result", {})
+        return {"value": r["value"]} if "value" in r else {"result": r}
+
+    async def _dispatch_screenshot(self, req: dict, target_id: str) -> dict:
+        session = await self.get_session(target_id)
+        await session.send("Page.enable")
+        if req.get("full_page"):
+            lm = await session.send("Page.getLayoutMetrics")
+            cs = lm["contentSize"]
+            await session.send(
+                "Emulation.setDeviceMetricsOverride",
+                {
+                    "width": int(cs["width"]),
+                    "height": int(cs["height"]),
+                    "deviceScaleFactor": 1,
+                    "mobile": False,
+                },
+            )
+        await session.send("Page.bringToFront")
+        result = await session.send("Page.captureScreenshot", {"format": "png", "fromSurface": True})
+        if req.get("full_page"):
+            await session.send("Emulation.clearDeviceMetricsOverride")
+        b64 = result.get("data")
+        if not b64:
+            return {"error": "No screenshot data"}
+        out = req.get("output", f"screenshot_{target_id}.png")
+        with open(out, "wb") as f:
+            f.write(base64.b64decode(b64))
+        return {"file": out}
+
+    async def _dispatch_console_tail(self, req: dict, target_id: str) -> dict:
+        duration = float(req.get("for", 10))
+        session = await self.get_session(target_id)
+        await session.send("Runtime.enable")
+        await session.send("Log.enable")
+        messages: list[dict] = []
+        start_ts = time.time()
+
+        async def console_handler(evt):
+            method = evt.get("method")
+            params = evt.get("params", {})
+            tdelta = f"+{time.time() - start_ts:0.3f}s"
+            if method == "Log.entryAdded":
+                entry = params.get("entry", {})
+                messages.append({"t": tdelta, "level": entry.get("level"), "source": entry.get("source"), "text": entry.get("text")})
+            elif method == "Runtime.consoleAPICalled":
+                vals = [a.get("value", a.get("description", a.get("type"))) for a in params.get("args", [])]
+                messages.append({"t": tdelta, "console": params.get("type"), "args": vals})
+
+        session.set_event_handler(console_handler)
+        await asyncio.sleep(duration)
+        session.set_event_handler(None)
+        return {"messages": messages}
+
+    async def _dispatch_worker_eval(self, req: dict, target_id: str) -> dict:
+        expr = req.get("expr", "")
+        if not self.bc or not self.bc._conn:
+            return {"error": "No browser connection"}
+        async with self._session_lock:
+            if target_id not in self.sessions:
+                result = await self.bc._conn.send(
+                    "Target.attachToTarget",
+                    {"targetId": target_id, "flatten": True},
+                )
+                sid = result.get("sessionId", "")
+                if not sid:
+                    return {"error": f"Failed to attach to {target_id}"}
+                self.sessions[target_id] = FlatSession(self.bc._conn, sid)
+            session = self.sessions[target_id]
+        await session.send("Runtime.enable")
+        result = await session.send(
+            "Runtime.evaluate",
+            {
+                "expression": expr,
+                "returnByValue": True,
+                "awaitPromise": True,
+            },
+        )
+        if "exceptionDetails" in result:
+            return {"error": result["exceptionDetails"]}
+        r = result.get("result", {})
+        return {"value": r["value"]} if "value" in r else {"result": r}
+
+    async def _dispatch_navigate(self, req: dict, target_id: str) -> dict:
+        url = req.get("url", "")
+        if not url:
+            return {"error": "Missing URL"}
+        session = await self.get_session(target_id)
+        await session.send("Page.enable")
+        result = await session.send("Page.navigate", {"url": url})
+        return {"value": {"frameId": result.get("frameId"), "url": url}}
+
+    async def _dispatch_reload(self, target_id: str) -> dict:
+        session = await self.get_session(target_id)
+        await session.send("Page.enable")
+        await session.send("Page.reload")
+        return {"value": True}
+
+    async def _eval_helper(self, target_id: str, js_expr: str) -> dict:
+        session = await self.get_session(target_id)
+        await session.send("Runtime.enable")
+        result = await session.send(
+            "Runtime.evaluate",
+            {
+                "expression": js_expr,
+                "returnByValue": True,
+                "awaitPromise": True,
+                "replMode": True,
+            },
+        )
+        if "exceptionDetails" in result:
+            return {"error": result["exceptionDetails"]}
+        r = result.get("result", {})
+        return {"value": r["value"]} if "value" in r else {"result": r}
+
+    async def _dispatch_wait(self, req: dict, target_id: str) -> dict:
+        timeout = float(req.get("timeout", 10))
+        check_js = _build_wait_js(req["cmd"], req)
+        session = await self.get_session(target_id)
+        await session.send("Runtime.enable")
+        start = time.time()
+        while time.time() - start < timeout:
+            result = await session.send(
+                "Runtime.evaluate",
+                {"expression": check_js, "returnByValue": True},
+            )
+            if "exceptionDetails" in result:
+                return {"error": f"Evaluation failed (page may have navigated): {result['exceptionDetails']}", "command": req["cmd"]}
+            r = result.get("result", {})
+            if r.get("value"):
+                return {"value": True, "elapsed": round(time.time() - start, 2)}
+            await asyncio.sleep(0.25)
+        return {"error": f"Timeout after {timeout}s", "command": req["cmd"]}
+
+
+async def make_dispatcher(args) -> tuple[Dispatcher, BrowserConnection | None]:
+    host, port, ws_path = resolve_connection(args)
+    user_data_dir = None
+    if getattr(args, "auto_connect", False):
+        user_data_dir = getattr(args, "user_data_dir", None) or default_chrome_user_data_dir()
+    bc = None
+    if ws_path:
+        bc = BrowserConnection(host, port, ws_path)
+        await bc.__aenter__()
+    return Dispatcher(host, port, ws_path, bc, user_data_dir), bc
+
+
+# --- CLI commands ---
 
 
 async def cmd_launch(args):
@@ -338,153 +851,14 @@ async def cmd_launch(args):
     print(f"Profile directory: {user_data_dir}")
 
 
-async def cmd_list(args):
-    host, port, ws_path = resolve_connection(args)
-    if ws_path:
-        async with BrowserConnection(host, port, ws_path) as bc:
-            targets = await bc.list_targets()
-            for t in targets:
-                if t.get("type") not in ("page", "webview"):
-                    continue
-                print(
-                    json.dumps(
-                        {
-                            "id": t.get("targetId"),
-                            "type": t.get("type"),
-                            "title": t.get("title"),
-                            "url": t.get("url"),
-                            "attached": t.get("attached"),
-                        },
-                        ensure_ascii=False,
-                    )
-                )
-    else:
-        targets = await list_targets_http(host, port)
-        for t in targets:
-            print(
-                json.dumps(
-                    {
-                        "id": t.get("id"),
-                        "type": t.get("type"),
-                        "title": t.get("title"),
-                        "url": t.get("url"),
-                        "attached": t.get("attached"),
-                    },
-                    ensure_ascii=False,
-                )
-            )
-
-
-async def cmd_open(args):
-    host, port, ws_path = resolve_connection(args)
-    if ws_path:
-        async with BrowserConnection(host, port, ws_path) as bc:
-            res = await bc.create_target(args.url)
-            print(json.dumps(res, ensure_ascii=False))
-    else:
-        res = await new_tab_http(host, port, args.url)
-        print(json.dumps({"id": res.get("id"), "url": res.get("url")}, ensure_ascii=False))
-
-
-async def cmd_eval(args):
-    host, port, ws_path = resolve_connection(args)
-    async with attach_to_target(host, port, args.id, ws_path) as conn:
-        await conn.send("Runtime.enable")
-        result = await conn.send(
-            "Runtime.evaluate",
-            {
-                "expression": args.expr,
-                "returnByValue": True,
-                "awaitPromise": True,
-                "replMode": True,
-            },
-        )
-        if "exceptionDetails" in result:
-            print(json.dumps(result["exceptionDetails"], ensure_ascii=False))
-            sys.exit(2)
-        r = result.get("result", {})
-        if r.get("type") == "object" and "value" in r:
-            print(json.dumps(r["value"], ensure_ascii=False))
-        elif "value" in r:
-            print(json.dumps(r["value"], ensure_ascii=False))
-        else:
-            print(json.dumps(r, ensure_ascii=False))
-
-
-async def cmd_screenshot(args):
-    host, port, ws_path = resolve_connection(args)
-    async with attach_to_target(host, port, args.id, ws_path) as conn:
-        await conn.send("Page.enable")
-        if args.full_page:
-            lm = await conn.send("Page.getLayoutMetrics")
-            content_size = lm["contentSize"]
-            width, height = int(content_size["width"]), int(content_size["height"])
-            await conn.send(
-                "Emulation.setDeviceMetricsOverride",
-                {
-                    "width": width,
-                    "height": height,
-                    "deviceScaleFactor": 1,
-                    "mobile": False,
-                },
-            )
-        await conn.send("Page.bringToFront")
-        result = await conn.send("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-        b64 = result.get("data")
-        if not b64:
-            raise CDPError("No screenshot data returned")
-        data = base64.b64decode(b64)
-        out = args.output or f"screenshot_{args.id}.png"
-        with open(out, "wb") as f:
-            f.write(data)
-        print(out)
-
-
-async def cmd_console_tail(args):
-    host, port, ws_path = resolve_connection(args)
-    async with attach_to_target(host, port, args.id, ws_path) as conn:
-        await conn.send("Runtime.enable")
-        await conn.send("Log.enable")
-
-        start_ts = time.time()
-
-        async def handler(evt):
-            method = evt.get("method")
-            params = evt.get("params", {})
-            now = time.time()
-            tdelta = f"+{now - start_ts:0.3f}s"
-            if method == "Log.entryAdded":
-                entry = params.get("entry", {})
-                level = entry.get("level")
-                text = entry.get("text")
-                source = entry.get("source")
-                print(json.dumps({"t": tdelta, "level": level, "source": source, "text": text}, ensure_ascii=False))
-            elif method == "Runtime.consoleAPICalled":
-                typ = params.get("type")
-                console_args = params.get("args", [])
-                vals = []
-                for a in console_args:
-                    if "value" in a:
-                        vals.append(a["value"])
-                    else:
-                        vals.append(a.get("description") or a.get("type"))
-                print(json.dumps({"t": tdelta, "console": typ, "args": vals}, ensure_ascii=False))
-
-        conn.set_event_handler(handler)
-        duration = float(args.for_seconds)
-        await asyncio.sleep(duration)
-
-
 SOCKET_PATH = f"/tmp/chromectl-{os.getuid()}.sock"
 
 
 async def cmd_stop(args):
-    import signal
     import subprocess
 
     stopped_anything = False
 
-    # Stop daemon if running
     if os.path.exists(SOCKET_PATH):
         try:
             reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
@@ -492,15 +866,14 @@ async def cmd_stop(args):
             await writer.drain()
             await asyncio.wait_for(reader.readline(), timeout=5)
             writer.close()
+            await writer.wait_closed()
             print("Daemon stopped")
             stopped_anything = True
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: could not stop daemon: {e}", file=sys.stderr)
 
-    # Kill chromectl-launched Chrome instances
     try:
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)
-
         pids_to_kill = []
         for line in result.stdout.splitlines():
             if "Google Chrome" in line and "chromectl" in line:
@@ -533,278 +906,11 @@ async def cmd_stop(args):
         print("Nothing to stop (no daemon, no chromectl Chrome instances)")
 
 
-class Dispatcher:
-    """Shared command dispatch for shell and daemon modes.
-
-    Handles reconnection to Chrome when the browser WS drops.
-    """
-
-    DISPATCH_TIMEOUT = 30  # seconds per command
-    RECONNECT_DELAY = 1  # seconds between reconnect attempts
-    MAX_RECONNECT = 5  # max consecutive reconnect attempts
-    IDLE_TIMEOUT = 300  # 5 min — shut down daemon if no commands
-
-    def __init__(self, host: str, port: int, ws_path: str | None, bc: BrowserConnection | None, user_data_dir: str | None = None):
-        self.host = host
-        self.port = port
-        self.ws_path = ws_path
-        self.bc = bc
-        self.sessions: dict[str, FlatSession] = {}
-        self._user_data_dir = user_data_dir
-        self._connected = bc is not None
-        self._last_success = time.time()
-        self._dead = False  # set when CDP connection is permanently lost
-
-    async def _reconnect(self) -> bool:
-        """Reconnect to Chrome by re-reading DevToolsActivePort or fallback."""
-        if not self._user_data_dir:
-            return False
-        for attempt in range(1, self.MAX_RECONNECT + 1):
-            try:
-                if self.bc:
-                    try:
-                        await self.bc.__aexit__(None, None, None)
-                    except Exception:
-                        pass
-                try:
-                    port, ws_path = read_devtools_active_port(self._user_data_dir)
-                except FileNotFoundError:
-                    port, ws_path = self.port, "/devtools/browser"
-                self.port = port
-                self.ws_path = ws_path
-                self.bc = BrowserConnection(self.host, port, ws_path)
-                await self.bc.__aenter__()
-                self.sessions.clear()
-                self._connected = True
-                print(f"reconnected to Chrome (attempt {attempt})", flush=True)
-                return True
-            except Exception as e:
-                print(f"reconnect attempt {attempt}/{self.MAX_RECONNECT} failed: {e}", flush=True)
-                if attempt < self.MAX_RECONNECT:
-                    await asyncio.sleep(self.RECONNECT_DELAY)
-        self._connected = False
-        return False
-
-    async def get_session(self, target_id: str):
-        if self.ws_path and self.bc:
-            if target_id not in self.sessions:
-                self.sessions[target_id] = await self.bc.attach_to_target(target_id)
-            return self.sessions[target_id]
-        ws_url = await find_ws_for_target_http(self.host, self.port, target_id)
-        conn = CDPConnection(ws_url)
-        await conn.__aenter__()
-        return conn
-
-    async def dispatch_safe(self, req: dict) -> dict:
-        """Dispatch with timeout and auto-reconnect on failure."""
-        try:
-            result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
-            self._last_success = time.time()
-            return result
-        except (asyncio.TimeoutError, CDPError, aiohttp.ClientError, ConnectionError, OSError) as e:
-            err_type = type(e).__name__
-            if isinstance(e, asyncio.TimeoutError) or "close" in str(e).lower() or "connect" in str(e).lower():
-                self.sessions.clear()
-                if await self._reconnect():
-                    try:
-                        result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
-                        self._last_success = time.time()
-                        return result
-                    except Exception as e2:
-                        self._dead = True
-                        return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
-                else:
-                    self._dead = True
-            return {"error": f"{err_type}: {e}"}
-
-    async def dispatch(self, req: dict) -> dict:
-        cmd = req.get("cmd", "")
-
-        if cmd in ("list", "targets"):
-            if self.ws_path and self.bc:
-                targets = await self.bc.list_targets()
-                results = []
-                for t in targets:
-                    if cmd == "list" and t.get("type") not in ("page", "webview"):
-                        continue
-                    results.append(
-                        {
-                            "id": t.get("targetId"),
-                            "type": t.get("type"),
-                            "title": t.get("title"),
-                            "url": t.get("url"),
-                        }
-                    )
-            else:
-                targets = await list_targets_http(self.host, self.port)
-                results = [{"id": t.get("id"), "type": t.get("type"), "title": t.get("title"), "url": t.get("url")} for t in targets]
-            return {"targets": results}
-
-        elif cmd == "open":
-            url = req.get("url", "about:blank")
-            if self.ws_path and self.bc:
-                return await self.bc.create_target(url)
-            res = await new_tab_http(self.host, self.port, url)
-            return {"id": res.get("id"), "url": res.get("url")}
-
-        elif cmd == "eval":
-            target_id = req.get("id")
-            if not target_id:
-                return {"error": "Missing 'id'"}
-            session = await self.get_session(target_id)
-            await session.send("Runtime.enable")
-            result = await session.send(
-                "Runtime.evaluate",
-                {
-                    "expression": req.get("expr", ""),
-                    "returnByValue": True,
-                    "awaitPromise": True,
-                    "replMode": True,
-                },
-            )
-            if "exceptionDetails" in result:
-                return {"error": result["exceptionDetails"]}
-            r = result.get("result", {})
-            return {"value": r["value"]} if "value" in r else {"result": r}
-
-        elif cmd == "screenshot":
-            target_id = req.get("id")
-            if not target_id:
-                return {"error": "Missing 'id'"}
-            session = await self.get_session(target_id)
-            await session.send("Page.enable")
-            if req.get("full_page"):
-                lm = await session.send("Page.getLayoutMetrics")
-                cs = lm["contentSize"]
-                await session.send(
-                    "Emulation.setDeviceMetricsOverride",
-                    {
-                        "width": int(cs["width"]),
-                        "height": int(cs["height"]),
-                        "deviceScaleFactor": 1,
-                        "mobile": False,
-                    },
-                )
-            await session.send("Page.bringToFront")
-            result = await session.send("Page.captureScreenshot", {"format": "png", "fromSurface": True})
-            b64 = result.get("data")
-            if not b64:
-                return {"error": "No screenshot data"}
-            out = req.get("output", f"screenshot_{target_id}.png")
-            with open(out, "wb") as f:
-                f.write(base64.b64decode(b64))
-            return {"file": out}
-
-        elif cmd == "console-tail":
-            target_id = req.get("id")
-            if not target_id:
-                return {"error": "Missing 'id'"}
-            duration = float(req.get("for", 5))
-            session = await self.get_session(target_id)
-            await session.send("Runtime.enable")
-            await session.send("Log.enable")
-            messages: list[dict] = []
-            start_ts = time.time()
-
-            async def console_handler(evt):
-                method = evt.get("method")
-                params = evt.get("params", {})
-                tdelta = f"+{time.time() - start_ts:0.3f}s"
-                if method == "Log.entryAdded":
-                    entry = params.get("entry", {})
-                    messages.append({"t": tdelta, "level": entry.get("level"), "text": entry.get("text")})
-                elif method == "Runtime.consoleAPICalled":
-                    vals = [a.get("value", a.get("description", a.get("type"))) for a in params.get("args", [])]
-                    messages.append({"t": tdelta, "console": params.get("type"), "args": vals})
-
-            session.set_event_handler(console_handler)
-            await asyncio.sleep(duration)
-            session.set_event_handler(None)
-            return {"messages": messages}
-
-        elif cmd == "cdp":
-            # Raw CDP command via browser connection
-            method = req.get("method", "")
-            params = req.get("params")
-            if not method:
-                return {"error": "Missing 'method'"}
-            if self.bc and self.bc._conn:
-                result = await self.bc._conn.send(method, params)
-                return {"result": result}
-            return {"error": "No browser connection (auto-connect only)"}
-
-        elif cmd == "worker-eval":
-            # Eval inside a worker target via flat session
-            target_id = req.get("id")
-            expr = req.get("expr", "")
-            if not target_id:
-                return {"error": "Missing 'id'"}
-            if not self.bc or not self.bc._conn:
-                return {"error": "No browser connection"}
-            # Attach to worker
-            if target_id not in self.sessions:
-                result = await self.bc._conn.send(
-                    "Target.attachToTarget",
-                    {
-                        "targetId": target_id,
-                        "flatten": True,
-                    },
-                )
-                sid = result.get("sessionId", "")
-                if not sid:
-                    return {"error": f"Failed to attach to {target_id}"}
-                self.sessions[target_id] = FlatSession(self.bc._conn, sid)
-            session = self.sessions[target_id]
-            await session.send("Runtime.enable")
-            result = await session.send(
-                "Runtime.evaluate",
-                {
-                    "expression": expr,
-                    "returnByValue": True,
-                    "awaitPromise": True,
-                },
-            )
-            if "exceptionDetails" in result:
-                return {"error": result["exceptionDetails"]}
-            r = result.get("result", {})
-            return {"value": r["value"]} if "value" in r else {"result": r}
-
-        elif cmd == "status":
-            return {
-                "connected": self._connected,
-                "mode": "auto-connect" if self.ws_path else "http",
-                "port": self.port,
-                "sessions": len(self.sessions),
-                "pid": os.getpid(),
-            }
-
-        else:
-            return {"error": f"Unknown command: {cmd}. Try: list, eval, screenshot, open, console-tail, status, quit"}
-
-
-async def make_dispatcher(args) -> tuple[Dispatcher, BrowserConnection | None]:
-    host, port, ws_path = resolve_connection(args)
-    user_data_dir = None
-    if getattr(args, "auto_connect", False):
-        user_data_dir = getattr(args, "user_data_dir", None) or default_chrome_user_data_dir()
-    bc = None
-    if ws_path:
-        bc = BrowserConnection(host, port, ws_path)
-        await bc.__aenter__()
-    return Dispatcher(host, port, ws_path, bc, user_data_dir), bc
-
-
 async def cmd_start(args):
-    """Connect to Chrome and listen on Unix socket. netcat-compatible.
-
-    Usage:  chromectl start
-            chromectl send list
-            chromectl stop
-    """
+    """Connect to Chrome and listen on Unix socket."""
     args.auto_connect = True
     dispatcher, bc = await make_dispatcher(args)
 
-    # Clean stale socket
     if os.path.exists(SOCKET_PATH):
         os.unlink(SOCKET_PATH)
 
@@ -812,28 +918,24 @@ async def cmd_start(args):
         try:
             data = await asyncio.wait_for(reader.readline(), timeout=30)
             if not data:
-                writer.close()
                 return
             line = data.decode().strip()
             if not line:
-                writer.close()
                 return
             try:
                 req = json.loads(line)
             except json.JSONDecodeError as e:
                 writer.write(json.dumps({"error": f"Invalid JSON: {e}"}).encode() + b"\n")
                 await writer.drain()
-                writer.close()
                 return
 
             if req.get("cmd") == "quit":
                 writer.write(json.dumps({"status": "bye"}).encode() + b"\n")
                 await writer.drain()
-                writer.close()
-                # Stop the server
                 server.close()
                 return
 
+            dispatcher._last_request = time.time()
             result = await dispatcher.dispatch_safe(req)
             writer.write(json.dumps(result, ensure_ascii=False).encode() + b"\n")
             await writer.drain()
@@ -845,13 +947,13 @@ async def cmd_start(args):
                 pass
         finally:
             writer.close()
+            await writer.wait_closed()
 
-    server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH)
+    server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH, limit=_STREAM_LIMIT)
     os.chmod(SOCKET_PATH, 0o600)
     print(f"chromectl daemon listening on {SOCKET_PATH} (PID {os.getpid()})", flush=True)
     print(f'Usage: echo \'{{"cmd":"list"}}\' | nc -U {SOCKET_PATH}', flush=True)
 
-    # Watchdog: shutdown if CDP connection is dead OR idle too long
     async def idle_watchdog():
         liveness_counter = 0
         while True:
@@ -860,13 +962,11 @@ async def cmd_start(args):
                 print("CDP connection lost, shutting down", flush=True)
                 server.close()
                 return
-            idle = time.time() - dispatcher._last_success
+            idle = time.time() - dispatcher._last_request
             if idle > dispatcher.IDLE_TIMEOUT:
-                print(f"idle {idle:.0f}s > {dispatcher.IDLE_TIMEOUT}s, shutting down", flush=True)
+                print(f"idle {idle:.0f}s, shutting down", flush=True)
                 server.close()
                 return
-            # Proactive liveness probe every 30s when idle, to detect dead CDP
-            # connections before the next client request arrives.
             liveness_counter += 1
             if liveness_counter >= 6 and idle > 10 and dispatcher.bc:
                 liveness_counter = 0
@@ -878,6 +978,10 @@ async def cmd_start(args):
                     return
 
     watchdog = asyncio.create_task(idle_watchdog())
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, server.close)
 
     try:
         await server.serve_forever()
@@ -892,85 +996,230 @@ async def cmd_start(args):
         print("daemon stopped", flush=True)
 
 
+# --- Request routing ---
 
-async def cmd_send(args):
-    """Send a single command to running daemon. For quick CLI use."""
-    if not os.path.exists(SOCKET_PATH):
-        print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl start", file=sys.stderr)
-        sys.exit(1)
-    # Build request from subcommand args
-    req: dict = {"cmd": args.send_cmd}
-    if hasattr(args, "send_id") and args.send_id:
-        req["id"] = args.send_id
-    if hasattr(args, "send_expr") and args.send_expr:
-        req["expr"] = args.send_expr
-    if hasattr(args, "send_url") and args.send_url:
-        req["url"] = args.send_url
-    if hasattr(args, "send_output") and args.send_output:
-        req["output"] = args.send_output
-    if hasattr(args, "send_full_page") and args.send_full_page:
-        req["full_page"] = True
-    if hasattr(args, "send_for") and args.send_for:
-        req["for"] = float(args.send_for)
 
-    reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+HELPERS_TEXT = """\
+Shorthands for common eval patterns. Selectors are CSS.
+
+  click/check/uncheck/highlight SELECTOR
+  submit/clear FORM
+  type SELECTOR TEXT
+  select SELECTOR VALUE
+  get-text/get-html/get-value/exists/count/get-texts SELECTOR
+  get-attr SELECTOR ATTR
+  scroll-to/wait-for/wait-hidden SELECTOR
+  wait-text SELECTOR TEXT
+  navigate URL
+  wait-url PATTERN
+  scroll-up/scroll-down [PIXELS]
+  scroll-by X Y
+  inject-css CSS
+  reload/back/forward/get-title/get-url/scroll-top/scroll-bottom
+
+  Wait: --timeout N (default 10s)
+
+  For anything not covered:
+    chromectl ABC123 eval "document.querySelector('x').doSomething()"
+
+  Example: chromectl ABC123 click "button.submit"\
+"""
+
+
+_STREAM_LIMIT = 16 * 1024 * 1024  # 16MB — large eval results
+
+
+async def _daemon_request(req: dict):
+    """Send JSON request to daemon socket, print response."""
+    reader, writer = await asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT)
     writer.write(json.dumps(req).encode() + b"\n")
     await writer.drain()
-    resp = await reader.readline()
+    resp = await asyncio.wait_for(reader.readline(), timeout=60)
     print(resp.decode().strip())
     writer.close()
+    await writer.wait_closed()
+
+
+async def _route_request(args, req: dict):
+    """Route request to daemon socket."""
+    if os.path.exists(SOCKET_PATH):
+        await _daemon_request(req)
+        return
+    print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl start", file=sys.stderr)
+    sys.exit(1)
+
+
+def build_on_request(args) -> dict:
+    """Build daemon request from 'on' subcommand args."""
+    cmd = args.command
+    req = {"cmd": cmd, "id": args.target_id}
+    pos = args.cmd_args or []
+
+    SELECTOR_CMDS = {
+        "click",
+        "check",
+        "uncheck",
+        "highlight",
+        "submit",
+        "clear",
+        "get-text",
+        "get-html",
+        "get-value",
+        "exists",
+        "count",
+        "get-texts",
+        "scroll-to",
+        "wait-for",
+        "wait-hidden",
+    }
+
+    if cmd in SELECTOR_CMDS:
+        if not pos:
+            print(f"Error: {cmd} requires SELECTOR", file=sys.stderr)
+            sys.exit(1)
+        req["selector"] = pos[0]
+    elif cmd in ("type", "wait-text"):
+        if len(pos) < 2:
+            print(f"Error: {cmd} requires SELECTOR TEXT", file=sys.stderr)
+            sys.exit(1)
+        req["selector"] = pos[0]
+        req["text"] = pos[1]
+    elif cmd == "select":
+        if len(pos) < 2:
+            print("Error: select requires SELECTOR VALUE", file=sys.stderr)
+            sys.exit(1)
+        req["selector"] = pos[0]
+        req["value"] = pos[1]
+    elif cmd == "get-attr":
+        if len(pos) < 2:
+            print("Error: get-attr requires SELECTOR ATTR", file=sys.stderr)
+            sys.exit(1)
+        req["selector"] = pos[0]
+        req["attr"] = pos[1]
+    elif cmd == "navigate":
+        if not pos:
+            print("Error: navigate requires URL", file=sys.stderr)
+            sys.exit(1)
+        req["url"] = pos[0]
+    elif cmd == "wait-url":
+        if not pos:
+            print("Error: wait-url requires PATTERN", file=sys.stderr)
+            sys.exit(1)
+        req["pattern"] = pos[0]
+    elif cmd in ("scroll-up", "scroll-down"):
+        if pos:
+            req["pixels"] = int(pos[0])
+    elif cmd == "scroll-by":
+        if len(pos) < 2:
+            print("Error: scroll-by requires X Y", file=sys.stderr)
+            sys.exit(1)
+        req["x"] = int(pos[0])
+        req["y"] = int(pos[1])
+    elif cmd == "inject-css":
+        if not pos:
+            print("Error: inject-css requires CSS", file=sys.stderr)
+            sys.exit(1)
+        req["css"] = pos[0]
+    elif cmd in ("eval", "worker-eval"):
+        if not pos:
+            print(f"Error: {cmd} requires expression", file=sys.stderr)
+            sys.exit(1)
+        req["expr"] = pos[0]
+    elif cmd == "cdp":
+        if not pos and not getattr(args, "method", None):
+            print("Error: cdp requires METHOD", file=sys.stderr)
+            sys.exit(1)
+        if pos:
+            req["method"] = pos[0]
+
+    if getattr(args, "output", None):
+        req["output"] = args.output
+    if getattr(args, "full_page", False):
+        req["full_page"] = True
+    if getattr(args, "for_seconds", None):
+        req["for"] = float(args.for_seconds)
+    if getattr(args, "timeout", None):
+        req["timeout"] = float(args.timeout)
+    if getattr(args, "method", None) and "method" not in req:
+        req["method"] = args.method
+    if getattr(args, "params", None):
+        req["params"] = json.loads(args.params)
+
+    return req
+
+
+async def cmd_on(args):
+    await _route_request(args, build_on_request(args))
+
+
+async def cmd_helpers(args):
+    print(HELPERS_TEXT)
+
+
+async def cmd_list_top(args):
+    await _route_request(args, {"cmd": "list"})
+
+
+async def cmd_open_top(args):
+    await _route_request(args, {"cmd": "open", "url": args.url})
+
+
+async def cmd_status_top(args):
+    await _route_request(args, {"cmd": "status"})
+
+
+async def cmd_targets_top(args):
+    await _route_request(args, {"cmd": "targets"})
+
+
+async def cmd_cdp_top(args):
+    req = {"cmd": "cdp", "method": args.cdp_method}
+    if args.params:
+        req["params"] = json.loads(args.params)
+    await _route_request(args, req)
+
+
+# --- Parser ---
 
 
 def build_parser():
-    p = argparse.ArgumentParser(prog="chromectl", description="Operate Chrome via DevTools Protocol (CDP) from the CLI.")
+    p = argparse.ArgumentParser(prog="chromectl", description="Control Chrome via DevTools Protocol (CDP).")
     p.add_argument("--host", default=DEFAULT_HOST)
     p.add_argument("--port", type=int, default=DEFAULT_PORT)
-    p.add_argument(
-        "--auto-connect", action="store_true", help="Connect via DevToolsActivePort file (Chrome M144+, chrome://inspect/#remote-debugging)"
-    )
-    p.add_argument("--user-data-dir", default=None, help="Chrome user data directory (default: auto-detected for platform)")
+    p.add_argument("--auto-connect", action="store_true", help="Connect via DevToolsActivePort (Chrome M144+)")
+    p.add_argument("--user-data-dir", default=None, help="Chrome user data directory")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sp = sub.add_parser("start", help="Connect to running Chrome and listen on Unix socket")
-    sp.set_defaults(func=cmd_start)
+    sub.add_parser("start", help="Connect to Chrome, listen on Unix socket").set_defaults(func=cmd_start)
+    sub.add_parser("stop", help="Stop daemon and Chrome instances").set_defaults(func=cmd_stop)
+    sub.add_parser("list", help="List open tabs").set_defaults(func=cmd_list_top)
 
-    sp = sub.add_parser("stop", help="Stop daemon and/or launched Chrome instances")
-    sp.set_defaults(func=cmd_stop)
+    sp = sub.add_parser("open", help="Open new tab")
+    sp.add_argument("url", help="URL to open")
+    sp.set_defaults(func=cmd_open_top)
 
-    sp = sub.add_parser("send", help="Send command to running daemon")
-    sp.add_argument("send_cmd", metavar="CMD", help="Command: list, eval, screenshot, open, console-tail")
-    sp.add_argument("--id", dest="send_id", help="Target id")
-    sp.add_argument("-e", "--expr", dest="send_expr", help="JS expression (for eval)")
-    sp.add_argument("--url", dest="send_url", help="URL (for open)")
-    sp.add_argument("-o", "--output", dest="send_output", help="Output file (for screenshot)")
-    sp.add_argument("--full-page", dest="send_full_page", action="store_true")
-    sp.add_argument("--for", dest="send_for", help="Duration in seconds (for console-tail)")
-    sp.set_defaults(func=cmd_send)
+    sub.add_parser("status", help="Daemon connection status").set_defaults(func=cmd_status_top)
+    sub.add_parser("targets", help="List all targets (pages, workers, iframes)").set_defaults(func=cmd_targets_top)
+    sub.add_parser("helpers", help="List DOM helper commands").set_defaults(func=cmd_helpers)
 
-    sp = sub.add_parser("list", help="List open tabs/targets")
-    sp.set_defaults(func=cmd_list)
+    sp = sub.add_parser("cdp", help="Send raw CDP command (browser-level)")
+    sp.add_argument("cdp_method", metavar="METHOD", help="CDP method, e.g. Browser.getVersion")
+    sp.add_argument("--params", help="Method params as JSON")
+    sp.set_defaults(func=cmd_cdp_top)
 
-    sp = sub.add_parser("open", help="Open a new tab at URL and print its targetId")
-    sp.add_argument("url", help="URL to open, e.g., https://example.com")
-    sp.set_defaults(func=cmd_open)
+    sp = sub.add_parser("on", help="Run command on a target (eval, click, type, screenshot, ...)")
+    sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+    sp.add_argument("command", metavar="COMMAND", help="Command to run")
+    sp.add_argument("cmd_args", nargs="*", metavar="ARG", help="Command arguments")
+    sp.add_argument("-o", "--output", help="Output file (screenshot)")
+    sp.add_argument("--full-page", action="store_true", help="Full-page screenshot")
+    sp.add_argument("--for", dest="for_seconds", help="Duration in seconds (console-tail)")
+    sp.add_argument("--timeout", help="Wait timeout in seconds (default: 10)")
+    sp.add_argument("--method", help="CDP method (cdp command)")
+    sp.add_argument("--params", help="CDP params as JSON (cdp command)")
+    sp.set_defaults(func=cmd_on)
 
-    sp = sub.add_parser("eval", help="Evaluate JavaScript in a target")
-    sp.add_argument("--id", required=True, help="Target id from `chromectl list` or `chromectl open`")
-    sp.add_argument("-e", "--expr", required=True, help="JavaScript expression to evaluate")
-    sp.set_defaults(func=cmd_eval)
-
-    sp = sub.add_parser("screenshot", help="Capture a PNG screenshot")
-    sp.add_argument("--id", required=True, help="Target id to capture")
-    sp.add_argument("-o", "--output", help="Output PNG path")
-    sp.add_argument("--full-page", action="store_true", help="Full-page capture")
-    sp.set_defaults(func=cmd_screenshot)
-
-    sp = sub.add_parser("console-tail", help="Stream console/log entries for a target")
-    sp.add_argument("--id", required=True, help="Target id to attach to")
-    sp.add_argument("--for", dest="for_seconds", default="10", help="Seconds to stream (default: 10)")
-    sp.set_defaults(func=cmd_console_tail)
-
-    sp = sub.add_parser("launch", help="Launch a separate Chrome instance with its own profile (legacy)")
+    sp = sub.add_parser("launch", help="Launch separate Chrome instance (legacy)")
     sp.add_argument("--chrome-app", default="Google Chrome", help="macOS app name")
     sp.add_argument("--user-data-dir", default=None, help="Custom Chrome profile directory")
     sp.add_argument("--port", type=int, default=DEFAULT_PORT, help="Remote debugging port")
@@ -980,7 +1229,29 @@ def build_parser():
     return p
 
 
+_KNOWN_COMMANDS = {"start", "stop", "list", "open", "status", "targets", "helpers", "cdp", "launch", "on"}
+_FLAGS_WITH_VALUE = {"--host", "--port", "--user-data-dir"}
+
+
+def _preprocess_argv():
+    """If first positional arg isn't a known command, insert 'on' for TARGET COMMAND syntax."""
+    argv = sys.argv[1:]
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in _FLAGS_WITH_VALUE:
+            i += 2
+        elif arg.startswith("-"):
+            i += 1
+        else:
+            if arg not in _KNOWN_COMMANDS:
+                argv.insert(i, "on")
+            break
+    sys.argv = [sys.argv[0]] + argv
+
+
 async def amain():
+    _preprocess_argv()
     parser = build_parser()
     args = parser.parse_args()
     try:

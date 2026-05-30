@@ -33,6 +33,7 @@ convention = "google"
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]  # no docstrings required in tests
 "**/scripts/*.py" = ["D103"]  # scripts don't need function docstrings
+"chrome-control/*.py" = ["D103", "B904"]  # standalone CLI tool, not a library
 
 [tool.pyright]
 pythonVersion = "3.10"
