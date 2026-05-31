@@ -9,7 +9,7 @@
 | [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
 | [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
 
-**Other Agents**: say to llm to install from `https://github.com/vre/flow-state/<plugin-name>`
+**Other Agents**: tell the llm to install from `https://github.com/vre/flow-state/<plugin-name>`
 
 ---
 
@@ -46,7 +46,7 @@
 
 - 🔗 **Auto-connect** — connects to your running Chrome session (M144+), all tabs, cookies, logins
 - 🔌 **Daemon mode** — single persistent WebSocket, Unix socket interface, no repeated permission dialogs
-- 🧩 **DOM helpers** — get-text, get-html, exists, count, click, fill, scroll, wait
+- 🧩 **30+ DOM helpers** — click, type, get-text, exists, wait-for, scroll, and more
 - 📸 **Screenshots** — viewport or full-page PNG capture
 - 🛠️ **Standalone CLI** — works without an LLM too
 
@@ -59,7 +59,7 @@
 
 - ⚠️ **Test tool** — `navigator.webdriver=true` on all remote debugging sessions, every anti-bot system detects it
 - 🔌 **Direct BiDi** — native Firefox WebSocket, no geckodriver, no Selenium
-- 🔧 **Same CLI surface** — commands mirror chromectl: list, eval, screenshot, DOM helpers
+- 🔧 **Same CLI surface** — commands mirror chromectl: list, eval, screenshot, 30+ DOM helpers
 - 🏗️ **Daemon mode** — persistent BiDi session, stable context IDs, Unix socket
 
 [Full documentation →](firefox-control/README.md)

@@ -544,8 +544,14 @@ class Dispatcher:
         raise CDPError(f"Ambiguous: '{partial_id}' matches {len(matches)} targets")
 
     async def dispatch_safe(self, req: dict) -> dict:
+        cmd = req.get("cmd", "")
+        timeout = self.DISPATCH_TIMEOUT
+        if cmd in _WAIT_COMMANDS:
+            timeout = float(req.get("timeout", 10)) + 5
+        elif cmd == "console-tail":
+            timeout = float(req.get("for", 10)) + 5
         try:
-            result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
+            result = await asyncio.wait_for(self.dispatch(req), timeout=timeout)
             self._last_success = time.time()
             return result
         except (asyncio.TimeoutError, CDPError, aiohttp.ClientError, ConnectionError, OSError) as e:
@@ -554,7 +560,7 @@ class Dispatcher:
                 self.sessions.clear()
                 if await self._reconnect():
                     try:
-                        result = await asyncio.wait_for(self.dispatch(req), timeout=self.DISPATCH_TIMEOUT)
+                        result = await asyncio.wait_for(self.dispatch(req), timeout=timeout)
                         self._last_success = time.time()
                         return result
                     except Exception as e2:

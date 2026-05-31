@@ -23,12 +23,7 @@ Commands:
   eval <ctx> <expr>       Evaluate JavaScript in a browsing context
   screenshot <ctx> [-o f] Capture viewport screenshot
   navigate <ctx> <url>    Navigate to URL
-  get-text <ctx> <sel>    Get text content of element
-  get-html <ctx> <sel>    Get outerHTML of element
-  exists <ctx> <sel>      Check if element exists
-  count <ctx> <sel>       Count matching elements
-  click <ctx> <sel>       Click element
-  fill <ctx> <sel> <val>  Fill input element
+  30+ DOM helpers         click, type, scroll, wait, and more (run 'helpers')
   bidi <method> [params]  Send raw BiDi command
 """
 
@@ -215,57 +210,166 @@ async def cmd_navigate(conn: BiDiConnection, context: str, url: str) -> dict:
     return result
 
 
-async def cmd_dom_helper(conn: BiDiConnection, context: str, helper: str, selector: str, value: str | None = None) -> Any:
-    """Run a DOM helper via script.callFunction."""
-    js_fns = {
-        "get-text": """(sel) => {
-            const el = document.querySelector(sel);
-            return el ? el.textContent : null;
-        }""",
-        "get-html": """(sel) => {
-            const el = document.querySelector(sel);
-            return el ? el.outerHTML : null;
-        }""",
-        "exists": """(sel) => {
-            return document.querySelector(sel) !== null;
-        }""",
-        "count": """(sel) => {
-            return document.querySelectorAll(sel).length;
-        }""",
-        "click": """(sel) => {
-            const el = document.querySelector(sel);
-            if (!el) throw new Error('Element not found: ' + sel);
-            el.click();
-            return true;
-        }""",
-        "fill": """(sel, val) => {
-            const el = document.querySelector(sel);
-            if (!el) throw new Error('Element not found: ' + sel);
-            el.value = val;
-            el.dispatchEvent(new Event('input', {bubbles: true}));
-            el.dispatchEvent(new Event('change', {bubbles: true}));
-            return true;
-        }""",
-    }
-    fn = js_fns.get(helper)
-    if not fn:
+def _js(s: str) -> str:
+    """Escape a Python string as a JS string literal."""
+    return json.dumps(s)
+
+
+_HELPER_COMMANDS = {
+    "click",
+    "check",
+    "uncheck",
+    "highlight",
+    "submit",
+    "clear",
+    "type",
+    "fill",
+    "select",
+    "get-text",
+    "get-html",
+    "get-value",
+    "get-attr",
+    "exists",
+    "count",
+    "get-texts",
+    "scroll-to",
+    "scroll-up",
+    "scroll-down",
+    "scroll-top",
+    "scroll-bottom",
+    "scroll-by",
+    "back",
+    "forward",
+    "get-title",
+    "get-url",
+    "inject-css",
+}
+
+_WAIT_COMMANDS = {"wait-for", "wait-text", "wait-url", "wait-hidden"}
+
+_SELECTOR_ONLY = {
+    "click",
+    "check",
+    "uncheck",
+    "highlight",
+    "submit",
+    "clear",
+    "get-text",
+    "get-html",
+    "get-value",
+    "exists",
+    "count",
+    "get-texts",
+    "scroll-to",
+}
+
+
+def _build_helper_js(cmd: str, req: dict) -> str | None:
+    """Build JS expression for a helper command."""
+    sel = req.get("selector", "")
+    s = _js(sel)
+
+    if cmd == "click":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.click();return true}})()"
+    if cmd == "check":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});if(!e.checked)e.click();return e.checked}})()"
+    if cmd == "uncheck":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});if(e.checked)e.click();return!e.checked}})()"
+    if cmd == "highlight":
+        return f"(()=>{{const a=document.querySelectorAll({s});if(!a.length)throw new Error('No elements: '+{s});a.forEach(e=>e.style.outline='2px solid red');return a.length}})()"
+    if cmd == "submit":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No form: '+{s});e.submit();return true}})()"
+    if cmd == "clear":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No form: '+{s});e.reset();return true}})()"
+    if cmd == "type":
+        t = _js(req.get("text", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.focus();e.value={t};e.dispatchEvent(new InputEvent('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "fill":
+        t = _js(req.get("value", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.focus();e.value={t};e.dispatchEvent(new InputEvent('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "select":
+        v = _js(req.get("value", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.value={v};e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "get-text":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.innerText}})()"
+    if cmd == "get-html":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.innerHTML}})()"
+    if cmd == "get-value":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.value}})()"
+    if cmd == "get-attr":
+        a = _js(req.get("attr", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});return e.getAttribute({a})}})()"
+    if cmd == "exists":
+        return f"document.querySelector({s})!==null"
+    if cmd == "count":
+        return f"document.querySelectorAll({s}).length"
+    if cmd == "get-texts":
+        return f"[...document.querySelectorAll({s})].map(e=>e.innerText)"
+    if cmd == "scroll-to":
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.scrollIntoView({{behavior:'smooth',block:'center'}});return true}})()"
+    if cmd == "scroll-up":
+        px = req.get("pixels")
+        return f"window.scrollBy(0,-{px})" if px else "window.scrollBy(0,-window.innerHeight)"
+    if cmd == "scroll-down":
+        px = req.get("pixels")
+        return f"window.scrollBy(0,{px})" if px else "window.scrollBy(0,window.innerHeight)"
+    if cmd == "scroll-top":
+        return "window.scrollTo(0,0)"
+    if cmd == "scroll-bottom":
+        return "window.scrollTo(0,document.body.scrollHeight)"
+    if cmd == "scroll-by":
+        x, y = int(req.get("x", 0)), int(req.get("y", 0))
+        return f"window.scrollBy({x},{y})"
+    if cmd == "back":
+        return "history.back()"
+    if cmd == "forward":
+        return "history.forward()"
+    if cmd == "get-title":
+        return "document.title"
+    if cmd == "get-url":
+        return "location.href"
+    if cmd == "inject-css":
+        c = _js(req.get("css", ""))
+        return f"(()=>{{const s=document.createElement('style');s.textContent={c};document.head.appendChild(s);return true}})()"
+    return None
+
+
+def _build_wait_js(cmd: str, req: dict) -> str:
+    """Build JS check expression for a wait command."""
+    sel = req.get("selector", "")
+    s = _js(sel)
+
+    if cmd == "wait-for":
+        return f"document.querySelector({s})!==null"
+    if cmd == "wait-hidden":
+        return f"(()=>{{const e=document.querySelector({s});return!e||e.offsetParent===null||getComputedStyle(e).display==='none'}})()"
+    if cmd == "wait-text":
+        t = _js(req.get("text", ""))
+        return f"(()=>{{const e=document.querySelector({s});return e&&e.innerText.includes({t})}})()"
+    if cmd == "wait-url":
+        p = _js(req.get("pattern", ""))
+        return f"location.href.includes({p})"
+    return "false"
+
+
+async def cmd_dom_helper(conn: BiDiConnection, context: str, helper: str, req: dict) -> Any:
+    """Run a DOM helper via script.evaluate."""
+    expr = _build_helper_js(helper, req)
+    if expr is None:
         raise BiDiError(f"Unknown helper: {helper}")
+    return await cmd_eval(conn, context, expr)
 
-    args = [{"type": "string", "value": selector}]
-    if value is not None:
-        args.append({"type": "string", "value": value})
 
-    result = await conn.send(
-        "script.callFunction",
-        {
-            "functionDeclaration": fn,
-            "target": {"context": context},
-            "arguments": args,
-            "awaitPromise": True,
-            "resultOwnership": "none",
-        },
-    )
-    return _unpack_value(result.get("result", {}))
+async def cmd_wait_helper(conn: BiDiConnection, context: str, helper: str, req: dict, timeout: float = 10) -> bool:
+    """Poll a wait condition until true or timeout."""
+    check_js = _build_wait_js(helper, req)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        result = await cmd_eval(conn, context, check_js)
+        if result:
+            return True
+        await asyncio.sleep(0.25)
+    raise BiDiError(f"Timeout after {timeout}s waiting for {helper}")
 
 
 async def cmd_bidi_raw(conn: BiDiConnection, method: str, params_json: str | None) -> Any:
@@ -349,16 +453,25 @@ async def _dispatch(conn: BiDiConnection, req: dict) -> dict:
         result = await cmd_bidi_raw(conn, req["method"], req.get("params"))
         return {"result": result}
 
-    if cmd in ("get-text", "get-html", "exists", "count", "click", "fill"):
-        result = await cmd_dom_helper(conn, req["context"], cmd, req["selector"], req.get("value"))
+    if cmd in _HELPER_COMMANDS:
+        result = await cmd_dom_helper(conn, req["context"], cmd, req)
+        return {"result": result}
+
+    if cmd in _WAIT_COMMANDS:
+        timeout = req.get("timeout", 10)
+        result = await cmd_wait_helper(conn, req["context"], cmd, req, timeout)
         return {"result": result}
 
     return {"error": f"Unknown command: {cmd}"}
 
 
 async def _dispatch_safe(conn: BiDiConnection, req: dict) -> dict:
+    cmd = req.get("cmd", "")
+    timeout = 30
+    if cmd in _WAIT_COMMANDS:
+        timeout = float(req.get("timeout", 10)) + 5
     try:
-        return await asyncio.wait_for(_dispatch(conn, req), timeout=30)
+        return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
     except BiDiError as e:
         return {"error": f"BiDi: {e}"}
     except asyncio.TimeoutError:
@@ -517,16 +630,43 @@ async def _route_request(args, req: dict):
 # --- CLI ---
 
 
-DOM_HELPERS = ["get-text", "get-html", "exists", "count", "click", "fill"]
+HELPERS_TEXT = """DOM helper commands (use with: firefoxctl <context> <command> [args]):
 
-HELPERS_TEXT = """DOM helper commands (use with: firefoxctl <context> <command> <selector> [value]):
+  click <sel>            Click first matching element
+  check <sel>            Check checkbox
+  uncheck <sel>          Uncheck checkbox
+  highlight <sel>        Outline matching elements in red
+  submit <sel>           Submit form
+  clear <sel>            Reset form
+  type <sel> <text>      Type text into input (focus + input/change events)
+  fill <sel> <value>     Set input value (alias for type)
+  select <sel> <value>   Set select element value
 
-  get-text <sel>       Get text content of first matching element
-  get-html <sel>       Get outerHTML of first matching element
-  exists <sel>         Check if element exists (true/false)
-  count <sel>          Count matching elements
-  click <sel>          Click first matching element
-  fill <sel> <value>   Set input value and dispatch input+change events
+  get-text <sel>         Get innerText of first matching element
+  get-html <sel>         Get innerHTML of first matching element
+  get-value <sel>        Get value property of input/select
+  get-attr <sel> <attr>  Get attribute value
+  get-texts <sel>        Get innerText of all matching elements
+  exists <sel>           Check if element exists (true/false)
+  count <sel>            Count matching elements
+
+  scroll-to <sel>        Scroll element into view
+  scroll-up [pixels]     Scroll up (default: one viewport)
+  scroll-down [pixels]   Scroll down (default: one viewport)
+  scroll-top             Scroll to top of page
+  scroll-bottom          Scroll to bottom of page
+  scroll-by <x> <y>      Scroll by pixel offset
+
+  back                   Navigate back (history.back)
+  forward                Navigate forward (history.forward)
+  get-title              Get document title
+  get-url                Get current URL
+  inject-css <css>       Inject CSS into page
+
+  wait-for <sel> [--timeout N]         Wait for element to appear
+  wait-hidden <sel> [--timeout N]      Wait for element to hide
+  wait-text <sel> <text> [--timeout N] Wait for text in element
+  wait-url <pattern> [--timeout N]     Wait for URL to contain pattern
 """
 
 
@@ -571,20 +711,51 @@ def build_parser():
     sp.set_defaults(func=_cmd_bidi)
 
     # DOM helper subcommands
-    for helper in DOM_HELPERS:
-        needs_value = helper == "fill"
-        sp = sub.add_parser(helper, help=f"DOM helper: {helper}")
-        sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID from list")
-        sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
-        if needs_value:
-            sp.add_argument("value", metavar="VALUE", help="Value to fill")
+    for helper in sorted(_HELPER_COMMANDS):
+        sp = sub.add_parser(helper, help=f"DOM: {helper}")
+        sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID")
+        if helper in _SELECTOR_ONLY:
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+        elif helper == "fill":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("value", metavar="VALUE", help="Value to set")
+        elif helper == "type":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("text", metavar="TEXT", help="Text to type")
+        elif helper == "select":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("value", metavar="VALUE", help="Option value")
+        elif helper == "get-attr":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("attr", metavar="ATTR", help="Attribute name")
+        elif helper in ("scroll-up", "scroll-down"):
+            sp.add_argument("pixels", nargs="?", type=int, default=None, help="Pixels (default: viewport)")
+        elif helper == "scroll-by":
+            sp.add_argument("x", type=int, help="Horizontal pixels")
+            sp.add_argument("y", type=int, help="Vertical pixels")
+        elif helper == "inject-css":
+            sp.add_argument("css", metavar="CSS", help="CSS text to inject")
         sp.set_defaults(func=_cmd_dom_helper, helper_name=helper)
+
+    # Wait commands
+    for helper in sorted(_WAIT_COMMANDS):
+        sp = sub.add_parser(helper, help=f"Wait: {helper}")
+        sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID")
+        if helper in ("wait-for", "wait-hidden"):
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+        elif helper == "wait-text":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("text", metavar="TEXT", help="Text to wait for")
+        elif helper == "wait-url":
+            sp.add_argument("pattern", metavar="PATTERN", help="URL substring")
+        sp.add_argument("--timeout", type=float, default=10, help="Timeout in seconds (default: 10)")
+        sp.set_defaults(func=_cmd_wait_helper, helper_name=helper)
 
     return p
 
 
 # Shorthand: firefoxctl <context> <command> ... → insert into subcommand form
-_KNOWN_COMMANDS = {"start", "stop", "list", "eval", "screenshot", "navigate", "bidi", "helpers"} | set(DOM_HELPERS)
+_KNOWN_COMMANDS = {"start", "stop", "list", "eval", "screenshot", "navigate", "bidi", "helpers"} | _HELPER_COMMANDS | _WAIT_COMMANDS
 _FLAGS_WITH_VALUE = {"--host", "--port"}
 
 
@@ -645,9 +816,20 @@ async def _cmd_bidi(args):
 
 
 async def _cmd_dom_helper(args):
-    req = {"cmd": args.helper_name, "context": args.context, "selector": args.selector}
-    if hasattr(args, "value"):
-        req["value"] = args.value
+    req = {"cmd": args.helper_name, "context": args.context}
+    for field in ("selector", "value", "text", "attr", "css", "pixels", "x", "y"):
+        v = getattr(args, field, None)
+        if v is not None:
+            req[field] = v
+    await _route_request(args, req)
+
+
+async def _cmd_wait_helper(args):
+    req = {"cmd": args.helper_name, "context": args.context, "timeout": args.timeout}
+    for field in ("selector", "text", "pattern"):
+        v = getattr(args, field, None)
+        if v is not None:
+            req[field] = v
     await _route_request(args, req)
 
 

@@ -45,12 +45,37 @@ firefoxctl.py CONTEXT navigate https://example.com
 ## DOM helpers
 
 ```
-  get-text SELECTOR       Get text content
-  get-html SELECTOR       Get outerHTML
-  exists SELECTOR         Check if element exists
-  count SELECTOR          Count matching elements
   click SELECTOR          Click element
-  fill SELECTOR VALUE     Set input value
+  check SELECTOR          Check checkbox
+  uncheck SELECTOR        Uncheck checkbox
+  type SELECTOR TEXT      Type text into input
+  fill SELECTOR VALUE     Set input value (alias for type)
+  select SELECTOR VALUE   Set select value
+  get-text SELECTOR       Get innerText
+  get-html SELECTOR       Get innerHTML
+  get-value SELECTOR      Get input value
+  get-attr SELECTOR ATTR  Get attribute
+  get-texts SELECTOR      Get text of all matches
+  exists SELECTOR         Check if element exists
+  count SELECTOR          Count matches
+  highlight SELECTOR      Outline elements in red
+  submit SELECTOR         Submit form
+  clear SELECTOR          Reset form
+  scroll-to SELECTOR      Scroll element into view
+  scroll-up [PIXELS]      Scroll up
+  scroll-down [PIXELS]    Scroll down
+  scroll-top              Scroll to top
+  scroll-bottom           Scroll to bottom
+  scroll-by X Y           Scroll by offset
+  back                    Navigate back
+  forward                 Navigate forward
+  get-title               Get document title
+  get-url                 Get current URL
+  inject-css CSS          Inject CSS
+  wait-for SEL [--timeout N]         Wait for element
+  wait-hidden SEL [--timeout N]      Wait for element to hide
+  wait-text SEL TEXT [--timeout N]   Wait for text
+  wait-url PATTERN [--timeout N]     Wait for URL
 ```
 
 For anything not covered: `firefoxctl.py CONTEXT eval "JS expression"`

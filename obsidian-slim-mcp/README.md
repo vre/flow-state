@@ -1,4 +1,4 @@
-# obsidian-slim-mcp
+# Obsidian Slim MCP
 
 Obsidian vault operations via Local REST API. Single-tool MCP server for Claude Desktop/Code.
 
@@ -146,3 +146,7 @@ uv run obsidian-slim-mcp          # start MCP server
 uv run obsidian-cli help     # CLI help
 uv run pytest tests/ -v      # run tests
 ```
+
+## License
+
+MIT, See [LICENSE](LICENSE) for more information.

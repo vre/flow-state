@@ -1,4 +1,4 @@
-# CLI and Skill to Control Chrome over DevTools Protocol
+# Chrome Control
 
 Control Chrome programmatically via CDP (Chrome DevTools Protocol). That is the same protocol that powers Chrome's built-in DevTools (F12). Inspect pages, run JavaScript, take screenshots, and monitor console output across all your tabs, cookies, and logged-in sessions.
 
@@ -6,11 +6,68 @@ Built for two audiences:
 - **Skill**: Use your LLM to debug web apps through your real browser session with Claude or other skillful LLM
 - **Standalone CLI**: Use for command-line script automation via `chromectl.py`
 
-## Quick start
+## What You Can Do
+
+Once connected to your running Chrome:
+
+- **List tabs** across all windows and profiles
+- **Run JavaScript** in any tab (inspect DOM, call functions, read page state)
+- **Take screenshots** (viewport or full-page)
+- **Monitor console** output (errors, warnings, logs) for a duration
+- **DOM helpers** — click, type, get-text, get-html, exists, count, scroll, wait, and more
+- **Open new tabs** with a URL
+
+JavaScript evaluation is the universal tool — anything you can do in the DevTools console, you can do via `eval`:
+
+```bash
+# Extract structured data
+./chromectl.py $ID eval "({title: document.title, url: location.href})"
+
+# Await async operations (top-level await supported)
+./chromectl.py $ID eval "await fetch('/api/data').then(r => r.json())"
+```
+
+(`$ID` is a target ID from `./chromectl.py list` output. Prefix match OK — e.g. `88FA` instead of full ID.)
+
+## What You Can't Do
+
+Chrome M144+ limitations:
+
+- **No HTTP discovery API** — `/json`, `/json/version` return 404. chromectl uses `Target.getTargets()` over WebSocket instead.
+- **No direct page WebSocket** — `ws://.../devtools/page/<id>` returns 403. All page interaction goes through flat sessions multiplexed over the browser WebSocket.
+- **Permission dialog on reconnect** — if the connection drops (Chrome restart, sleep/wake), reconnecting requires a new manual approval in Chrome.
+- **Worker attachment unstable** — attaching to service worker targets can crash the WebSocket connection. This is a known Chrome bug, not intentional.
+
+Legacy mode (`launch`) has none of these limitations — it uses a separate profile with full CDP access.
+
+## Install
+
+### Claude Code
+
+```bash
+claude plugin marketplace add vre/flow-state
+claude plugin install chrome-control@flow-state
+```
+
+### Other Coding Agents
+
+Tell your LLM to install the skill from `https://github.com/vre/flow-state/chrome-control`
+
+### Standalone CLI
+
+```bash
+cd flow-state/chrome-control
+chmod +x chromectl.py
+./chromectl.py start
+```
+
+Requires [uv](https://github.com/astral-sh/uv) — the script's shebang handles dependencies automatically.
+
+## Usage
 
 ### 1. Enable remote debugging in Chrome
 
-Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles simultaneously . Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
+Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles simultaneously. Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
 
 ### 2. Start chromectl
 
@@ -18,21 +75,24 @@ Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies
 ./chromectl.py start
 ```
 
-(Requires [uv](https://github.com/astral-sh/uv) — the script's shebang handles dependencies automatically.)
-
 Chrome will show a permission dialog, click Allow. chromectl keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
 
 ### 3. Use it
 
 ```bash
 # List all open tabs
-./chromectl.py send list
+./chromectl.py list
 
 # Run JavaScript in a tab (use target ID from list output)
-./chromectl.py send eval --id <target-id> -e "document.title"
+./chromectl.py TARGET eval "document.title"
 
 # Take a screenshot
-./chromectl.py send screenshot --id <target-id> -o page.png
+./chromectl.py TARGET screenshot -o page.png
+
+# DOM helpers
+./chromectl.py TARGET click "button.submit"
+./chromectl.py TARGET get-text h1
+./chromectl.py TARGET type "input[name=q]" "search term"
 
 # Or use netcat directly
 echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
@@ -44,44 +104,7 @@ echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
 ./chromectl.py stop
 ```
 
-## What you can do
-
-Once connected to your running Chrome:
-
-- **List tabs** across all windows and profiles
-- **Run JavaScript** in any tab (inspect DOM, call functions, read page state)
-- **Take screenshots** (viewport or full-page)
-- **Monitor console** output (errors, warnings, logs) for a duration
-- **Open new tabs** with a URL
-
-JavaScript evaluation is the universal tool — anything you can do in the DevTools console, you can do via `eval`:
-
-```bash
-# Click a button
-./chromectl.py send eval --id $ID -e "document.querySelector('button#submit').click()"
-
-# Navigate
-./chromectl.py send eval --id $ID -e "window.location.href = 'https://example.com'"
-
-# Extract structured data
-./chromectl.py send eval --id $ID -e "({title: document.title, url: location.href})"
-
-# Await async operations (top-level await supported)
-./chromectl.py send eval --id $ID -e "await fetch('/api/data').then(r => r.json())"
-```
-
-(`$ID` is a target ID from `./chromectl.py send list` output.)
-
-## What you can't do (Chrome M144+ limitations)
-
-- **No HTTP discovery API** — `/json`, `/json/version` return 404. chromectl uses `Target.getTargets()` over WebSocket instead.
-- **No direct page WebSocket** — `ws://.../devtools/page/<id>` returns 403. All page interaction goes through flat sessions multiplexed over the browser WebSocket.
-- **Permission dialog on reconnect** — if the connection drops (Chrome restart, sleep/wake), reconnecting requires a new manual approval in Chrome.
-- **Worker attachment unstable** — attaching to service worker targets can crash the WebSocket connection. This is a known Chrome bug, not intentional.
-
-Legacy mode (`launch`) has none of these limitations — it uses a separate profile with full CDP access.
-
-## How it works
+## How It Works
 
 ```
                   ┌──────────────────────────────┐
@@ -97,63 +120,50 @@ Legacy mode (`launch`) has none of these limitations — it uses a separate prof
                              │ JSON line protocol
               ┌──────────────┼───────────────────┐
               │              │                   │
-          nc -U sock    chromectl send      Python script
+          nc -U sock    chromectl CLI      Python script
                                           (chromectl_daemon.py)
 ```
 
 **Flat sessions**: Chrome M144+ blocks direct page WebSocket URLs. chromectl maintains a single browser-level WebSocket and multiplexes page sessions using `Target.attachToTarget` with `flatten=true`. Each page gets a `sessionId`; CDP commands and events are routed by this ID over the shared connection.
 
-## Install
-
-### Claude Code
-
-```bash
-claude plugin marketplace add vre/flow-state
-claude plugin install chrome-control
-```
-
-### Other coding agents
-
-Clone the repo and point your agent at the `SKILL.md` file:
-
-```bash
-git clone https://github.com/vre/flow-state.git
-```
-
-The skill definition is in `chrome-control/SKILL.md`. How to load it depends on the agent:
-
-- **GitHub Copilot** — copy SKILL.md content into `.github/copilot-instructions.md`
-- **OpenAI Codex** — copy SKILL.md content into `AGENTS.md` or pass via `--instructions`
-- **Cursor / Windsurf** — copy SKILL.md content into `.cursorrules` or equivalent
-
-### Standalone CLI (no LLM needed)
-
-```bash
-git clone https://github.com/vre/flow-state.git
-cd flow-state/chrome-control
-chmod +x chromectl.py
-./chromectl.py start
-```
-
 ## Commands
+
+### Global
 
 | Command | Description |
 |---------|-------------|
 | `start` | Connect to running Chrome, listen on Unix socket |
 | `stop` | Stop daemon and any launched Chrome instances |
-| `send <cmd>` | Send a command to the running daemon |
-| `send list` | List open tabs/targets |
-| `send open <url>` | Open a new tab |
-| `send eval --id <id> -e <expr>` | Run JavaScript in a tab |
-| `send screenshot --id <id> [-o file]` | Capture PNG screenshot |
-| `send console-tail --id <id> [--for N]` | Stream console messages |
-| `send targets` | List all targets (pages, workers, iframes) |
-| `send status` | Show daemon connection status |
-| `send cdp --method <method>` | Send raw CDP command (auto-connect only) |
-| `send worker-eval --id <id> -e <expr>` | Run JavaScript in a service worker |
+| `list` | List open tabs |
+| `open <url>` | Open a new tab |
+| `status` | Show daemon connection status |
+| `targets` | List all targets (pages, workers, iframes) |
+| `helpers` | List all DOM helper commands |
+| `cdp <method> [--params JSON]` | Send raw CDP command (browser-level) |
 | `launch [--headless]` | Launch a separate Chrome instance (legacy) |
 
-### Socket protocol
+### Target
+
+All target commands: `chromectl.py TARGET COMMAND [ARGS]`
+
+Target ID from `list`/`open` output. Prefix match OK (e.g. `88FA` instead of full 32-char ID).
+
+| Command | Description |
+|---------|-------------|
+| `TARGET eval <expr>` | Run JavaScript in a tab |
+| `TARGET screenshot [-o file] [--full-page]` | Capture PNG screenshot |
+| `TARGET console-tail [--for N]` | Stream console messages |
+| `TARGET navigate <url>` | Navigate to URL |
+| `TARGET click <sel>` | Click element |
+| `TARGET type <sel> <text>` | Type text into input |
+| `TARGET get-text <sel>` | Get text content |
+| `TARGET exists <sel>` | Check if element exists |
+| `TARGET wait-for <sel> [--timeout N]` | Wait for element to appear |
+| `TARGET scroll-to <sel>` | Scroll element into view |
+
+30+ DOM helpers available — run `chromectl.py helpers` for the full list.
+
+### Socket Protocol
 
 chromectl accepts JSON commands over its Unix socket, one per line:
 
@@ -164,7 +174,7 @@ echo '{"cmd":"screenshot","id":"TARGET_ID","output":"shot.png"}' | nc -U /tmp/ch
 echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-$(id -u).sock
 ```
 
-### chromectl_daemon.py — Python library
+### Python Library
 
 For scripts that need chromectl access programmatically:
 
@@ -180,15 +190,15 @@ async with daemon_context() as socket_path:
 socket_path = await ensure_daemon_running()
 ```
 
-## Legacy mode
+## Legacy Mode
 
 If you need full CDP access (HTTP discovery, direct page WebSocket, worker attachment) or don't want to touch your default Chrome, launch a separate instance:
 
 ```bash
 ./chromectl.py launch --headless
 TARGET=$(./chromectl.py open https://example.com | jq -r .id)
-./chromectl.py eval --id $TARGET -e "document.title"
-./chromectl.py screenshot --id $TARGET -o page.png
+./chromectl.py $TARGET eval "document.title"
+./chromectl.py $TARGET screenshot -o page.png
 ./chromectl.py stop
 ```
 
@@ -199,9 +209,9 @@ TARGET=$(./chromectl.py open https://example.com | jq -r .id)
 - **Google Chrome** (Chrome M144+ for auto-connect, any version for legacy mode)
 - **macOS or Linux** (Unix socket requires POSIX)
 
-## Why this exists
+## Why This Exists
 
-Chrome M136 (April 2025) through M146 progressively locked down remote debugging on the default profile to prevent cookie theft. The traditional approach of launching Chrome with `--remote-debugging-port` and a separate `--user-data-dir`  still works but requires a separate profile (no cookies, no logins, no extensions).
+Chrome M136 (April 2025) through M146 progressively locked down remote debugging on the default profile to prevent cookie theft. The traditional approach of launching Chrome with `--remote-debugging-port` and a separate `--user-data-dir` still works but requires a separate profile (no cookies, no logins, no extensions).
 
 Chrome M144 (January 2026) introduced an alternative: enable remote debugging from inside a running browser via `chrome://inspect/#remote-debugging`. This enables CDP access to **your existing session** with all profiles, all cookies, all logged-in sites. The tradeoff is that each new WebSocket connection triggers a permission dialog.
 
@@ -210,10 +220,18 @@ chrome-control handles both modes:
 - **Auto-connect** (Chrome M144+): connects to your running Chrome via `DevToolsActivePort`, keeps one persistent connection to avoid repeated permission prompts
 - **Legacy** (`launch`): starts a separate Chrome instance with full CDP access and a separate profile
 
-## Fork history
+## Release Highlights
 
-Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill). Additions: Chrome M144+ auto-connect, daemon mode, flat session multiplexing, reconnect handling, liveness probes.
+- **v1.0.0** — Chrome DevTools Protocol CLI and skill
+  - Auto-connect to your running Chrome (M144+), no separate profile needed
+  - Daemon mode with persistent WebSocket and Unix socket interface
+  - 30+ DOM helper commands: click, type, get-text, exists, wait-for, scroll, and more
+  - Forked base from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill)
+
+## Fork History
+
+Forked from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill). Additions: Chrome M144+ auto-connect, daemon mode, flat session multiplexing, reconnect handling, liveness probes, 30+ DOM helpers.
 
 ## License
 
-MIT
+MIT, See [LICENSE](LICENSE) for more information.

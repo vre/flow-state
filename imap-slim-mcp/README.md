@@ -50,24 +50,11 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Other Coding Agents
 
-Clone the repo and add the MCP server:
-
-```bash
-git clone https://github.com/vre/flow-state.git
-cd flow-state/imap-slim-mcp
-uv sync
-```
-
-The MCP server config is in `imap-slim-mcp/.mcp.json`. How to load it depends on the agent:
-
-- **GitHub Copilot** — add to `.github/copilot-mcp.json`
-- **OpenAI Codex** — add to MCP config or pass via `--mcp-config`
-- **Cursor / Windsurf** — add to MCP settings
+Tell your LLM to install the MCP server from `https://github.com/vre/flow-state/imap-slim-mcp`
 
 ### Manual
 
 ```bash
-git clone https://github.com/vre/flow-state.git
 cd flow-state/imap-slim-mcp
 uv sync
 claude mcp add imap-slim -- uv --directory $(pwd) run imap-slim
