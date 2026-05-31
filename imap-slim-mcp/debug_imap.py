@@ -7,22 +7,30 @@ import ssl
 
 import keyring
 
-SERVICE_NAME = "imap-stream"
+SERVICE_NAME = "imap-slim"
+_LEGACY_SERVICE_NAME = "imap-stream"
+
+
+def _keyring_get(key: str) -> str | None:
+    val = keyring.get_password(SERVICE_NAME, key)
+    if val is None:
+        val = keyring.get_password(_LEGACY_SERVICE_NAME, key)
+    return val
 
 
 def get_credentials():
     """Get credentials from keychain."""
-    accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
+    accounts_json = _keyring_get("accounts")
     if not accounts_json:
         return None, None, None, None
 
     accounts = json.loads(accounts_json)
-    default = keyring.get_password(SERVICE_NAME, "default_account") or accounts[0]
+    default = _keyring_get("default_account") or accounts[0]
 
-    server = keyring.get_password(SERVICE_NAME, f"{default}:imap_server")
-    port = keyring.get_password(SERVICE_NAME, f"{default}:imap_port") or "993"
-    username = keyring.get_password(SERVICE_NAME, f"{default}:imap_username")
-    password = keyring.get_password(SERVICE_NAME, f"{default}:imap_password")
+    server = _keyring_get(f"{default}:imap_server")
+    port = _keyring_get(f"{default}:imap_port") or "993"
+    username = _keyring_get(f"{default}:imap_username")
+    password = _keyring_get(f"{default}:imap_password")
 
     return server, port, username, password
 

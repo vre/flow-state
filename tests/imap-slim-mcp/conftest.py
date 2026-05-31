@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 
-# Add imap-stream-mcp directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-stream-mcp"))
+# Add imap-slim-mcp directory to Python path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-slim-mcp"))
 
 
 @dataclass

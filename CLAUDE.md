@@ -26,7 +26,7 @@ ORC does NOT escalate for: implementation details, refactoring, review findings,
 
 ## Project
 
-- End-user plugin project: youtube-to-markdown, imap-stream-mcp, chrome-control
+- End-user plugin project: youtube-to-markdown, imap-slim-mcp, chrome-control
 - Build: `uv sync` per plugin, `uv run pytest` for tests
 - Tests: ALL tests go in `tests/<plugin>/`, never in `<plugin>/tests/`. Run: `cd tests && uv run pytest <plugin>/`
 - Key docs: `TESTING.md`, `docs/<plugin>/adrs/`, `docs/<plugin>/plans/`, `docs/<plugin>/reflections/`

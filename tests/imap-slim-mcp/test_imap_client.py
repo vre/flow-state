@@ -2249,3 +2249,100 @@ class TestAttachmentRoundtrip:
         att_parts = [p for p in parsed.walk() if p.get_content_disposition() == "attachment"]
         assert len(att_parts) == 1
         assert att_parts[0].get_payload(decode=True) == b"%PDF-1.4 real pdf content here"
+
+
+class TestKeyringMigration:
+    """Tests for legacy imap-stream → imap-slim keychain migration."""
+
+    def setup_method(self):
+        import imap_client
+
+        imap_client._migrated = False
+
+    @patch("imap_client.keyring")
+    def test_migrate_copies_and_deletes_legacy(self, mock_kr):
+        """Migration copies all legacy entries to new name, then deletes them."""
+        from imap_client import _LEGACY_SERVICE_NAME, SERVICE_NAME, _migrate_legacy
+
+        legacy_data = {
+            (_LEGACY_SERVICE_NAME, "accounts"): '["work"]',
+            (_LEGACY_SERVICE_NAME, "default_account"): "work",
+            (_LEGACY_SERVICE_NAME, "work:imap_server"): "mail.example.com",
+            (_LEGACY_SERVICE_NAME, "work:imap_port"): "993",
+            (_LEGACY_SERVICE_NAME, "work:imap_username"): "user@example.com",
+            (_LEGACY_SERVICE_NAME, "work:imap_password"): "secret",
+        }
+        mock_kr.get_password.side_effect = lambda svc, key: legacy_data.get((svc, key))
+        mock_kr.errors.PasswordDeleteError = KeyError
+
+        _migrate_legacy()
+
+        set_calls = {(c.args[0], c.args[1]) for c in mock_kr.set_password.call_args_list}
+        assert (SERVICE_NAME, "accounts") in set_calls
+        assert (SERVICE_NAME, "work:imap_server") in set_calls
+        assert (SERVICE_NAME, "work:imap_password") in set_calls
+
+        del_calls = {(c.args[0], c.args[1]) for c in mock_kr.delete_password.call_args_list}
+        assert (_LEGACY_SERVICE_NAME, "accounts") in del_calls
+        assert (_LEGACY_SERVICE_NAME, "work:imap_server") in del_calls
+
+    @patch("imap_client.keyring")
+    def test_no_legacy_data_skips_migration(self, mock_kr):
+        """No migration when legacy keychain is empty."""
+        from imap_client import _migrate_legacy
+
+        mock_kr.get_password.return_value = None
+
+        _migrate_legacy()
+
+        mock_kr.set_password.assert_not_called()
+        mock_kr.delete_password.assert_not_called()
+
+    @patch("imap_client.keyring")
+    def test_keyring_get_uses_new_name_first(self, mock_kr):
+        """_keyring_get returns new-name value without touching legacy."""
+        from imap_client import SERVICE_NAME, _keyring_get
+
+        mock_kr.get_password.side_effect = lambda svc, key: "val" if svc == SERVICE_NAME else None
+
+        result = _keyring_get("accounts")
+
+        assert result == "val"
+        assert mock_kr.get_password.call_count == 1
+
+    @patch("imap_client.keyring")
+    def test_keyring_get_triggers_migration_on_miss(self, mock_kr):
+        """_keyring_get triggers migration when new name returns None."""
+        from imap_client import _LEGACY_SERVICE_NAME, SERVICE_NAME, _keyring_get
+
+        call_count = [0]
+
+        def fake_get(svc, key):
+            if svc == SERVICE_NAME:
+                call_count[0] += 1
+                # First call: miss. After migration: hit.
+                return "migrated" if call_count[0] > 1 else None
+            if svc == _LEGACY_SERVICE_NAME and key == "accounts":
+                return '["default"]'
+            return None
+
+        mock_kr.get_password.side_effect = fake_get
+        mock_kr.errors.PasswordDeleteError = KeyError
+
+        result = _keyring_get("accounts")
+
+        assert result == "migrated"
+        assert mock_kr.set_password.called
+
+    @patch("imap_client.keyring")
+    def test_migration_runs_only_once(self, mock_kr):
+        """Second call to _migrate_legacy is a no-op."""
+        from imap_client import _LEGACY_SERVICE_NAME, _migrate_legacy
+
+        mock_kr.get_password.side_effect = lambda svc, key: ('["a"]' if svc == _LEGACY_SERVICE_NAME and key == "accounts" else None)
+        mock_kr.errors.PasswordDeleteError = KeyError
+
+        _migrate_legacy()
+        first_set_count = mock_kr.set_password.call_count
+        _migrate_legacy()
+        assert mock_kr.set_password.call_count == first_set_count

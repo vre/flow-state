@@ -1,4 +1,4 @@
-# IMAP Stream MCP
+# IMAP Slim MCP
 
 Lightweight IMAP email client for Claude Desktop/Code/Cowork.
 
@@ -22,30 +22,61 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **cleanup** - Remove downloaded attachments (auto-cleared on reboot on macOS/Linux, persists on Windows until user cleans)
 - **help** - Built-in documentation
 
-## Installation for Claude Code
+## Install
 
-### As a Plugin
+### Claude Code
 
 ```bash
-/plugin marketplace add vre/flow-state
-/plugin install imap-stream-mcp@flow-state
+claude plugin marketplace add vre/flow-state
+claude plugin install imap-slim-mcp@flow-state
 ```
 
 Then configure credentials (see below).
 
-### Manual Installation
+### Claude Desktop
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "imap-slim": {
+      "command": "uv",
+      "args": ["--directory", "/path/to/imap-slim-mcp", "run", "imap-slim"]
+    }
+  }
+}
+```
+
+### Other Coding Agents
+
+Clone the repo and add the MCP server:
 
 ```bash
 git clone https://github.com/vre/flow-state.git
-cd flow-state/imap-stream-mcp
+cd flow-state/imap-slim-mcp
 uv sync
-claude mcp add imap-stream -- uv --directory $(pwd) run imap-stream
+```
+
+The MCP server config is in `imap-slim-mcp/.mcp.json`. How to load it depends on the agent:
+
+- **GitHub Copilot** — add to `.github/copilot-mcp.json`
+- **OpenAI Codex** — add to MCP config or pass via `--mcp-config`
+- **Cursor / Windsurf** — add to MCP settings
+
+### Manual
+
+```bash
+git clone https://github.com/vre/flow-state.git
+cd flow-state/imap-slim-mcp
+uv sync
+claude mcp add imap-slim -- uv --directory $(pwd) run imap-slim
 ```
 (you can define the [installation scope](https://code.claude.com/docs/en/mcp#mcp-installation-scopes) with "claude mcp add --scope local|user|project ...")
 
 ## Configuration
 
-### Option 1: OS Keychain (Recommended)
+### OS Keychain (Recommended)
 
 ```bash
 uv run python setup.py                 # Interactive setup
@@ -55,32 +86,19 @@ uv run python setup.py --default work  # Set default
 uv run python setup.py --remove work   # Remove account
 ```
 
-### Option 2: Environment Variables (Automation/Docker)
+### Environment Variables (Automation/Docker)
 
 Add to your MCP config:
 
 ```json
 "env": {
-  "IMAP_STREAM_SERVER": "imap.example.com",
-  "IMAP_STREAM_USERNAME": "you@example.com",
-  "IMAP_STREAM_PASSWORD": "app-password"
+  "IMAP_SLIM_SERVER": "imap.example.com",
+  "IMAP_SLIM_USERNAME": "you@example.com",
+  "IMAP_SLIM_PASSWORD": "app-password"
 }
 ```
 
-## Installation for Claude Desktop (Manual)
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "imap-stream": {
-      "command": "uv",
-      "args": ["--directory", "/path/to/imap-stream-mcp", "run", "imap-stream"]
-    }
-  }
-}
-```
+> `IMAP_STREAM_*` env vars still work for backward compatibility.
 
 ## Workflow: Reply to Email
 
@@ -104,7 +122,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 ## Project Structure
 
 ```
-imap_stream_mcp.py   # MCP server entry point, action dispatcher
+imap_stream_mcp.py   # MCP server (legacy module name, kept for compatibility)
 imap_client.py       # IMAP operations (list, read, search, draft)
 bodystructure.py     # BODYSTRUCTURE parsing (attachments, snippets)
 session.py           # Connection management, caching, message fetch
@@ -114,7 +132,7 @@ debug_imap.py        # Connection troubleshooting utility
 .mcp.json            # MCP server configuration for plugin install
 ```
 
-## MCP API - Usage
+## API Reference
 
 ```
 # List messages (preview: true for body snippets, false for headers only)
@@ -159,7 +177,7 @@ debug_imap.py        # Connection troubleshooting utility
 {action: "help", payload: "draft"}
 ```
 
-## MCP API - Multi-Account Usage
+### Multi-Account
 
 ```
 # Use default account
@@ -168,6 +186,10 @@ debug_imap.py        # Connection troubleshooting utility
 # Use specific account
 {action: "list", folder: "INBOX", account: "work", preview: false}
 ```
+
+## Release Highlights
+
+- **v1.0.0** — Multi-account fix, injection defense module with NFKC normalization and randomized nonce delimiters.
 
 ## License
 

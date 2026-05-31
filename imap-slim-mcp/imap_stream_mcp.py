@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IMAP Stream MCP Server - Lightweight IMAP client for Claude.
+"""IMAP Slim MCP Server - Lightweight IMAP client for Claude.
 
 Inspired by Jesse Vincent's MCP design philosophy:
 - Single tool with action dispatcher (~500 tokens vs typical 15,000+)
@@ -10,9 +10,9 @@ Usage with Claude Desktop/Code:
     Add to your MCP config:
     {
         "mcpServers": {
-            "imap-stream": {
+            "imap-slim": {
                 "command": "uv",
-                "args": ["--directory", "/path/to/imap-stream-mcp", "run", "imap-stream"]
+                "args": ["--directory", "/path/to/imap-slim-mcp", "run", "imap-slim"]
             }
         }
     }
@@ -485,9 +485,9 @@ uv run --directory {plugin_dir} python setup.py
 **Option 2:** Set environment variables in MCP config:
 ```json
 "env": {{
-  "IMAP_STREAM_SERVER": "imap.example.com",
-  "IMAP_STREAM_USERNAME": "you@example.com",
-  "IMAP_STREAM_PASSWORD": "app-password"
+  "IMAP_SLIM_SERVER": "imap.example.com",
+  "IMAP_SLIM_USERNAME": "you@example.com",
+  "IMAP_SLIM_PASSWORD": "app-password"
 }}
 ```"""
 
@@ -955,9 +955,9 @@ This stores your IMAP credentials securely in your system keychain.
 
 ## Alternative: Environment Variables
 ```bash
-export IMAP_STREAM_SERVER="imap.example.com"
-export IMAP_STREAM_USERNAME="you@example.com"
-export IMAP_STREAM_PASSWORD="app-password"
+export IMAP_SLIM_SERVER="imap.example.com"
+export IMAP_SLIM_USERNAME="you@example.com"
+export IMAP_SLIM_PASSWORD="app-password"
 ```
 
 After setup, try: `{{action: "folders"}}` to verify connection.

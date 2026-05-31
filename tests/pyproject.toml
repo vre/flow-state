@@ -7,24 +7,24 @@ dependencies = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24.0",
     "aiohttp>=3.9",
-    "imap-stream-mcp",
+    "imap-slim-mcp",
     "obsidian-slim-mcp",
 ]
 
 [tool.uv.sources]
-imap-stream-mcp = { path = "../imap-stream-mcp" }
+imap-slim-mcp = { path = "../imap-slim-mcp" }
 obsidian-slim-mcp = { path = "../obsidian-slim-mcp" }
 
 [tool.pytest.ini_options]
 testpaths = [
     "youtube-to-markdown",
-    "imap-stream-mcp",
+    "imap-slim-mcp",
     "obsidian-slim-mcp",
     "chrome-control",
 ]
 pythonpath = [
     "../youtube-to-markdown",
-    "../imap-stream-mcp",
+    "../imap-slim-mcp",
     "../obsidian-slim-mcp",
     "../chrome-control",
 ]

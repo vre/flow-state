@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""IMAP Stream Setup - Configure IMAP credentials in system keychain.
+"""IMAP Slim Setup - Configure IMAP credentials in system keychain.
 
 This script manages IMAP account configurations, supporting multiple accounts.
 Credentials are stored securely in the system keychain.
@@ -19,13 +19,12 @@ import json
 import sys
 
 import keyring
-
-SERVICE_NAME = "imap-stream"
+from imap_client import SERVICE_NAME, _keyring_get
 
 
 def get_accounts() -> list[str]:
     """Get list of configured accounts."""
-    accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
+    accounts_json = _keyring_get("accounts")
     if accounts_json:
         return json.loads(accounts_json)
     return []
@@ -42,7 +41,7 @@ def get_default_account() -> str | None:
     if not accounts:
         return None
 
-    default = keyring.get_password(SERVICE_NAME, "default_account")
+    default = _keyring_get("default_account")
     if default and default in accounts:
         return default
 
@@ -92,13 +91,11 @@ def save_account_credentials(name: str, server: str, port: str, username: str, p
     """Save account credentials to keychain."""
     accounts = get_accounts()
 
-    # Always use prefixed keys
     keyring.set_password(SERVICE_NAME, f"{name}:imap_server", server)
     keyring.set_password(SERVICE_NAME, f"{name}:imap_port", port)
     keyring.set_password(SERVICE_NAME, f"{name}:imap_username", username)
     keyring.set_password(SERVICE_NAME, f"{name}:imap_password", password)
 
-    # Update accounts list
     if name not in accounts:
         accounts.append(name)
         save_accounts(accounts)
@@ -118,7 +115,6 @@ def add_account(name: str):
     print("\nStoring credentials in keychain...")
     save_account_credentials(name, server, port, username, password)
 
-    # Set as default if first account
     if len(get_accounts()) == 1:
         keyring.set_password(SERVICE_NAME, "default_account", name)
         print(f"Set '{name}' as default account.")
@@ -142,18 +138,15 @@ def remove_account(name: str):
         print(f"Error: Account '{name}' not found.")
         sys.exit(1)
 
-    # Remove credentials
     for key in ["imap_server", "imap_port", "imap_username", "imap_password"]:
         try:
             keyring.delete_password(SERVICE_NAME, f"{name}:{key}")
         except keyring.errors.PasswordDeleteError:
             pass
 
-    # Update accounts list
     accounts.remove(name)
     save_accounts(accounts)
 
-    # Update default if needed
     default = get_default_account()
     if default == name and accounts:
         keyring.set_password(SERVICE_NAME, "default_account", accounts[0])
@@ -175,8 +168,8 @@ def list_accounts():
     print("Configured accounts:")
     for acc in accounts:
         marker = " (default)" if acc == default else ""
-        username = keyring.get_password(SERVICE_NAME, f"{acc}:imap_username")
-        server = keyring.get_password(SERVICE_NAME, f"{acc}:imap_server")
+        username = _keyring_get(f"{acc}:imap_username")
+        server = _keyring_get(f"{acc}:imap_server")
         print(f"  {acc}{marker}: {username} @ {server}")
 
 
@@ -186,7 +179,6 @@ def clear_all():
 
     print("Removing all stored credentials...")
 
-    # Remove all account credentials
     for acc in accounts:
         for key in ["imap_server", "imap_port", "imap_username", "imap_password"]:
             try:
@@ -194,7 +186,6 @@ def clear_all():
             except keyring.errors.PasswordDeleteError:
                 pass
 
-    # Remove accounts list and default
     for key in ["accounts", "default_account"]:
         try:
             keyring.delete_password(SERVICE_NAME, key)
@@ -207,7 +198,7 @@ def clear_all():
 def interactive_setup():
     """Interactive setup - add or edit account."""
     print("=" * 50)
-    print("  IMAP Stream Setup")
+    print("  IMAP Slim Setup")
     print("=" * 50)
     print()
     print("This configures your IMAP connection.")

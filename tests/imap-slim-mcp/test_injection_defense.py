@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-stream-mcp"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-slim-mcp"))
 
 from imap_stream_mcp import MailAction, use_mail
 from injection_defense import sanitize_external_text, wrap_untrusted

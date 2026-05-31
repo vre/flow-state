@@ -1,13 +1,13 @@
 {
   "mcpServers": {
-    "imap-stream": {
+    "imap-slim": {
       "type": "stdio",
       "command": "uv",
       "args": [
         "--directory",
-        "./imap-stream-mcp",
+        "./imap-slim-mcp",
         "run",
-        "imap-stream"
+        "imap-slim"
       ],
       "env": {}
     },

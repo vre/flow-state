@@ -41,7 +41,7 @@ tests/youtube-to-markdown/
 ### MCP Servers
 
 ```
-tests/imap-stream-mcp/
+tests/imap-slim-mcp/
 ├── test_account_param.py
 ├── test_bodystructure.py
 ├── test_flag_parsing.py
@@ -79,7 +79,7 @@ cd tests && uv run pytest
 
 # Run specific project tests
 cd tests && uv run pytest youtube-to-markdown/
-cd tests && uv run pytest imap-stream-mcp/
+cd tests && uv run pytest imap-slim-mcp/
 cd tests && uv run pytest obsidian-slim-mcp/
 
 # chrome-control

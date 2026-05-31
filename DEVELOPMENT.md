@@ -15,7 +15,7 @@ youtube-to-markdown -> ../../youtube-to-markdown  (symlink)
   "mcpServers": {
     "imap-stream": {
       "command": "uv",
-      "args": ["--directory", "./imap-stream-mcp", "run", "imap-stream"]
+      "args": ["--directory", "./imap-slim-mcp", "run", "imap-stream"]
     }
   }
 }
@@ -34,7 +34,7 @@ firefox-control/firefoxctl.py    (standalone CLI, uv inline deps, WebDriver BiDi
 firefox-control/SKILL.md         (Claude Code skill definition)
 ```
 
-Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation. Browser automation tools have no MCP server — they are CLI tools and skills.
+Note: Each sub-project (e.g., 'imap-slim-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation. Browser automation tools have no MCP server — they are CLI tools and skills.
 
 ## Dev Skills from flow-jigs
 

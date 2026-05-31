@@ -24,7 +24,52 @@ from bodystructure import count_attachments, extract_snippet, find_html_part, fi
 from imapclient import IMAPClient
 from markdown_utils import convert_body
 
-SERVICE_NAME = "imap-stream"
+SERVICE_NAME = "imap-slim"
+_LEGACY_SERVICE_NAME = "imap-stream"
+_migrated = False
+
+
+def _migrate_legacy():
+    """Copy all keychain entries from legacy service name to new."""
+    global _migrated
+    if _migrated:
+        return
+    _migrated = True
+
+    legacy_accounts = keyring.get_password(_LEGACY_SERVICE_NAME, "accounts")
+    if not legacy_accounts:
+        return
+
+    accounts = json.loads(legacy_accounts)
+    keys_to_copy = ["accounts", "default_account"]
+    for acc in accounts:
+        for suffix in ["imap_server", "imap_port", "imap_username", "imap_password"]:
+            keys_to_copy.append(f"{acc}:{suffix}")
+
+    copied = 0
+    for key in keys_to_copy:
+        val = keyring.get_password(_LEGACY_SERVICE_NAME, key)
+        if val is not None:
+            keyring.set_password(SERVICE_NAME, key, val)
+            copied += 1
+
+    if copied:
+        for key in keys_to_copy:
+            try:
+                keyring.delete_password(_LEGACY_SERVICE_NAME, key)
+            except keyring.errors.PasswordDeleteError:
+                pass
+        print(f"Migrated {copied} keychain entries from '{_LEGACY_SERVICE_NAME}' to '{SERVICE_NAME}'", file=sys.stderr)
+
+
+def _keyring_get(key: str) -> str | None:
+    """Read from keychain: new name first, migrate from legacy if missing."""
+    val = keyring.get_password(SERVICE_NAME, key)
+    if val is not None:
+        return val
+    _migrate_legacy()
+    return keyring.get_password(SERVICE_NAME, key)
+
 
 # Standard IMAP flags (RFC 3501)
 STANDARD_FLAGS = {"seen", "flagged", "answered", "deleted", "draft"}
@@ -143,10 +188,10 @@ def get_credentials(account: str | None = None) -> tuple[str, str, str, str]:
         if account not in accounts:
             raise IMAPError(f"Account '{account}' not found. Available: {', '.join(accounts)}")
 
-        server = keyring.get_password(SERVICE_NAME, f"{account}:imap_server")
-        port = keyring.get_password(SERVICE_NAME, f"{account}:imap_port")
-        username = keyring.get_password(SERVICE_NAME, f"{account}:imap_username")
-        password = keyring.get_password(SERVICE_NAME, f"{account}:imap_password")
+        server = _keyring_get(f"{account}:imap_server")
+        port = _keyring_get(f"{account}:imap_port")
+        username = _keyring_get(f"{account}:imap_username")
+        password = _keyring_get(f"{account}:imap_password")
 
         if not all([server, username, password]):
             raise IMAPError(f"Account '{account}' credentials incomplete.")
@@ -154,13 +199,14 @@ def get_credentials(account: str | None = None) -> tuple[str, str, str, str]:
         return server, port or "993", username, password
 
     # Fallback: Environment variables (automation/Docker)
-    server = os.environ.get("IMAP_STREAM_SERVER")
-    port = os.environ.get("IMAP_STREAM_PORT")
-    username = os.environ.get("IMAP_STREAM_USERNAME")
-    password = os.environ.get("IMAP_STREAM_PASSWORD")
+    # IMAP_SLIM_* preferred, IMAP_STREAM_* accepted for backward compat
+    server = os.environ.get("IMAP_SLIM_SERVER") or os.environ.get("IMAP_STREAM_SERVER")
+    port = os.environ.get("IMAP_SLIM_PORT") or os.environ.get("IMAP_STREAM_PORT")
+    username = os.environ.get("IMAP_SLIM_USERNAME") or os.environ.get("IMAP_STREAM_USERNAME")
+    password = os.environ.get("IMAP_SLIM_PASSWORD") or os.environ.get("IMAP_STREAM_PASSWORD")
 
     if not all([server, username, password]):
-        raise IMAPError("IMAP not configured. Run 'uv run python setup.py' to configure, or set IMAP_STREAM_* environment variables.")
+        raise IMAPError("IMAP not configured. Run 'uv run python setup.py' to configure, or set IMAP_SLIM_* environment variables.")
 
     return server, port or "993", username, password
 
@@ -171,7 +217,7 @@ def list_accounts() -> list[str]:
     Returns:
         List of account names, empty if none configured
     """
-    accounts_json = keyring.get_password(SERVICE_NAME, "accounts")
+    accounts_json = _keyring_get("accounts")
     if accounts_json:
         return json.loads(accounts_json)
     return []
@@ -188,7 +234,7 @@ def get_default_account() -> str | None:
         return None
 
     # Check for explicit default
-    default = keyring.get_password(SERVICE_NAME, "default_account")
+    default = _keyring_get("default_account")
     if default and default in accounts:
         return default
 
