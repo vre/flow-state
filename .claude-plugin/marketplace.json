@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Knowledge work, context management, and productivity tools/skills/etc. for Claude Code",
-    "version": "20260530.1000",
+    "version": "20260531.1000",
     "pluginRoot": "./"
   },
   "plugins": [
@@ -34,6 +34,15 @@
       "version": "1.0.0",
       "category": "browser-automation",
       "keywords": ["chrome", "cdp", "devtools", "debugging", "screenshots", "browser"],
+      "skills": ["./"]
+    },
+    {
+      "name": "firefox-control",
+      "source": "./firefox-control",
+      "description": "TEST TOOL: Control Firefox via WebDriver BiDi. Direct WebSocket, no geckodriver. Daemon mode with persistent connection. navigator.webdriver=true kills production use — proves BiDi works, documents why Firefox fails for agent automation.",
+      "version": "0.1.0",
+      "category": "browser-automation",
+      "keywords": ["firefox", "bidi", "webdriver", "browser", "automation"],
       "skills": ["./"]
     }
   ]

@@ -40,7 +40,22 @@
 - 📋 **Console monitoring**: Stream live console output for a duration
 - 🛠️ **Standalone CLI**: Works without an LLM too — `chromectl.py start` and go
 
+## **Firefox Control**
+
+> **Test Tool — Mozilla Painted Themselves Into a Corner.**
+> Control Firefox via WebDriver BiDi. Direct WebSocket, no geckodriver.
+> Proves BiDi works. Documents why Firefox fails for agent automation.
+
+- ⚠️ **Test tool**: `navigator.webdriver=true` on all remote debugging sessions — every anti-bot system detects it
+- 🔌 **Direct BiDi**: Native Firefox WebSocket, no geckodriver, no Selenium
+- 🔧 **Same CLI surface**: Commands mirror chromectl — list, eval, screenshot, DOM helpers
+- 🏗️ **Daemon mode**: Persistent BiDi session, stable context IDs, Unix socket
+
 ## Latest Release Highlights
+
+- **NEW** `firefox-control v0.1.0` — WebDriver BiDi CLI for Firefox (test tool)
+  - Direct BiDi WebSocket, daemon mode, DOM helpers
+  - Exists to prove BiDi works and to poke Mozilla about `navigator.webdriver`
 
 - **NEW** `chrome-control v1.0.0` — Chrome DevTools Protocol CLI and skill
   - Auto-connect to your running Chrome (M144+) — no separate profile needed
@@ -63,6 +78,7 @@ Add the marketplace and install:
 /plugin install youtube-to-markdown@flow-state
 /plugin install imap-stream-mcp@flow-state
 /plugin install chrome-control@flow-state
+/plugin install firefox-control@flow-state
 ```
 
 ### Usage
@@ -87,6 +103,7 @@ As you don't have any configured yet, it will show you how to set up.
 - [youtube-to-markdown](youtube-to-markdown/README.md) - Installation, usage, output options
 - [imap-stream-mcp](imap-stream-mcp/README.md) - Configuration, actions, multi-account setup
 - [chrome-control](chrome-control/README.md) - Chrome automation via CDP, CLI reference
+- [firefox-control](firefox-control/README.md) - Firefox automation via BiDi (test tool)
 
 ## Examples of Youtube to Markdown Output
 

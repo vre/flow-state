@@ -66,6 +66,9 @@ tests/chrome-control/
 ├── test_chromectl.py       # 84 unit tests (mocked CDP, no Chrome needed)
 ├── test_integration.sh     # Integration tests against real Chrome
 └── test_idle_shutdown.sh   # Daemon idle timeout tests (real Chrome)
+
+tests/firefox-control/
+└── test_integration.sh     # Integration tests against real Firefox
 ```
 
 ## Running Tests
@@ -85,6 +88,9 @@ cd tests && uv run pytest chrome-control/
 # chrome-control integration (requires Chrome with remote debugging enabled)
 cd tests/chrome-control && bash test_integration.sh
 cd tests/chrome-control && bash test_idle_shutdown.sh
+
+# firefox-control integration (requires Firefox with --remote-debugging-port 9223)
+cd tests/firefox-control && bash test_integration.sh
 
 # Common options
 uv run pytest -v              # Verbose

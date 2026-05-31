@@ -34,6 +34,7 @@ convention = "google"
 "tests/**/*.py" = ["D"]  # no docstrings required in tests
 "**/scripts/*.py" = ["D103"]  # scripts don't need function docstrings
 "chrome-control/*.py" = ["D103", "B904"]  # standalone CLI tool, not a library
+"firefox-control/*.py" = ["D103"]
 
 [tool.pyright]
 pythonVersion = "3.10"

@@ -26,13 +26,15 @@ This setup ensures:
 - No reinstall needed after changes
 - Same pattern for both skills and MCP servers
 
-**Browser automation** (`chrome-control/`):
+**Browser automation** (`chrome-control/`, `firefox-control/`):
 ```
-chrome-control/chromectl.py    (standalone CLI, uv inline deps)
-chrome-control/SKILL.md        (Claude Code skill definition)
+chrome-control/chromectl.py      (standalone CLI, uv inline deps, CDP)
+chrome-control/SKILL.md          (Claude Code skill definition)
+firefox-control/firefoxctl.py    (standalone CLI, uv inline deps, WebDriver BiDi)
+firefox-control/SKILL.md         (Claude Code skill definition)
 ```
 
-Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation. chrome-control has no MCP server — it's a CLI tool and skill.
+Note: Each sub-project (e.g., 'imap-stream-mcp') also has its own '.mcp.json' with `${CLAUDE_PLUGIN_ROOT}` for standalone installation. Browser automation tools have no MCP server — they are CLI tools and skills.
 
 ## Dev Skills from flow-jigs
 
