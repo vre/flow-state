@@ -159,6 +159,15 @@ EVAL4=$(/usr/bin/nc -U "$SOCK" <<< "{\"cmd\":\"eval\",\"id\":\"$TARGET\",\"expr\
 check_json_field "$EVAL4" "value" "async-ok" "eval top-level await"
 echo ""
 
+# -- navigate --
+echo "[navigate]"
+/usr/bin/nc -U "$SOCK" <<< "{\"cmd\":\"eval\",\"id\":\"$TARGET\",\"expr\":\"void 0\"}" >/dev/null
+NAV=$(/usr/bin/nc -U "$SOCK" <<< "{\"cmd\":\"navigate\",\"id\":\"$TARGET\",\"url\":\"https://example.com\"}")
+sleep 1
+NAV_TITLE=$(/usr/bin/nc -U "$SOCK" <<< "{\"cmd\":\"eval\",\"id\":\"$TARGET\",\"expr\":\"document.title\"}")
+check_json_field "$NAV_TITLE" "value" "Example Domain" "navigate then eval title"
+echo ""
+
 # -- screenshot --
 echo "[screenshot]"
 SHOT_FILE="/tmp/chromectl-inttest-$$.png"
@@ -277,10 +286,10 @@ echo ""
 
 # -- CLI (quick check) --
 echo "[cli]"
-CLI_EVAL=$("$CHROMECTL" "$TARGET" eval "1+1" 2>&1)
+CLI_EVAL=$("$CHROMECTL" --json "$TARGET" eval "1+1" 2>&1)
 check_json_field "$CLI_EVAL" "value" "2" "cli eval"
 
-CLI_GETTEXT=$("$CHROMECTL" "$TARGET" get-text "h1" 2>&1)
+CLI_GETTEXT=$("$CHROMECTL" --json "$TARGET" get-text "h1" 2>&1)
 check_json_field "$CLI_GETTEXT" "value" "integration test" "cli get-text"
 echo ""
 

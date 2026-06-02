@@ -27,8 +27,13 @@ User must launch Firefox with: `firefox --remote-debugging-port 9223`
 
 ```bash
 firefoxctl.py list
+firefoxctl.py open https://example.com
+firefoxctl.py status
+firefoxctl.py targets
 firefoxctl.py stop
 ```
+
+Use `--json` for machine-parseable JSON output (default is human-readable).
 
 ## Target commands
 
@@ -39,44 +44,32 @@ Context ID from list output (full UUID required — no prefix match).
 ```bash
 firefoxctl.py CONTEXT eval "document.title"
 firefoxctl.py CONTEXT screenshot -o page.png
+firefoxctl.py CONTEXT console-tail --for 30
 firefoxctl.py CONTEXT navigate https://example.com
 ```
 
 ## DOM helpers
 
+Shorthands for common eval patterns. Selectors are CSS.
+
 ```
-  click SELECTOR          Click element
-  check SELECTOR          Check checkbox
-  uncheck SELECTOR        Uncheck checkbox
-  type SELECTOR TEXT      Type text into input
-  fill SELECTOR VALUE     Set input value (alias for type)
-  select SELECTOR VALUE   Set select value
-  get-text SELECTOR       Get innerText
-  get-html SELECTOR       Get innerHTML
-  get-value SELECTOR      Get input value
-  get-attr SELECTOR ATTR  Get attribute
-  get-texts SELECTOR      Get text of all matches
-  exists SELECTOR         Check if element exists
-  count SELECTOR          Count matches
-  highlight SELECTOR      Outline elements in red
-  submit SELECTOR         Submit form
-  clear SELECTOR          Reset form
-  scroll-to SELECTOR      Scroll element into view
-  scroll-up [PIXELS]      Scroll up
-  scroll-down [PIXELS]    Scroll down
-  scroll-top              Scroll to top
-  scroll-bottom           Scroll to bottom
-  scroll-by X Y           Scroll by offset
-  back                    Navigate back
-  forward                 Navigate forward
-  get-title               Get document title
-  get-url                 Get current URL
-  inject-css CSS          Inject CSS
-  wait-for SEL [--timeout N]         Wait for element
-  wait-hidden SEL [--timeout N]      Wait for element to hide
-  wait-text SEL TEXT [--timeout N]   Wait for text
-  wait-url PATTERN [--timeout N]     Wait for URL
+  click/check/uncheck/highlight SELECTOR
+  submit/clear FORM
+  type/fill SELECTOR TEXT
+  select SELECTOR VALUE
+  get-text/get-html/get-value/exists/count/get-texts SELECTOR
+  get-attr SELECTOR ATTR
+  scroll-to/wait-for/wait-hidden SELECTOR
+  wait-text SELECTOR TEXT
+  navigate URL
+  wait-url PATTERN
+  scroll-up/scroll-down [PIXELS]
+  scroll-by X Y
+  inject-css CSS
+  reload/back/forward/get-title/get-url/scroll-top/scroll-bottom
 ```
+
+Wait commands: --timeout N (default 10s)
 
 For anything not covered: `firefoxctl.py CONTEXT eval "JS expression"`
 

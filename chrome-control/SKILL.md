@@ -25,8 +25,11 @@ If connection fails → tell user to enable `chrome://inspect/#remote-debugging`
 chromectl.py list
 chromectl.py open https://example.com
 chromectl.py status
+chromectl.py targets
 chromectl.py stop
 ```
+
+Use `--json` for machine-parseable JSON output (default is human-readable).
 
 ## Target commands
 
@@ -38,6 +41,7 @@ Target ID from list/open output. Prefix match OK (e.g. `88FA` instead of full 32
 chromectl.py ABC123 eval "document.title"
 chromectl.py ABC123 screenshot -o page.png [--full-page]
 chromectl.py ABC123 console-tail [--for 30]
+chromectl.py ABC123 navigate https://example.com
 ```
 
 ## DOM helpers
@@ -47,7 +51,7 @@ Shorthands for common eval patterns. Selectors are CSS.
 ```
   click/check/uncheck/highlight SELECTOR
   submit/clear FORM
-  type SELECTOR TEXT
+  type/fill SELECTOR TEXT
   select SELECTOR VALUE
   get-text/get-html/get-value/exists/count/get-texts SELECTOR
   get-attr SELECTOR ATTR
@@ -66,6 +70,13 @@ Wait commands: --timeout N (default 10s)
 For anything not covered: `chromectl.py ABC123 eval "JS expression"`
 
 Top-level await: `chromectl.py ABC123 eval "await fetch('/api').then(r => r.json())"`
+
+## Raw CDP
+
+```bash
+chromectl.py cdp Browser.getVersion
+chromectl.py cdp Target.getTargets
+```
 
 ## Legacy mode
 

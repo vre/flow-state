@@ -77,8 +77,18 @@ class BiDiConnection:
             ) from e
         self._recv_task = asyncio.create_task(self._recv_loop())
 
-        result = await self.send("session.new", {"capabilities": {}})
-        self._session_id = result.get("sessionId")
+        try:
+            result = await self.send("session.new", {"capabilities": {}})
+            self._session_id = result.get("sessionId")
+        except BiDiError as e:
+            if "already started" in str(e).lower():
+                await self._http_session.close()
+                raise BiDiError(
+                    "Firefox has a zombie BiDi session from a previous connection.\n"
+                    "Restart Firefox to clear it:\n"
+                    f"  pkill -f firefox && firefox --remote-debugging-port {DEFAULT_PORT}"
+                ) from e
+            raise
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
@@ -210,6 +220,18 @@ async def cmd_navigate(conn: BiDiConnection, context: str, url: str) -> dict:
     return result
 
 
+async def cmd_open(conn: BiDiConnection, url: str) -> dict:
+    """Open a new tab, optionally navigating to url."""
+    result = await conn.send("browsingContext.create", {"type": "tab"})
+    context = result.get("context", "")
+    if url and url != "about:blank":
+        await conn.send(
+            "browsingContext.navigate",
+            {"context": context, "url": url, "wait": "complete"},
+        )
+    return {"context": context, "url": url}
+
+
 def _js(s: str) -> str:
     """Escape a Python string as a JS string literal."""
     return json.dumps(s)
@@ -308,17 +330,26 @@ def _build_helper_js(cmd: str, req: dict) -> str | None:
     if cmd == "scroll-to":
         return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.scrollIntoView({{behavior:'smooth',block:'center'}});return true}})()"
     if cmd == "scroll-up":
-        px = req.get("pixels")
+        try:
+            px = int(req["pixels"]) if "pixels" in req else None
+        except (ValueError, TypeError):
+            return None
         return f"window.scrollBy(0,-{px})" if px else "window.scrollBy(0,-window.innerHeight)"
     if cmd == "scroll-down":
-        px = req.get("pixels")
+        try:
+            px = int(req["pixels"]) if "pixels" in req else None
+        except (ValueError, TypeError):
+            return None
         return f"window.scrollBy(0,{px})" if px else "window.scrollBy(0,window.innerHeight)"
     if cmd == "scroll-top":
         return "window.scrollTo(0,0)"
     if cmd == "scroll-bottom":
         return "window.scrollTo(0,document.body.scrollHeight)"
     if cmd == "scroll-by":
-        x, y = int(req.get("x", 0)), int(req.get("y", 0))
+        try:
+            x, y = int(req.get("x", 0)), int(req.get("y", 0))
+        except (ValueError, TypeError):
+            return None
         return f"window.scrollBy({x},{y})"
     if cmd == "back":
         return "history.back()"
@@ -435,31 +466,106 @@ async def _dispatch(conn: BiDiConnection, req: dict) -> dict:
 
     if cmd == "list":
         tabs = await cmd_list(conn)
-        return {"tabs": tabs}
+        return {"contexts": tabs}
+
+    if cmd == "bidi":
+        method = req.get("method")
+        if not method:
+            return {"error": "Missing 'method'"}
+        result = await cmd_bidi_raw(conn, method, req.get("params"))
+        return {"result": result}
+
+    if cmd == "open":
+        url = req.get("url", "about:blank")
+        return await cmd_open(conn, url)
+
+    if cmd == "status":
+        port = conn.ws_url.split(":")[2].split("/")[0] if conn.ws_url else 0
+        return {
+            "connected": True,
+            "port": int(port),
+            "session_id": conn._session_id,
+            "pid": os.getpid(),
+        }
+
+    if cmd == "targets":
+        result = await conn.send("browsingContext.getTree", {})
+        flat: list[dict] = []
+
+        def flatten(ctx: dict, depth: int = 0) -> None:
+            flat.append(
+                {
+                    "context": ctx.get("context", ""),
+                    "url": ctx.get("url", ""),
+                    "type": "tab" if depth == 0 else "iframe",
+                }
+            )
+            for child in ctx.get("children", []):
+                flatten(child, depth + 1)
+
+        for ctx in result.get("contexts", []):
+            flatten(ctx)
+        return {"targets": flat}
+
+    # All remaining commands need a context
+    context = req.get("context")
+    if not context:
+        return {"error": "Missing context ID"}
+
+    if cmd == "console-tail":
+        duration = float(req.get("for", 10))
+        messages: list[dict] = []
+        start_ts = time.time()
+
+        async def _log_handler(data: dict) -> None:
+            params = data.get("params", {})
+            tdelta = f"+{time.time() - start_ts:0.3f}s"
+            entry = params.get("entry", params)
+            messages.append(
+                {
+                    "t": tdelta,
+                    "level": entry.get("level", ""),
+                    "text": entry.get("text", ""),
+                }
+            )
+
+        conn.on_event("log.entryAdded", _log_handler)
+        await conn.subscribe(["log.entryAdded"])
+        await asyncio.sleep(duration)
+        handlers = conn._event_handlers.get("log.entryAdded", [])
+        if _log_handler in handlers:
+            handlers.remove(_log_handler)
+        return {"messages": messages}
 
     if cmd == "eval":
-        result = await cmd_eval(conn, req["context"], req["expression"])
+        result = await cmd_eval(conn, context, req.get("expr", ""))
         return {"result": result}
 
     if cmd == "screenshot":
-        data = await cmd_screenshot(conn, req["context"])
-        return {"data": base64.b64encode(data).decode(), "bytes": len(data)}
+        data = await cmd_screenshot(conn, context)
+        out = req.get("output", f"screenshot_{context[:8]}.png")
+        with open(out, "wb") as f:
+            f.write(data)
+        return {"file": out, "bytes": len(data)}
 
     if cmd == "navigate":
-        result = await cmd_navigate(conn, req["context"], req["url"])
+        url = req.get("url", "")
+        if not url:
+            return {"error": "Missing URL"}
+        result = await cmd_navigate(conn, context, url)
         return result
 
-    if cmd == "bidi":
-        result = await cmd_bidi_raw(conn, req["method"], req.get("params"))
-        return {"result": result}
+    if cmd == "reload":
+        await conn.send("browsingContext.reload", {"context": context, "wait": "complete"})
+        return {"result": True}
 
     if cmd in _HELPER_COMMANDS:
-        result = await cmd_dom_helper(conn, req["context"], cmd, req)
+        result = await cmd_dom_helper(conn, context, cmd, req)
         return {"result": result}
 
     if cmd in _WAIT_COMMANDS:
         timeout = req.get("timeout", 10)
-        result = await cmd_wait_helper(conn, req["context"], cmd, req, timeout)
+        result = await cmd_wait_helper(conn, context, cmd, req, timeout)
         return {"result": result}
 
     return {"error": f"Unknown command: {cmd}"}
@@ -482,78 +588,123 @@ async def _dispatch_safe(conn: BiDiConnection, req: dict) -> dict:
 
 async def cmd_start(args):
     """Start daemon: persistent BiDi connection, Unix socket interface."""
-    async with BiDiConnection(args.host, args.port) as conn:
-        if os.path.exists(SOCKET_PATH):
+    host, port = args.host, args.port
+
+    if os.path.exists(SOCKET_PATH):
+        try:
+            r, w = await asyncio.open_unix_connection(SOCKET_PATH)
+            w.write(b'{"cmd":"status"}\n')
+            await w.drain()
+            await asyncio.wait_for(r.readline(), timeout=2)
+            w.close()
+            await w.wait_closed()
+            print(f"Daemon already running on {SOCKET_PATH}", file=sys.stderr)
+            sys.exit(1)
+        except Exception:
+            print(f"Removing stale socket {SOCKET_PATH}", flush=True)
             os.unlink(SOCKET_PATH)
 
-        last_request = time.time()
+    conn = BiDiConnection(host, port)
+    await conn.__aenter__()
 
-        async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-            nonlocal last_request
-            try:
-                data = await asyncio.wait_for(reader.readline(), timeout=30)
-                if not data:
-                    return
-                line = data.decode().strip()
-                if not line:
-                    return
-                try:
-                    req = json.loads(line)
-                except json.JSONDecodeError as e:
-                    writer.write(json.dumps({"error": f"Invalid JSON: {e}"}).encode() + b"\n")
-                    await writer.drain()
-                    return
+    last_request = time.time()
+    _dead = False
 
-                if req.get("cmd") == "quit":
-                    writer.write(json.dumps({"status": "bye"}).encode() + b"\n")
-                    await writer.drain()
-                    server.close()
-                    return
-
-                last_request = time.time()
-                result = await _dispatch_safe(conn, req)
-                writer.write(json.dumps(result, ensure_ascii=False).encode() + b"\n")
-                await writer.drain()
-            except Exception as e:
-                try:
-                    writer.write(json.dumps({"error": f"{type(e).__name__}: {e}"}).encode() + b"\n")
-                    await writer.drain()
-                except Exception:
-                    pass
-            finally:
-                writer.close()
-                await writer.wait_closed()
-
-        server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH, limit=_STREAM_LIMIT)
-        os.chmod(SOCKET_PATH, 0o600)
-        print(f"firefoxctl daemon listening on {SOCKET_PATH} (PID {os.getpid()})", flush=True)
-        print(f'Usage: echo \'{{"cmd":"list"}}\' | nc -U {SOCKET_PATH}', flush=True)
-        print("⚠️  Reminder: navigator.webdriver=true in this Firefox session", flush=True)
-
-        async def idle_watchdog():
-            while True:
-                await asyncio.sleep(5)
-                idle = time.time() - last_request
-                if idle > IDLE_TIMEOUT:
-                    print(f"idle {idle:.0f}s, shutting down", flush=True)
-                    server.close()
-                    return
-
-        watchdog = asyncio.create_task(idle_watchdog())
-
-        loop = asyncio.get_running_loop()
-        for sig in (signal.SIGTERM, signal.SIGINT):
-            loop.add_signal_handler(sig, server.close)
-
+    async def _dispatch_safe_daemon(req: dict) -> dict:
+        nonlocal _dead
+        cmd = req.get("cmd", "")
+        timeout = 30
+        if cmd in _WAIT_COMMANDS:
+            timeout = float(req.get("timeout", 10)) + 5
+        elif cmd == "console-tail":
+            timeout = float(req.get("for", 10)) + 5
         try:
-            await server.serve_forever()
-        except asyncio.CancelledError:
-            pass
+            return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+        except (asyncio.TimeoutError, BiDiError, aiohttp.ClientError, ConnectionError, OSError) as e:
+            _dead = True
+            return {"error": f"BiDi connection lost: {type(e).__name__}: {e}"}
+        except Exception as e:
+            return {"error": f"{type(e).__name__}: {e}"}
+
+    async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+        nonlocal last_request
+        try:
+            data = await asyncio.wait_for(reader.readline(), timeout=30)
+            if not data:
+                return
+            line = data.decode().strip()
+            if not line:
+                return
+            try:
+                req = json.loads(line)
+            except json.JSONDecodeError as e:
+                writer.write(json.dumps({"error": f"Invalid JSON: {e}"}).encode() + b"\n")
+                await writer.drain()
+                return
+
+            if req.get("cmd") == "quit":
+                writer.write(json.dumps({"status": "bye"}).encode() + b"\n")
+                await writer.drain()
+                server.close()
+                return
+
+            last_request = time.time()
+            result = await _dispatch_safe_daemon(req)
+            writer.write(json.dumps(result, ensure_ascii=False).encode() + b"\n")
+            await writer.drain()
+        except Exception as e:
+            try:
+                writer.write(json.dumps({"error": f"{type(e).__name__}: {e}"}).encode() + b"\n")
+                await writer.drain()
+            except Exception:
+                pass
         finally:
-            watchdog.cancel()
-            if os.path.exists(SOCKET_PATH):
-                os.unlink(SOCKET_PATH)
-            print("daemon stopped", flush=True)
+            writer.close()
+            await writer.wait_closed()
+
+    server = await asyncio.start_unix_server(handle_client, path=SOCKET_PATH, limit=_STREAM_LIMIT)
+    os.chmod(SOCKET_PATH, 0o600)
+    print(f"firefoxctl daemon listening on {SOCKET_PATH} (PID {os.getpid()})", flush=True)
+    print(f'Usage: echo \'{{"cmd":"list"}}\' | nc -U {SOCKET_PATH}', flush=True)
+    print("⚠️  Reminder: navigator.webdriver=true in this Firefox session", flush=True)
+
+    async def idle_watchdog():
+        nonlocal _dead
+        while True:
+            await asyncio.sleep(5)
+            if _dead:
+                print("BiDi connection lost, shutting down", flush=True)
+                server.close()
+                return
+            if not os.path.exists(SOCKET_PATH):
+                print("socket removed, shutting down", flush=True)
+                server.close()
+                return
+            idle = time.time() - last_request
+            if idle > IDLE_TIMEOUT:
+                print(f"idle {idle:.0f}s, shutting down", flush=True)
+                server.close()
+                return
+
+    watchdog = asyncio.create_task(idle_watchdog())
+
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, server.close)
+
+    try:
+        await server.serve_forever()
+    except asyncio.CancelledError:
+        pass
+    finally:
+        watchdog.cancel()
+        if os.path.exists(SOCKET_PATH):
+            os.unlink(SOCKET_PATH)
+        try:
+            await conn.__aexit__(None, None, None)
+        except Exception:
+            pass
+        print("daemon stopped", flush=True)
 
 
 async def cmd_stop(args):
@@ -569,8 +720,9 @@ async def cmd_stop(args):
         writer.close()
         await writer.wait_closed()
         print("Daemon stopped")
-    except Exception as e:
-        print(f"Warning: could not stop daemon: {e}", file=sys.stderr)
+    except Exception:
+        print("Daemon not responding, removing stale socket", file=sys.stderr)
+        os.unlink(SOCKET_PATH)
 
 
 async def _send_to_daemon(req: dict) -> dict:
@@ -591,30 +743,41 @@ def _daemon_running() -> bool:
 
 
 async def _route_request(args, req: dict):
-    """Route to daemon if running, otherwise direct connection."""
-    if _daemon_running():
-        result = await _send_to_daemon(req)
+    """Route request to daemon. Requires daemon running."""
+    if not _daemon_running():
+        print(f"No daemon running ({SOCKET_PATH} not found). Start with: firefoxctl --port {args.port} start", file=sys.stderr)
+        sys.exit(1)
+
+    result = await _send_to_daemon(req)
+
+    json_output = getattr(args, "json_output", False)
+    if json_output:
+        print(json.dumps(result, ensure_ascii=False))
         if "error" in result:
-            print(f"Error: {result['error']}", file=sys.stderr)
             sys.exit(2)
-    else:
-        async with BiDiConnection(args.host, args.port) as conn:
-            result = await _dispatch_safe(conn, req)
-            if "error" in result:
-                print(f"Error: {result['error']}", file=sys.stderr)
-                sys.exit(2)
+        return
+
+    if "error" in result:
+        print(f"Error: {result['error']}", file=sys.stderr)
+        sys.exit(2)
 
     # Format output
-    if "tabs" in result:
-        tabs = result["tabs"]
-        print(format_tabs(tabs))
-    elif "data" in result and "bytes" in result:
-        # screenshot via daemon — save to file
-        out = getattr(args, "output", "screenshot.png")
-        raw = base64.b64decode(result["data"])
-        with open(out, "wb") as f:
-            f.write(raw)
-        print(f"Saved {result['bytes']} bytes to {out}")
+    if "contexts" in result:
+        print(format_tabs(result["contexts"]))
+    elif "targets" in result:
+        for t in result["targets"]:
+            print(f"{t.get('context', '')}  {t.get('type', '')}  {t.get('url', '')}")
+    elif "file" in result:
+        print(f"Saved {result.get('bytes', '?')} bytes to {result['file']}")
+    elif "messages" in result:
+        for m in result["messages"]:
+            print(f"{m.get('t', '')}  {m.get('level', '')}  {m.get('text', '')}")
+        print(f"({len(result['messages'])} messages)")
+    elif "connected" in result:
+        for k, v in result.items():
+            print(f"{k}: {v}")
+    elif "context" in result and "url" in result:
+        print(f"{result['context']}  {result['url']}")
     elif "result" in result:
         val = result["result"]
         if isinstance(val, dict | list):
@@ -630,43 +793,30 @@ async def _route_request(args, req: dict):
 # --- CLI ---
 
 
-HELPERS_TEXT = """DOM helper commands (use with: firefoxctl <context> <command> [args]):
+HELPERS_TEXT = """\
+Shorthands for common eval patterns. Selectors are CSS.
 
-  click <sel>            Click first matching element
-  check <sel>            Check checkbox
-  uncheck <sel>          Uncheck checkbox
-  highlight <sel>        Outline matching elements in red
-  submit <sel>           Submit form
-  clear <sel>            Reset form
-  type <sel> <text>      Type text into input (focus + input/change events)
-  fill <sel> <value>     Set input value (alias for type)
-  select <sel> <value>   Set select element value
+  click/check/uncheck/highlight SELECTOR
+  submit/clear FORM
+  type/fill SELECTOR TEXT
+  select SELECTOR VALUE
+  get-text/get-html/get-value/exists/count/get-texts SELECTOR
+  get-attr SELECTOR ATTR
+  scroll-to/wait-for/wait-hidden SELECTOR
+  wait-text SELECTOR TEXT
+  navigate URL
+  wait-url PATTERN
+  scroll-up/scroll-down [PIXELS]
+  scroll-by X Y
+  inject-css CSS
+  reload/back/forward/get-title/get-url/scroll-top/scroll-bottom
 
-  get-text <sel>         Get innerText of first matching element
-  get-html <sel>         Get innerHTML of first matching element
-  get-value <sel>        Get value property of input/select
-  get-attr <sel> <attr>  Get attribute value
-  get-texts <sel>        Get innerText of all matching elements
-  exists <sel>           Check if element exists (true/false)
-  count <sel>            Count matching elements
+  Wait: --timeout N (default 10s)
 
-  scroll-to <sel>        Scroll element into view
-  scroll-up [pixels]     Scroll up (default: one viewport)
-  scroll-down [pixels]   Scroll down (default: one viewport)
-  scroll-top             Scroll to top of page
-  scroll-bottom          Scroll to bottom of page
-  scroll-by <x> <y>      Scroll by pixel offset
+  For anything not covered:
+    firefoxctl CONTEXT eval "document.querySelector('x').doSomething()"
 
-  back                   Navigate back (history.back)
-  forward                Navigate forward (history.forward)
-  get-title              Get document title
-  get-url                Get current URL
-  inject-css <css>       Inject CSS into page
-
-  wait-for <sel> [--timeout N]         Wait for element to appear
-  wait-hidden <sel> [--timeout N]      Wait for element to hide
-  wait-text <sel> <text> [--timeout N] Wait for text in element
-  wait-url <pattern> [--timeout N]     Wait for URL to contain pattern
+  Example: firefoxctl CONTEXT click "button.submit"\
 """
 
 
@@ -682,14 +832,29 @@ def build_parser():
     )
     p.add_argument("--host", default=DEFAULT_HOST)
     p.add_argument("--port", type=int, default=DEFAULT_PORT)
+    p.add_argument("--json", action="store_true", dest="json_output", help="Output raw JSON")
 
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    # Global commands
     sub.add_parser("start", help="Start daemon (persistent BiDi connection)").set_defaults(func=_cmd_start)
     sub.add_parser("stop", help="Stop daemon").set_defaults(func=_cmd_stop)
     sub.add_parser("list", help="List open tabs").set_defaults(func=_cmd_list)
+
+    sp = sub.add_parser("open", help="Open new tab")
+    sp.add_argument("url", metavar="URL", help="URL to open")
+    sp.set_defaults(func=_cmd_open)
+
+    sub.add_parser("status", help="Daemon connection status").set_defaults(func=_cmd_status)
+    sub.add_parser("targets", help="List all targets (tabs, iframes)").set_defaults(func=_cmd_targets)
     sub.add_parser("helpers", help="List DOM helper commands").set_defaults(func=_cmd_helpers)
 
+    sp = sub.add_parser("bidi", help="Send raw BiDi command")
+    sp.add_argument("method", metavar="METHOD", help="BiDi method (e.g. browser.getClientWindows)")
+    sp.add_argument("--params", help="Method params as JSON")
+    sp.set_defaults(func=_cmd_bidi)
+
+    # Target commands
     sp = sub.add_parser("eval", help="Evaluate JavaScript")
     sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID from list")
     sp.add_argument("expression", metavar="EXPR", help="JavaScript expression")
@@ -700,15 +865,19 @@ def build_parser():
     sp.add_argument("-o", "--output", default="screenshot.png", help="Output file (default: screenshot.png)")
     sp.set_defaults(func=_cmd_screenshot)
 
+    sp = sub.add_parser("console-tail", help="Stream console messages")
+    sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID")
+    sp.add_argument("--for", dest="for_seconds", type=float, default=10, help="Duration in seconds (default: 10)")
+    sp.set_defaults(func=_cmd_console_tail)
+
     sp = sub.add_parser("navigate", help="Navigate to URL")
     sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID from list")
     sp.add_argument("url", metavar="URL", help="URL to navigate to")
     sp.set_defaults(func=_cmd_navigate)
 
-    sp = sub.add_parser("bidi", help="Send raw BiDi command")
-    sp.add_argument("method", metavar="METHOD", help="BiDi method (e.g. browser.getClientWindows)")
-    sp.add_argument("--params", help="Method params as JSON")
-    sp.set_defaults(func=_cmd_bidi)
+    sp = sub.add_parser("reload", help="Reload page")
+    sp.add_argument("context", metavar="CONTEXT", help="Browsing context ID from list")
+    sp.set_defaults(func=_cmd_reload)
 
     # DOM helper subcommands
     for helper in sorted(_HELPER_COMMANDS):
@@ -755,7 +924,11 @@ def build_parser():
 
 
 # Shorthand: firefoxctl <context> <command> ... → insert into subcommand form
-_KNOWN_COMMANDS = {"start", "stop", "list", "eval", "screenshot", "navigate", "bidi", "helpers"} | _HELPER_COMMANDS | _WAIT_COMMANDS
+_KNOWN_COMMANDS = (
+    {"start", "stop", "list", "eval", "screenshot", "navigate", "reload", "bidi", "helpers", "open", "status", "targets", "console-tail"}
+    | _HELPER_COMMANDS
+    | _WAIT_COMMANDS
+)
 _FLAGS_WITH_VALUE = {"--host", "--port"}
 
 
@@ -797,15 +970,19 @@ async def _cmd_list(args):
 
 
 async def _cmd_eval(args):
-    await _route_request(args, {"cmd": "eval", "context": args.context, "expression": args.expression})
+    await _route_request(args, {"cmd": "eval", "context": args.context, "expr": args.expression})
 
 
 async def _cmd_screenshot(args):
-    await _route_request(args, {"cmd": "screenshot", "context": args.context})
+    await _route_request(args, {"cmd": "screenshot", "context": args.context, "output": args.output})
 
 
 async def _cmd_navigate(args):
     await _route_request(args, {"cmd": "navigate", "context": args.context, "url": args.url})
+
+
+async def _cmd_reload(args):
+    await _route_request(args, {"cmd": "reload", "context": args.context})
 
 
 async def _cmd_bidi(args):
@@ -813,6 +990,22 @@ async def _cmd_bidi(args):
     if args.params:
         req["params"] = args.params
     await _route_request(args, req)
+
+
+async def _cmd_open(args):
+    await _route_request(args, {"cmd": "open", "url": args.url})
+
+
+async def _cmd_status(args):
+    await _route_request(args, {"cmd": "status"})
+
+
+async def _cmd_targets(args):
+    await _route_request(args, {"cmd": "targets"})
+
+
+async def _cmd_console_tail(args):
+    await _route_request(args, {"cmd": "console-tail", "context": args.context, "for": args.for_seconds})
 
 
 async def _cmd_dom_helper(args):

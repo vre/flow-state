@@ -9,8 +9,10 @@ Control Firefox via [WebDriver BiDi](https://www.w3.org/TR/webdriver-bidi/) from
 Once connected to Firefox:
 
 - **List tabs** — all open browsing contexts
+- **Open new tabs** with a URL
 - **Run JavaScript** in any tab (DOM inspection, function calls, page state)
 - **Take screenshots** — viewport PNG capture
+- **Monitor console** output (errors, warnings, logs) for a duration
 - **DOM helpers** — click, type, get-text, exists, count, scroll, wait, and more
 - **Raw BiDi** — send any WebDriver BiDi command directly
 
@@ -81,16 +83,28 @@ The daemon connects via BiDi WebSocket and listens on a Unix socket (`/tmp/firef
 # List open tabs
 ./firefoxctl.py list
 
+# Open a new tab
+./firefoxctl.py open https://example.com
+
+# Check daemon status
+./firefoxctl.py status
+
 # Run JavaScript (use context ID from list output)
 ./firefoxctl.py CONTEXT eval "document.title"
 
 # Take a screenshot
 ./firefoxctl.py CONTEXT screenshot -o page.png
 
+# Monitor console output
+./firefoxctl.py CONTEXT console-tail --for 30
+
 # DOM helpers
 ./firefoxctl.py CONTEXT click "button.submit"
 ./firefoxctl.py CONTEXT get-text h1
 ./firefoxctl.py CONTEXT type "input[name=q]" "search term"
+
+# JSON output for scripting
+./firefoxctl.py --json list
 
 # Or use netcat directly
 echo '{"cmd":"list"}' | nc -U /tmp/firefoxctl-$(id -u).sock
@@ -122,8 +136,8 @@ firefoxctl CLI / LLM agent / echo '{"cmd":"list"}' | nc -U <socket>
 
 - **Protocol**: WebDriver BiDi (W3C standard) over WebSocket
 - **Connection**: direct to Firefox, no geckodriver, no Selenium, no Puppeteer
-- **Daemon**: persistent BiDi session, stable context IDs, idle timeout (5 min)
-- **CLI**: JSON line protocol, pipe-friendly
+- **Daemon**: persistent BiDi session, stable context IDs, idle timeout (5 min), clean shutdown (session.end)
+- **CLI**: human-readable by default, `--json` for machine-parseable output
 
 ## Commands
 
@@ -134,6 +148,9 @@ firefoxctl CLI / LLM agent / echo '{"cmd":"list"}' | nc -U <socket>
 | `start` | Connect to Firefox BiDi, listen on Unix socket |
 | `stop` | Stop daemon |
 | `list` | List open tabs |
+| `open <url>` | Open a new tab |
+| `status` | Show daemon connection status |
+| `targets` | List all targets (tabs, iframes) |
 | `helpers` | List all DOM helper commands |
 | `bidi <method> [--params JSON]` | Send raw BiDi command |
 
@@ -147,7 +164,9 @@ Context ID from `list` output (full UUID required — no prefix match).
 |---------|-------------|
 | `CONTEXT eval <expr>` | Run JavaScript in a context |
 | `CONTEXT screenshot [-o file]` | Capture viewport PNG screenshot |
+| `CONTEXT console-tail [--for N]` | Stream console messages |
 | `CONTEXT navigate <url>` | Navigate to URL |
+| `CONTEXT reload` | Reload page |
 | `CONTEXT click <sel>` | Click element |
 | `CONTEXT type <sel> <text>` | Type text into input |
 | `CONTEXT get-text <sel>` | Get text content |
@@ -157,14 +176,26 @@ Context ID from `list` output (full UUID required — no prefix match).
 
 30+ DOM helpers available — run `firefoxctl.py helpers` for the full list.
 
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output raw JSON instead of human-readable format |
+| `--port N` | Firefox remote debugging port (default: 9222) |
+
 ### Socket Protocol
 
-firefoxctl accepts JSON commands over its Unix socket, one per line:
+firefoxctl accepts JSON commands over its Unix socket, one per line. Socket always returns JSON regardless of `--json` flag.
 
 ```bash
 echo '{"cmd":"list"}' | nc -U /tmp/firefoxctl-$(id -u).sock
-echo '{"cmd":"eval","context":"CONTEXT_ID","expression":"document.title"}' | nc -U /tmp/firefoxctl-$(id -u).sock
-echo '{"cmd":"screenshot","context":"CONTEXT_ID"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"open","url":"https://example.com"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"status"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"targets"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"eval","context":"CONTEXT_ID","expr":"document.title"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"console-tail","context":"CONTEXT_ID","for":10}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"screenshot","context":"CONTEXT_ID","output":"page.png"}' | nc -U /tmp/firefoxctl-$(id -u).sock
+echo '{"cmd":"quit"}' | nc -U /tmp/firefoxctl-$(id -u).sock
 ```
 
 ### Python Library
@@ -176,8 +207,8 @@ from firefoxctl_daemon import daemon_context, send_command, ensure_daemon_runnin
 
 async with daemon_context(port=9223) as socket_path:
     result = await send_command({"cmd": "list"}, socket_path)
-    for tab in result["tabs"]:
-        print(tab["url"])
+    for ctx in result["contexts"]:
+        print(ctx["url"])
 
 # Or for mid-run recovery (starts daemon if needed, idempotent):
 socket_path = await ensure_daemon_running(port=9223)

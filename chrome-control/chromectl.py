@@ -332,6 +332,7 @@ _HELPER_COMMANDS = {
     "submit",
     "clear",
     "type",
+    "fill",
     "select",
     "get-text",
     "get-html",
@@ -373,6 +374,9 @@ def _build_helper_js(cmd: str, req: dict) -> str | None:
         return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No form: '+{s});e.reset();return true}})()"
     if cmd == "type":
         t = _js(req.get("text", ""))
+        return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.focus();e.value={t};e.dispatchEvent(new InputEvent('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
+    if cmd == "fill":
+        t = _js(req.get("value", ""))
         return f"(()=>{{const e=document.querySelector({s});if(!e)throw new Error('No element: '+{s});e.focus();e.value={t};e.dispatchEvent(new InputEvent('input',{{bubbles:true}}));e.dispatchEvent(new Event('change',{{bubbles:true}}));return e.value}})()"
     if cmd == "select":
         v = _js(req.get("value", ""))
@@ -704,9 +708,10 @@ class Dispatcher:
         if not b64:
             return {"error": "No screenshot data"}
         out = req.get("output", f"screenshot_{target_id}.png")
+        data = base64.b64decode(b64)
         with open(out, "wb") as f:
-            f.write(base64.b64decode(b64))
-        return {"file": out}
+            f.write(data)
+        return {"file": out, "bytes": len(data)}
 
     async def _dispatch_console_tail(self, req: dict, target_id: str) -> dict:
         duration = float(req.get("for", 10))
@@ -1010,7 +1015,7 @@ Shorthands for common eval patterns. Selectors are CSS.
 
   click/check/uncheck/highlight SELECTOR
   submit/clear FORM
-  type SELECTOR TEXT
+  type/fill SELECTOR TEXT
   select SELECTOR VALUE
   get-text/get-html/get-value/exists/count/get-texts SELECTOR
   get-attr SELECTOR ATTR
@@ -1035,127 +1040,118 @@ Shorthands for common eval patterns. Selectors are CSS.
 _STREAM_LIMIT = 16 * 1024 * 1024  # 16MB — large eval results
 
 
-async def _daemon_request(req: dict):
+def _format_output(result: dict) -> None:
+    """Print daemon response in human-readable format."""
+    if "error" in result:
+        print(f"Error: {result['error']}", file=sys.stderr)
+        sys.exit(2)
+    if "targets" in result:
+        for t in result["targets"]:
+            print(f"{t.get('id', '')}  {t.get('url', '')}  {t.get('title', '')}")
+    elif "file" in result:
+        print(f"Saved {result.get('bytes', '?')} bytes to {result['file']}")
+    elif "messages" in result:
+        for m in result["messages"]:
+            print(f"{m.get('t', '')}  {m.get('level', m.get('console', ''))}  {m.get('text', m.get('args', ''))}")
+        print(f"({len(result['messages'])} messages)")
+    elif "connected" in result:
+        for k, v in result.items():
+            print(f"{k}: {v}")
+    elif "id" in result and "url" in result:
+        print(f"{result['id']}  {result['url']}")
+    elif "value" in result:
+        val = result["value"]
+        if isinstance(val, dict | list):
+            print(json.dumps(val, indent=2, ensure_ascii=False))
+        else:
+            print(val)
+    elif "result" in result:
+        val = result["result"]
+        if isinstance(val, dict | list):
+            print(json.dumps(val, indent=2, ensure_ascii=False))
+        else:
+            print(val)
+    elif "status" in result:
+        print(result["status"])
+    else:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+
+
+async def _daemon_request(req: dict, json_output: bool = False):
     """Send JSON request to daemon socket, print response."""
     reader, writer = await asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT)
     writer.write(json.dumps(req).encode() + b"\n")
     await writer.drain()
     resp = await asyncio.wait_for(reader.readline(), timeout=60)
-    print(resp.decode().strip())
     writer.close()
     await writer.wait_closed()
+
+    if json_output:
+        raw = resp.decode().strip()
+        print(raw)
+        if '"error"' in raw:
+            sys.exit(2)
+        return
+
+    result = json.loads(resp.decode())
+    _format_output(result)
 
 
 async def _route_request(args, req: dict):
     """Route request to daemon socket."""
     if os.path.exists(SOCKET_PATH):
-        await _daemon_request(req)
+        json_output = getattr(args, "json_output", False)
+        await _daemon_request(req, json_output=json_output)
         return
     print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl start", file=sys.stderr)
     sys.exit(1)
 
 
-def build_on_request(args) -> dict:
-    """Build daemon request from 'on' subcommand args."""
-    cmd = args.command
-    req = {"cmd": cmd, "id": args.target_id}
-    pos = args.cmd_args or []
+async def _cmd_eval(args):
+    await _route_request(args, {"cmd": "eval", "id": args.target_id, "expr": args.expression})
 
-    SELECTOR_CMDS = {
-        "click",
-        "check",
-        "uncheck",
-        "highlight",
-        "submit",
-        "clear",
-        "get-text",
-        "get-html",
-        "get-value",
-        "exists",
-        "count",
-        "get-texts",
-        "scroll-to",
-        "wait-for",
-        "wait-hidden",
-    }
 
-    if cmd in SELECTOR_CMDS:
-        if not pos:
-            print(f"Error: {cmd} requires SELECTOR", file=sys.stderr)
-            sys.exit(1)
-        req["selector"] = pos[0]
-    elif cmd in ("type", "wait-text"):
-        if len(pos) < 2:
-            print(f"Error: {cmd} requires SELECTOR TEXT", file=sys.stderr)
-            sys.exit(1)
-        req["selector"] = pos[0]
-        req["text"] = pos[1]
-    elif cmd == "select":
-        if len(pos) < 2:
-            print("Error: select requires SELECTOR VALUE", file=sys.stderr)
-            sys.exit(1)
-        req["selector"] = pos[0]
-        req["value"] = pos[1]
-    elif cmd == "get-attr":
-        if len(pos) < 2:
-            print("Error: get-attr requires SELECTOR ATTR", file=sys.stderr)
-            sys.exit(1)
-        req["selector"] = pos[0]
-        req["attr"] = pos[1]
-    elif cmd == "navigate":
-        if not pos:
-            print("Error: navigate requires URL", file=sys.stderr)
-            sys.exit(1)
-        req["url"] = pos[0]
-    elif cmd == "wait-url":
-        if not pos:
-            print("Error: wait-url requires PATTERN", file=sys.stderr)
-            sys.exit(1)
-        req["pattern"] = pos[0]
-    elif cmd in ("scroll-up", "scroll-down"):
-        if pos:
-            req["pixels"] = int(pos[0])
-    elif cmd == "scroll-by":
-        if len(pos) < 2:
-            print("Error: scroll-by requires X Y", file=sys.stderr)
-            sys.exit(1)
-        req["x"] = int(pos[0])
-        req["y"] = int(pos[1])
-    elif cmd == "inject-css":
-        if not pos:
-            print("Error: inject-css requires CSS", file=sys.stderr)
-            sys.exit(1)
-        req["css"] = pos[0]
-    elif cmd in ("eval", "worker-eval"):
-        if not pos:
-            print(f"Error: {cmd} requires expression", file=sys.stderr)
-            sys.exit(1)
-        req["expr"] = pos[0]
-    elif cmd == "cdp":
-        if not pos and not getattr(args, "method", None):
-            print("Error: cdp requires METHOD", file=sys.stderr)
-            sys.exit(1)
-        if pos:
-            req["method"] = pos[0]
+async def _cmd_worker_eval(args):
+    await _route_request(args, {"cmd": "worker-eval", "id": args.target_id, "expr": args.expression})
 
-    if getattr(args, "output", None):
-        req["output"] = args.output
-    if getattr(args, "full_page", False):
+
+async def _cmd_screenshot(args):
+    req = {"cmd": "screenshot", "id": args.target_id, "output": args.output}
+    if args.full_page:
         req["full_page"] = True
-    if getattr(args, "for_seconds", None):
-        req["for"] = float(args.for_seconds)
-    if getattr(args, "timeout", None):
-        req["timeout"] = float(args.timeout)
-    if getattr(args, "method", None) and "method" not in req:
-        req["method"] = args.method
-    if getattr(args, "params", None):
-        req["params"] = json.loads(args.params)
-
-    return req
+    await _route_request(args, req)
 
 
-async def cmd_on(args):
-    await _route_request(args, build_on_request(args))
+async def _cmd_console_tail(args):
+    await _route_request(args, {"cmd": "console-tail", "id": args.target_id, "for": args.for_seconds})
+
+
+async def _cmd_navigate(args):
+    await _route_request(args, {"cmd": "navigate", "id": args.target_id, "url": args.url})
+
+
+async def _cmd_reload(args):
+    await _route_request(args, {"cmd": "reload", "id": args.target_id})
+
+
+async def _cmd_dom_helper(args):
+    req = {"cmd": args.helper_name, "id": args.target_id}
+    for field in ("selector", "value", "text", "attr", "css", "pixels", "x", "y"):
+        val = getattr(args, field, None)
+        if val is not None:
+            req[field] = val
+    await _route_request(args, req)
+
+
+async def _cmd_wait_helper(args):
+    req = {"cmd": args.helper_name, "id": args.target_id}
+    for field in ("selector", "text", "pattern"):
+        val = getattr(args, field, None)
+        if val is not None:
+            req[field] = val
+    if args.timeout:
+        req["timeout"] = args.timeout
+    await _route_request(args, req)
 
 
 async def cmd_helpers(args):
@@ -1194,6 +1190,7 @@ def build_parser():
     p.add_argument("--port", type=int, default=DEFAULT_PORT)
     p.add_argument("--auto-connect", action="store_true", help="Connect via DevToolsActivePort (Chrome M144+)")
     p.add_argument("--user-data-dir", default=None, help="Chrome user data directory")
+    p.add_argument("--json", action="store_true", dest="json_output", help="Output raw JSON")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("start", help="Connect to Chrome, listen on Unix socket").set_defaults(func=cmd_start)
@@ -1213,17 +1210,92 @@ def build_parser():
     sp.add_argument("--params", help="Method params as JSON")
     sp.set_defaults(func=cmd_cdp_top)
 
-    sp = sub.add_parser("on", help="Run command on a target (eval, click, type, screenshot, ...)")
+    # Target commands
+    sp = sub.add_parser("eval", help="Evaluate JavaScript")
     sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
-    sp.add_argument("command", metavar="COMMAND", help="Command to run")
-    sp.add_argument("cmd_args", nargs="*", metavar="ARG", help="Command arguments")
-    sp.add_argument("-o", "--output", help="Output file (screenshot)")
+    sp.add_argument("expression", metavar="EXPR", help="JavaScript expression")
+    sp.set_defaults(func=_cmd_eval)
+
+    sp = sub.add_parser("worker-eval", help="Evaluate JavaScript in service worker")
+    sp.add_argument("target_id", metavar="TARGET", help="Worker target ID")
+    sp.add_argument("expression", metavar="EXPR", help="JavaScript expression")
+    sp.set_defaults(func=_cmd_worker_eval)
+
+    sp = sub.add_parser("screenshot", help="Capture PNG screenshot")
+    sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+    sp.add_argument("-o", "--output", default="screenshot.png", help="Output file (default: screenshot.png)")
     sp.add_argument("--full-page", action="store_true", help="Full-page screenshot")
-    sp.add_argument("--for", dest="for_seconds", help="Duration in seconds (console-tail)")
-    sp.add_argument("--timeout", help="Wait timeout in seconds (default: 10)")
-    sp.add_argument("--method", help="CDP method (cdp command)")
-    sp.add_argument("--params", help="CDP params as JSON (cdp command)")
-    sp.set_defaults(func=cmd_on)
+    sp.set_defaults(func=_cmd_screenshot)
+
+    sp = sub.add_parser("console-tail", help="Stream console messages")
+    sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+    sp.add_argument("--for", dest="for_seconds", type=float, default=10, help="Duration in seconds (default: 10)")
+    sp.set_defaults(func=_cmd_console_tail)
+
+    sp = sub.add_parser("navigate", help="Navigate to URL")
+    sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+    sp.add_argument("url", metavar="URL", help="URL to navigate to")
+    sp.set_defaults(func=_cmd_navigate)
+
+    sp = sub.add_parser("reload", help="Reload page")
+    sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+    sp.set_defaults(func=_cmd_reload)
+
+    # DOM helper subcommands
+    _SELECTOR_ONLY = {
+        "click",
+        "check",
+        "uncheck",
+        "highlight",
+        "submit",
+        "clear",
+        "get-text",
+        "get-html",
+        "get-value",
+        "exists",
+        "count",
+        "get-texts",
+        "scroll-to",
+    }
+    for helper in sorted(_HELPER_COMMANDS):
+        sp = sub.add_parser(helper, help=f"DOM: {helper}")
+        sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+        if helper in _SELECTOR_ONLY:
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+        elif helper == "fill":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("value", metavar="VALUE", help="Value to set")
+        elif helper == "type":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("text", metavar="TEXT", help="Text to type")
+        elif helper == "select":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("value", metavar="VALUE", help="Option value")
+        elif helper == "get-attr":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("attr", metavar="ATTR", help="Attribute name")
+        elif helper in ("scroll-up", "scroll-down"):
+            sp.add_argument("pixels", nargs="?", type=int, default=None, help="Pixels (default: viewport)")
+        elif helper == "scroll-by":
+            sp.add_argument("x", type=int, help="Horizontal pixels")
+            sp.add_argument("y", type=int, help="Vertical pixels")
+        elif helper == "inject-css":
+            sp.add_argument("css", metavar="CSS", help="CSS text to inject")
+        sp.set_defaults(func=_cmd_dom_helper, helper_name=helper)
+
+    # Wait commands
+    for helper in sorted(_WAIT_COMMANDS):
+        sp = sub.add_parser(helper, help=f"Wait: {helper}")
+        sp.add_argument("target_id", metavar="TARGET", help="Target ID from list/open (prefix match OK)")
+        if helper in ("wait-for", "wait-hidden"):
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+        elif helper == "wait-text":
+            sp.add_argument("selector", metavar="SELECTOR", help="CSS selector")
+            sp.add_argument("text", metavar="TEXT", help="Text to wait for")
+        elif helper == "wait-url":
+            sp.add_argument("pattern", metavar="PATTERN", help="URL substring")
+        sp.add_argument("--timeout", type=float, default=10, help="Timeout in seconds (default: 10)")
+        sp.set_defaults(func=_cmd_wait_helper, helper_name=helper)
 
     sp = sub.add_parser("launch", help="Launch separate Chrome instance (legacy)")
     sp.add_argument("--chrome-app", default="Google Chrome", help="macOS app name")
@@ -1235,12 +1307,32 @@ def build_parser():
     return p
 
 
-_KNOWN_COMMANDS = {"start", "stop", "list", "open", "status", "targets", "helpers", "cdp", "launch", "on"}
+_KNOWN_COMMANDS = (
+    {
+        "start",
+        "stop",
+        "list",
+        "open",
+        "status",
+        "targets",
+        "helpers",
+        "cdp",
+        "launch",
+        "eval",
+        "worker-eval",
+        "screenshot",
+        "console-tail",
+        "navigate",
+        "reload",
+    }
+    | _HELPER_COMMANDS
+    | _WAIT_COMMANDS
+)
 _FLAGS_WITH_VALUE = {"--host", "--port", "--user-data-dir"}
 
 
 def _preprocess_argv():
-    """If first positional arg isn't a known command, insert 'on' for TARGET COMMAND syntax."""
+    """If first positional arg isn't a known command, rewrite for TARGET COMMAND shorthand."""
     argv = sys.argv[1:]
     i = 0
     while i < len(argv):
@@ -1251,7 +1343,11 @@ def _preprocess_argv():
             i += 1
         else:
             if arg not in _KNOWN_COMMANDS:
-                argv.insert(i, "on")
+                if i + 1 < len(argv) and argv[i + 1] in _KNOWN_COMMANDS:
+                    target = argv[i]
+                    cmd = argv[i + 1]
+                    rest = argv[i + 2 :]
+                    argv = argv[:i] + [cmd, target] + rest
             break
     sys.argv = [sys.argv[0]] + argv
 
@@ -1267,6 +1363,9 @@ async def amain():
         sys.exit(2)
     except aiohttp.ClientError as e:
         print(f"HTTP/WS error: {e}", file=sys.stderr)
+        sys.exit(2)
+    except asyncio.TimeoutError:
+        print("Timeout waiting for CDP response", file=sys.stderr)
         sys.exit(2)
 
 

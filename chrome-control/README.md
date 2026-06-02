@@ -11,11 +11,12 @@ Built for two audiences:
 Once connected to your running Chrome:
 
 - **List tabs** across all windows and profiles
+- **Open new tabs** with a URL
 - **Run JavaScript** in any tab (inspect DOM, call functions, read page state)
 - **Take screenshots** (viewport or full-page)
 - **Monitor console** output (errors, warnings, logs) for a duration
 - **DOM helpers** — click, type, get-text, get-html, exists, count, scroll, wait, and more
-- **Open new tabs** with a URL
+- **Raw CDP** — send any Chrome DevTools Protocol command directly
 
 JavaScript evaluation is the universal tool — anything you can do in the DevTools console, you can do via `eval`:
 
@@ -83,16 +84,28 @@ Chrome will show a permission dialog, click Allow. chromectl keeps this connecti
 # List all open tabs
 ./chromectl.py list
 
+# Open a new tab
+./chromectl.py open https://example.com
+
+# Check daemon status
+./chromectl.py status
+
 # Run JavaScript in a tab (use target ID from list output)
 ./chromectl.py TARGET eval "document.title"
 
 # Take a screenshot
 ./chromectl.py TARGET screenshot -o page.png
 
+# Monitor console output
+./chromectl.py TARGET console-tail --for 30
+
 # DOM helpers
 ./chromectl.py TARGET click "button.submit"
 ./chromectl.py TARGET get-text h1
 ./chromectl.py TARGET type "input[name=q]" "search term"
+
+# JSON output for scripting
+./chromectl.py --json list
 
 # Or use netcat directly
 echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
@@ -102,6 +115,13 @@ echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
 
 ```bash
 ./chromectl.py stop
+```
+
+### Raw CDP
+
+```bash
+./chromectl.py cdp Browser.getVersion
+./chromectl.py cdp Target.getTargets
 ```
 
 ## How It Works
@@ -154,6 +174,7 @@ Target ID from `list`/`open` output. Prefix match OK (e.g. `88FA` instead of ful
 | `TARGET screenshot [-o file] [--full-page]` | Capture PNG screenshot |
 | `TARGET console-tail [--for N]` | Stream console messages |
 | `TARGET navigate <url>` | Navigate to URL |
+| `TARGET reload` | Reload page |
 | `TARGET click <sel>` | Click element |
 | `TARGET type <sel> <text>` | Type text into input |
 | `TARGET get-text <sel>` | Get text content |
@@ -163,13 +184,23 @@ Target ID from `list`/`open` output. Prefix match OK (e.g. `88FA` instead of ful
 
 30+ DOM helpers available — run `chromectl.py helpers` for the full list.
 
+### Flags
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output raw JSON instead of human-readable format |
+
 ### Socket Protocol
 
-chromectl accepts JSON commands over its Unix socket, one per line:
+chromectl accepts JSON commands over its Unix socket, one per line. Socket always returns JSON regardless of `--json` flag.
 
 ```bash
 echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
+echo '{"cmd":"open","url":"https://example.com"}' | nc -U /tmp/chromectl-$(id -u).sock
+echo '{"cmd":"status"}' | nc -U /tmp/chromectl-$(id -u).sock
+echo '{"cmd":"targets"}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"eval","id":"TARGET_ID","expr":"document.title"}' | nc -U /tmp/chromectl-$(id -u).sock
+echo '{"cmd":"console-tail","id":"TARGET_ID","for":10}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"screenshot","id":"TARGET_ID","output":"shot.png"}' | nc -U /tmp/chromectl-$(id -u).sock
 echo '{"cmd":"quit"}' | nc -U /tmp/chromectl-$(id -u).sock
 ```
@@ -183,8 +214,8 @@ from chromectl_daemon import daemon_context, send_command, ensure_daemon_running
 
 async with daemon_context() as socket_path:
     result = await send_command({"cmd": "list"}, socket_path)
-    for tab in result["targets"]:
-        print(tab["title"])
+    for target in result["targets"]:
+        print(target["title"])
 
 # Or for mid-run recovery (starts daemon if needed, idempotent):
 socket_path = await ensure_daemon_running()
@@ -196,7 +227,7 @@ If you need full CDP access (HTTP discovery, direct page WebSocket, worker attac
 
 ```bash
 ./chromectl.py launch --headless
-TARGET=$(./chromectl.py open https://example.com | jq -r .id)
+TARGET=$(./chromectl.py --json open https://example.com | jq -r .id)
 ./chromectl.py $TARGET eval "document.title"
 ./chromectl.py $TARGET screenshot -o page.png
 ./chromectl.py stop
