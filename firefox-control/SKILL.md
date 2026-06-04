@@ -13,15 +13,13 @@ session. Every anti-bot system detects this. Mozilla has no extension-based
 automation API and no runtime toggle. For production agent workflows, use
 Chrome CDP tooling instead.
 
-## Start daemon
-
-```bash
-firefoxctl.py --port 9223 start
-```
-
-Creates: Unix socket at /tmp/firefoxctl-{uid}.sock. Idles out after 5 min.
+## Prerequisites
 
 User must launch Firefox with: `firefox --remote-debugging-port 9223`
+
+The daemon starts automatically on first command. No explicit `start` needed.
+
+The daemon holds the BiDi WebSocket open so each CLI call is instant — no connection overhead. Each command is a one-shot call; the caller does not hold any connection. The daemon idles out after 5 min of no commands. Unix socket: /tmp/firefoxctl-{uid}.sock.
 
 ## Commands
 

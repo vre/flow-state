@@ -69,15 +69,18 @@ Requires [uv](https://github.com/astral-sh/uv) — the script's shebang handles 
 firefox --remote-debugging-port 9223
 ```
 
-### 2. Start firefoxctl
+### 2. Use it
+
+The daemon starts automatically on first command. No explicit `start` needed.
 
 ```bash
-./firefoxctl.py --port 9223 start
+# If port differs from default (9222):
+./firefoxctl.py --port 9223 list
 ```
 
-The daemon connects via BiDi WebSocket and listens on a Unix socket (`/tmp/firefoxctl-<uid>.sock`). Shuts down after 5 minutes of inactivity.
+The daemon holds the BiDi WebSocket open so each CLI call is instant — no connection overhead per command. Each CLI invocation sends one request to the daemon via Unix socket and exits; the caller holds no persistent state. The daemon shuts down after 5 minutes of inactivity. Socket: `/tmp/firefoxctl-<uid>.sock`. You can also start it explicitly with `./firefoxctl.py start`.
 
-### 3. Use it
+### 3. Commands
 
 ```bash
 # List open tabs

@@ -9,6 +9,7 @@
 
 Connects to your running Chrome session via DevToolsActivePort
 (chrome://inspect/#remote-debugging). All tabs, cookies, and logins accessible.
+Daemon starts automatically on first command (no explicit 'start' needed).
 
 Commands:
   start                   Connect to Chrome daemon on Unix socket
@@ -28,6 +29,7 @@ import json
 import os
 import platform
 import signal
+import subprocess
 import sys
 import time
 from typing import Any
@@ -322,8 +324,10 @@ def _js(s: str) -> str:
     return json.dumps(s)
 
 
+# Keep in sync with firefox-control/firefoxctl.py
 _WAIT_COMMANDS = {"wait-for", "wait-text", "wait-url", "wait-hidden"}
 
+# Keep in sync with firefox-control/firefoxctl.py
 _HELPER_COMMANDS = {
     "click",
     "check",
@@ -356,7 +360,7 @@ _HELPER_COMMANDS = {
 
 
 def _build_helper_js(cmd: str, req: dict) -> str | None:
-    """Build JS expression for a helper command. Returns None if not a helper."""
+    # Keep in sync with firefox-control/firefoxctl.py
     sel = req.get("selector", "")
     s = _js(sel)
 
@@ -435,7 +439,7 @@ def _build_helper_js(cmd: str, req: dict) -> str | None:
 
 
 def _build_wait_js(cmd: str, req: dict) -> str:
-    """Build JS check expression for a wait command."""
+    # Keep in sync with firefox-control/firefoxctl.py
     sel = req.get("selector", "")
     s = _js(sel)
 
@@ -598,6 +602,19 @@ class Dispatcher:
         except CDPError as e:
             return {"error": str(e)}
 
+        return await self._dispatch_target_with_retry(cmd, req, target_id)
+
+    async def _dispatch_target_with_retry(self, cmd: str, req: dict, target_id: str) -> dict:
+        try:
+            return await self._dispatch_target_cmd(cmd, req, target_id)
+        except (CDPError, ConnectionError) as e:
+            self.sessions.pop(target_id, None)
+            try:
+                return await self._dispatch_target_cmd(cmd, req, target_id)
+            except Exception:
+                raise e
+
+    async def _dispatch_target_cmd(self, cmd: str, req: dict, target_id: str) -> dict:
         if cmd == "eval":
             return await self._dispatch_eval(req, target_id)
         if cmd == "screenshot":
@@ -733,8 +750,10 @@ class Dispatcher:
                 messages.append({"t": tdelta, "console": params.get("type"), "args": vals})
 
         session.set_event_handler(console_handler)
-        await asyncio.sleep(duration)
-        session.set_event_handler(None)
+        try:
+            await asyncio.sleep(duration)
+        finally:
+            session.set_event_handler(None)
         return {"messages": messages}
 
     async def _dispatch_worker_eval(self, req: dict, target_id: str) -> dict:
@@ -872,7 +891,7 @@ async def cmd_stop(args):
 
     if os.path.exists(SOCKET_PATH):
         try:
-            reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+            reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
             writer.write(b'{"cmd":"quit"}\n')
             await writer.drain()
             await asyncio.wait_for(reader.readline(), timeout=5)
@@ -887,7 +906,7 @@ async def cmd_stop(args):
         result = subprocess.run(["ps", "aux"], capture_output=True, text=True, check=True)
         pids_to_kill = []
         for line in result.stdout.splitlines():
-            if "Google Chrome" in line and "chromectl" in line:
+            if "Google Chrome" in line and "--user-data-dir=" in line and "chromectl" in line:
                 parts = line.split()
                 if len(parts) > 1:
                     try:
@@ -920,10 +939,22 @@ async def cmd_stop(args):
 async def cmd_start(args):
     """Connect to Chrome and listen on Unix socket."""
     args.auto_connect = True
-    dispatcher, bc = await make_dispatcher(args)
 
     if os.path.exists(SOCKET_PATH):
-        os.unlink(SOCKET_PATH)
+        try:
+            r, w = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
+            w.write(b'{"cmd":"status"}\n')
+            await w.drain()
+            await asyncio.wait_for(r.readline(), timeout=2)
+            w.close()
+            await w.wait_closed()
+            print(f"Daemon already running on {SOCKET_PATH}", file=sys.stderr)
+            sys.exit(1)
+        except Exception:
+            print(f"Removing stale socket {SOCKET_PATH}", flush=True)
+            os.unlink(SOCKET_PATH)
+
+    dispatcher, bc = await make_dispatcher(args)
 
     async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         try:
@@ -1079,32 +1110,61 @@ def _format_output(result: dict) -> None:
 
 async def _daemon_request(req: dict, json_output: bool = False):
     """Send JSON request to daemon socket, print response."""
-    reader, writer = await asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT)
+    reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT), timeout=5)
     writer.write(json.dumps(req).encode() + b"\n")
     await writer.drain()
     resp = await asyncio.wait_for(reader.readline(), timeout=60)
     writer.close()
     await writer.wait_closed()
 
+    result = json.loads(resp.decode())
     if json_output:
-        raw = resp.decode().strip()
-        print(raw)
-        if '"error"' in raw:
+        print(json.dumps(result, ensure_ascii=False))
+        if "error" in result:
             sys.exit(2)
         return
 
-    result = json.loads(resp.decode())
     _format_output(result)
 
 
-async def _route_request(args, req: dict):
-    """Route request to daemon socket."""
-    if os.path.exists(SOCKET_PATH):
-        json_output = getattr(args, "json_output", False)
-        await _daemon_request(req, json_output=json_output)
-        return
-    print(f"No daemon running ({SOCKET_PATH} not found). Start with: chromectl start", file=sys.stderr)
+async def _auto_start_daemon(args):
+    """Fork a daemon process and wait for socket to appear."""
+    script = os.path.abspath(__file__)
+    cmd = ["uv", "run", script, "--host", args.host, "--port", str(args.port), "--auto-connect"]
+    if getattr(args, "user_data_dir", None):
+        cmd += ["--user-data-dir", args.user_data_dir]
+    cmd.append("start")
+    print(f"Starting daemon on port {args.port}... (click Allow in Chrome if prompted)", file=sys.stderr, flush=True)
+    log = os.path.join(os.path.dirname(SOCKET_PATH), f"chromectl-{os.getuid()}.log")
+    with open(log, "w") as log_fh:
+        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh, start_new_session=True)
+        for _ in range(60):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                break
+            if os.path.exists(SOCKET_PATH):
+                try:
+                    r, w = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
+                    w.write(b'{"cmd":"status"}\n')
+                    await w.drain()
+                    await asyncio.wait_for(r.readline(), timeout=2)
+                    w.close()
+                    await w.wait_closed()
+                    return
+                except Exception:
+                    continue
+    with open(log) as f:
+        print(f.read(), file=sys.stderr, end="")
+    print("Daemon failed to start within 30s", file=sys.stderr)
     sys.exit(1)
+
+
+async def _route_request(args, req: dict):
+    """Route request to daemon. Auto-starts daemon if needed."""
+    if not os.path.exists(SOCKET_PATH):
+        await _auto_start_daemon(args)
+    json_output = getattr(args, "json_output", False)
+    await _daemon_request(req, json_output=json_output)
 
 
 async def _cmd_eval(args):
@@ -1167,6 +1227,9 @@ async def cmd_open_top(args):
 
 
 async def cmd_status_top(args):
+    if not os.path.exists(SOCKET_PATH):
+        print("No daemon running")
+        return
     await _route_request(args, {"cmd": "status"})
 
 

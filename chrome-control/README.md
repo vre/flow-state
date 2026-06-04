@@ -70,15 +70,11 @@ Requires [uv](https://github.com/astral-sh/uv) — the script's shebang handles 
 
 Open `chrome://inspect/#remote-debugging` and toggle the switch on. This applies to all profiles simultaneously. Chrome starts listening on a local port and writes a `DevToolsActivePort` file.
 
-### 2. Start chromectl
+### 2. Use it
 
-```bash
-./chromectl.py start
-```
+The daemon starts automatically on first command. No explicit `start` needed. Chrome will show a permission dialog on first connect — click Allow.
 
-Chrome will show a permission dialog, click Allow. chromectl keeps this connection alive on a Unix socket (`/tmp/chromectl-<uid>.sock`). It shuts down automatically after 5 minutes of inactivity or when Chrome closes.
-
-### 3. Use it
+Chrome pops a permission dialog on every new WebSocket connection. The daemon holds that single connection open so the user clicks Allow once and all subsequent CLI calls go through without prompts. Each CLI invocation sends one request to the daemon via Unix socket and exits; the caller holds no persistent state. The daemon shuts down after 5 minutes of inactivity or when Chrome closes. Socket: `/tmp/chromectl-<uid>.sock`. You can also start it explicitly with `./chromectl.py start`.
 
 ```bash
 # List all open tabs
@@ -134,7 +130,7 @@ echo '{"cmd":"list"}' | nc -U /tmp/chromectl-$(id -u).sock
                              │ WebSocket (one persistent connection)
                   ┌──────────┴───────────────────┐
                   │  chromectl daemon            │
-                  │  Unix socket + auto-reconnect│
+                  │  Unix socket + auto-start    │
                   │  idle shutdown after 5 min   │
                   └──────────┬───────────────────┘
                              │ JSON line protocol

@@ -17,6 +17,7 @@ and the webdriver flag. This tool proves BiDi works. For production agent
 workflows, use chromectl instead.
 
 Requires Firefox launched with: firefox --remote-debugging-port <port>
+Daemon starts automatically on first command (no explicit 'start' needed).
 
 Commands:
   list                    List open tabs
@@ -33,6 +34,7 @@ import base64
 import json
 import os
 import signal
+import subprocess
 import sys
 import time
 from typing import Any
@@ -78,7 +80,7 @@ class BiDiConnection:
         self._recv_task = asyncio.create_task(self._recv_loop())
 
         try:
-            result = await self.send("session.new", {"capabilities": {}})
+            result = await asyncio.wait_for(self.send("session.new", {"capabilities": {}}), timeout=10)
             self._session_id = result.get("sessionId")
         except BiDiError as e:
             if "already started" in str(e).lower():
@@ -143,7 +145,7 @@ class BiDiConnection:
         self._pending[self._id] = fut
         assert self._ws is not None
         await self._ws.send_json(msg)
-        resp = await asyncio.wait_for(fut, timeout=30.0)
+        resp = await fut
         if resp.get("type") == "error":
             err = resp.get("error", "unknown")
             err_msg = resp.get("message", "")
@@ -165,13 +167,7 @@ async def cmd_list(conn: BiDiConnection) -> list[dict]:
     contexts = result.get("contexts", [])
     tabs = []
     for ctx in contexts:
-        tabs.append(
-            {
-                "context": ctx.get("context", ""),
-                "url": ctx.get("url", ""),
-                "title": ctx.get("children", [{}])[0].get("url", ctx.get("url", "")) if ctx.get("children") else ctx.get("url", ""),
-            }
-        )
+        tabs.append({"context": ctx.get("context", ""), "url": ctx.get("url", "")})
     return tabs
 
 
@@ -192,6 +188,7 @@ async def cmd_eval(conn: BiDiConnection, context: str, expression: str) -> Any:
             "target": {"context": context},
             "awaitPromise": True,
             "resultOwnership": "none",
+            "serializationOptions": {"maxObjectDepth": 5, "maxDomDepth": 0},
         },
     )
     return _unpack_value(result.get("result", {}))
@@ -237,6 +234,7 @@ def _js(s: str) -> str:
     return json.dumps(s)
 
 
+# Keep in sync with chrome-control/chromectl.py
 _HELPER_COMMANDS = {
     "click",
     "check",
@@ -267,6 +265,7 @@ _HELPER_COMMANDS = {
     "inject-css",
 }
 
+# Keep in sync with chrome-control/chromectl.py
 _WAIT_COMMANDS = {"wait-for", "wait-text", "wait-url", "wait-hidden"}
 
 _SELECTOR_ONLY = {
@@ -287,7 +286,7 @@ _SELECTOR_ONLY = {
 
 
 def _build_helper_js(cmd: str, req: dict) -> str | None:
-    """Build JS expression for a helper command."""
+    # Keep in sync with chrome-control/chromectl.py
     sel = req.get("selector", "")
     s = _js(sel)
 
@@ -366,7 +365,7 @@ def _build_helper_js(cmd: str, req: dict) -> str | None:
 
 
 def _build_wait_js(cmd: str, req: dict) -> str:
-    """Build JS check expression for a wait command."""
+    # Keep in sync with chrome-control/chromectl.py
     sel = req.get("selector", "")
     s = _js(sel)
 
@@ -460,6 +459,20 @@ _STREAM_LIMIT = 16 * 1024 * 1024
 IDLE_TIMEOUT = int(os.environ.get("FIREFOXCTL_IDLE_TIMEOUT", 300))
 
 
+async def _resolve_context(conn: BiDiConnection, partial: str) -> str:
+    """Resolve partial context ID prefix to full UUID."""
+    if "-" in partial and len(partial) >= 36:
+        return partial
+    result = await conn.send("browsingContext.getTree", {})
+    contexts = [ctx.get("context", "") for ctx in result.get("contexts", [])]
+    matches = [c for c in contexts if c.startswith(partial)]
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise BiDiError(f"No context matching '{partial}'")
+    raise BiDiError(f"Ambiguous: '{partial}' matches {len(matches)} contexts")
+
+
 async def _dispatch(conn: BiDiConnection, req: dict) -> dict:
     """Route a JSON request to the appropriate command."""
     cmd = req.get("cmd", "")
@@ -508,9 +521,10 @@ async def _dispatch(conn: BiDiConnection, req: dict) -> dict:
         return {"targets": flat}
 
     # All remaining commands need a context
-    context = req.get("context")
-    if not context:
+    raw_context = req.get("context")
+    if not raw_context:
         return {"error": "Missing context ID"}
+    context = await _resolve_context(conn, raw_context)
 
     if cmd == "console-tail":
         duration = float(req.get("for", 10))
@@ -531,10 +545,12 @@ async def _dispatch(conn: BiDiConnection, req: dict) -> dict:
 
         conn.on_event("log.entryAdded", _log_handler)
         await conn.subscribe(["log.entryAdded"])
-        await asyncio.sleep(duration)
-        handlers = conn._event_handlers.get("log.entryAdded", [])
-        if _log_handler in handlers:
-            handlers.remove(_log_handler)
+        try:
+            await asyncio.sleep(duration)
+        finally:
+            handlers = conn._event_handlers.get("log.entryAdded", [])
+            if _log_handler in handlers:
+                handlers.remove(_log_handler)
         return {"messages": messages}
 
     if cmd == "eval":
@@ -592,7 +608,7 @@ async def cmd_start(args):
 
     if os.path.exists(SOCKET_PATH):
         try:
-            r, w = await asyncio.open_unix_connection(SOCKET_PATH)
+            r, w = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
             w.write(b'{"cmd":"status"}\n')
             await w.drain()
             await asyncio.wait_for(r.readline(), timeout=2)
@@ -609,6 +625,33 @@ async def cmd_start(args):
 
     last_request = time.time()
     _dead = False
+    _reconnect_lock = asyncio.Lock()
+
+    async def _reconnect() -> bool:
+        nonlocal conn, _dead
+        async with _reconnect_lock:
+            try:
+                await conn.__aexit__(None, None, None)
+            except Exception:
+                pass
+            for attempt in range(1, 6):
+                try:
+                    conn = BiDiConnection(host, port)
+                    await conn.__aenter__()
+                    print(f"reconnected to Firefox (attempt {attempt})", flush=True)
+                    return True
+                except BiDiError as e:
+                    if "already started" in str(e).lower():
+                        print("zombie BiDi session — restart Firefox", flush=True)
+                        _dead = True
+                        return False
+                    print(f"reconnect attempt {attempt}/5 failed: {e}", flush=True)
+                except Exception as e:
+                    print(f"reconnect attempt {attempt}/5 failed: {e}", flush=True)
+                if attempt < 5:
+                    await asyncio.sleep(1)
+            _dead = True
+            return False
 
     async def _dispatch_safe_daemon(req: dict) -> dict:
         nonlocal _dead
@@ -620,9 +663,19 @@ async def cmd_start(args):
             timeout = float(req.get("for", 10)) + 5
         try:
             return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
-        except (asyncio.TimeoutError, BiDiError, aiohttp.ClientError, ConnectionError, OSError) as e:
-            _dead = True
+        except (aiohttp.ClientError, ConnectionError, OSError) as e:
+            print(f"transport error: {type(e).__name__}: {e}", flush=True)
+            if await _reconnect():
+                try:
+                    return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+                except Exception as e2:
+                    _dead = True
+                    return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
             return {"error": f"BiDi connection lost: {type(e).__name__}: {e}"}
+        except BiDiError as e:
+            return {"error": f"BiDi: {e}"}
+        except asyncio.TimeoutError:
+            return {"error": "Timeout"}
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
 
@@ -670,6 +723,7 @@ async def cmd_start(args):
 
     async def idle_watchdog():
         nonlocal _dead
+        liveness_counter = 0
         while True:
             await asyncio.sleep(5)
             if _dead:
@@ -685,6 +739,16 @@ async def cmd_start(args):
                 print(f"idle {idle:.0f}s, shutting down", flush=True)
                 server.close()
                 return
+            liveness_counter += 1
+            if liveness_counter >= 6 and idle > 10:
+                liveness_counter = 0
+                try:
+                    await asyncio.wait_for(conn.send("session.status", {}), timeout=5)
+                except Exception as e:
+                    print(f"liveness probe failed: {type(e).__name__}: {e}", flush=True)
+                    if not await _reconnect():
+                        server.close()
+                        return
 
     watchdog = asyncio.create_task(idle_watchdog())
 
@@ -713,7 +777,7 @@ async def cmd_stop(args):
         print("No daemon running")
         return
     try:
-        reader, writer = await asyncio.open_unix_connection(SOCKET_PATH)
+        reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
         writer.write(b'{"cmd":"quit"}\n')
         await writer.drain()
         await asyncio.wait_for(reader.readline(), timeout=5)
@@ -727,7 +791,7 @@ async def cmd_stop(args):
 
 async def _send_to_daemon(req: dict) -> dict:
     """Send a command to the running daemon via Unix socket."""
-    reader, writer = await asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT)
+    reader, writer = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH, limit=_STREAM_LIMIT), timeout=5)
     try:
         writer.write(json.dumps(req).encode() + b"\n")
         await writer.drain()
@@ -742,11 +806,39 @@ def _daemon_running() -> bool:
     return os.path.exists(SOCKET_PATH)
 
 
+async def _auto_start_daemon(args):
+    """Fork a daemon process and wait for socket to appear."""
+    script = os.path.abspath(__file__)
+    cmd = ["uv", "run", script, "--host", args.host, "--port", str(args.port), "start"]
+    print(f"Starting daemon on port {args.port}...", file=sys.stderr, flush=True)
+    log = os.path.join(os.path.dirname(SOCKET_PATH), f"firefoxctl-{os.getuid()}.log")
+    with open(log, "w") as log_fh:
+        proc = subprocess.Popen(cmd, stdout=log_fh, stderr=log_fh, start_new_session=True)
+        for _ in range(20):
+            await asyncio.sleep(0.5)
+            if proc.poll() is not None:
+                break
+            if os.path.exists(SOCKET_PATH):
+                try:
+                    r, w = await asyncio.wait_for(asyncio.open_unix_connection(SOCKET_PATH), timeout=5)
+                    w.write(b'{"cmd":"status"}\n')
+                    await w.drain()
+                    await asyncio.wait_for(r.readline(), timeout=2)
+                    w.close()
+                    await w.wait_closed()
+                    return
+                except Exception:
+                    continue
+    with open(log) as f:
+        print(f.read(), file=sys.stderr, end="")
+    print("Daemon failed to start within 10s", file=sys.stderr)
+    sys.exit(1)
+
+
 async def _route_request(args, req: dict):
-    """Route request to daemon. Requires daemon running."""
+    """Route request to daemon. Auto-starts daemon if needed."""
     if not _daemon_running():
-        print(f"No daemon running ({SOCKET_PATH} not found). Start with: firefoxctl --port {args.port} start", file=sys.stderr)
-        sys.exit(1)
+        await _auto_start_daemon(args)
 
     result = await _send_to_daemon(req)
 
@@ -997,6 +1089,9 @@ async def _cmd_open(args):
 
 
 async def _cmd_status(args):
+    if not _daemon_running():
+        print("No daemon running")
+        return
     await _route_request(args, {"cmd": "status"})
 
 

@@ -7,17 +7,16 @@ description: Use when debugging web applications, diagnosing page errors, inspec
 
 Control Chrome via CDP. Connects to user's running Chrome — all tabs, cookies, logins accessible.
 
-## Start daemon
+## Prerequisites
 
-```bash
-chromectl.py start
-```
+User must enable `chrome://inspect/#remote-debugging` in Chrome.
 
-Creates: Unix socket at /tmp/chromectl-{uid}.sock
+The daemon starts automatically on first command. No explicit `start` needed.
+User clicks Allow once on the Chrome permission dialog.
 
-User clicks Allow once. Daemon idles out after 5 min or on `stop`.
+Chrome pops a permission dialog on every new WebSocket connection. The daemon holds that single connection open so the user clicks Allow once and all subsequent CLI calls go through without prompts. Each command is a one-shot call; the caller does not hold any connection. The daemon idles out after 5 min of no commands. Unix socket: /tmp/chromectl-{uid}.sock.
 
-If connection fails → tell user to enable `chrome://inspect/#remote-debugging`, or offer legacy mode (`launch`).
+If connection fails → tell user to check remote debugging is enabled, or offer legacy mode (`launch`).
 
 ## Commands
 
