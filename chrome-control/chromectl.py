@@ -35,6 +35,7 @@ import time
 from typing import Any
 
 import aiohttp
+from injection_defense import sanitize_result
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9222
@@ -561,7 +562,7 @@ class Dispatcher:
         try:
             result = await asyncio.wait_for(self.dispatch(req), timeout=timeout)
             self._last_success = time.time()
-            return result
+            return sanitize_result(result)
         except (asyncio.TimeoutError, CDPError, aiohttp.ClientError, ConnectionError, OSError) as e:
             err_type = type(e).__name__
             if isinstance(e, asyncio.TimeoutError) or "close" in str(e).lower() or "connect" in str(e).lower():
@@ -570,13 +571,13 @@ class Dispatcher:
                     try:
                         result = await asyncio.wait_for(self.dispatch(req), timeout=timeout)
                         self._last_success = time.time()
-                        return result
+                        return sanitize_result(result)
                     except Exception as e2:
                         self._dead = True
-                        return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
+                        return sanitize_result({"error": f"{type(e2).__name__}: {e2} (after reconnect)"})
                 else:
                     self._dead = True
-            return {"error": f"{err_type}: {e}"}
+            return sanitize_result({"error": f"{err_type}: {e}"})
 
     async def dispatch(self, req: dict) -> dict:
         cmd = req.get("cmd", "")

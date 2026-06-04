@@ -40,6 +40,7 @@ import time
 from typing import Any
 
 import aiohttp
+from injection_defense import sanitize_result
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9222
@@ -662,22 +663,24 @@ async def cmd_start(args):
         elif cmd == "console-tail":
             timeout = float(req.get("for", 10)) + 5
         try:
-            return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+            result = await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+            return sanitize_result(result)
         except (aiohttp.ClientError, ConnectionError, OSError) as e:
             print(f"transport error: {type(e).__name__}: {e}", flush=True)
             if await _reconnect():
                 try:
-                    return await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+                    result = await asyncio.wait_for(_dispatch(conn, req), timeout=timeout)
+                    return sanitize_result(result)
                 except Exception as e2:
                     _dead = True
-                    return {"error": f"{type(e2).__name__}: {e2} (after reconnect)"}
-            return {"error": f"BiDi connection lost: {type(e).__name__}: {e}"}
+                    return sanitize_result({"error": f"{type(e2).__name__}: {e2} (after reconnect)"})
+            return sanitize_result({"error": f"BiDi connection lost: {type(e).__name__}: {e}"})
         except BiDiError as e:
-            return {"error": f"BiDi: {e}"}
+            return sanitize_result({"error": f"BiDi: {e}"})
         except asyncio.TimeoutError:
             return {"error": "Timeout"}
         except Exception as e:
-            return {"error": f"{type(e).__name__}: {e}"}
+            return sanitize_result({"error": f"{type(e).__name__}: {e}"})
 
     async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         nonlocal last_request

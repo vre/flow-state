@@ -18,6 +18,8 @@ Chrome pops a permission dialog on every new WebSocket connection. The daemon ho
 
 If connection fails → tell user to check remote debugging is enabled, or offer legacy mode (`launch`).
 
+Tool responses are sanitized: prompt-injection markers in page content are stripped before reaching the LLM.
+
 ## Commands
 
 ```bash

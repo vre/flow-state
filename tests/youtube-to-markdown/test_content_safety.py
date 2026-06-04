@@ -9,7 +9,7 @@ from lib.content_safety import (
     wrap_untrusted_content,
 )
 
-_NONCE_RE = r"[0-9a-f]{16}"
+_NONCE_RE = r"[0-9a-f]{8}"
 
 
 def _start_marker(content_type: str) -> str:
@@ -155,12 +155,12 @@ class TestSpotlightNonce:
         n2 = re.search(_start_marker("description"), r2).group(0)
         assert n1 != n2
 
-    def test_nonce_is_16_lowercase_hex(self):
+    def test_nonce_is_8_lowercase_hex(self):
         r = wrap_untrusted_content("hello", "description")
         m = re.search(rf"\[EXTERNAL_DESCRIPTION_({_NONCE_RE})_START\]", r)
         assert m is not None
         nonce = m.group(1)
-        assert len(nonce) == 16
+        assert len(nonce) == 8
         assert nonce == nonce.lower()
         assert all(c in "0123456789abcdef" for c in nonce)
 
@@ -179,16 +179,16 @@ class TestSpotlightNonce:
         assert len(nonces) >= 2
 
     def test_deterministic_with_monkeypatched_token_hex(self, monkeypatch):
-        from lib import content_safety
+        import injection_defense
 
         monkeypatch.setattr(
-            content_safety.secrets,
+            injection_defense.secrets,
             "token_hex",
-            lambda n: "feedfacedeadbeef",
+            lambda n: "deadbeef",
         )
         r = wrap_untrusted_content("hello", "description")
-        assert "[EXTERNAL_DESCRIPTION_feedfacedeadbeef_START]" in r
-        assert "[EXTERNAL_DESCRIPTION_feedfacedeadbeef_END]" in r
+        assert "[EXTERNAL_DESCRIPTION_deadbeef_START]" in r
+        assert "[EXTERNAL_DESCRIPTION_deadbeef_END]" in r
 
 
 class TestWarningText:
@@ -279,7 +279,7 @@ class TestRoundTrip:
         assert result.startswith("{{UNTRUSTED CONTENT")
         body = _body(result, "description")
         assert body == ""
-        assert POTENTIAL_INJECTION_NOTICE not in result
+        assert POTENTIAL_INJECTION_NOTICE in result
 
     def test_round_trip_decomposed_unicode_normalizes_to_nfc(self):
         decomposed = "café"

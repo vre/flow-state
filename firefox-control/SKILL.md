@@ -21,6 +21,8 @@ The daemon starts automatically on first command. No explicit `start` needed.
 
 The daemon holds the BiDi WebSocket open so each CLI call is instant — no connection overhead. Each command is a one-shot call; the caller does not hold any connection. The daemon idles out after 5 min of no commands. Unix socket: /tmp/firefoxctl-{uid}.sock.
 
+Tool responses are sanitized: prompt-injection markers in page content are stripped before reaching the LLM.
+
 ## Commands
 
 ```bash
