@@ -11,6 +11,11 @@
 
 Obsidian Local REST API has no rename/move endpoint (open issue #191). `FileManager.renameFile()` would update backlinks but isn't exposed. A rename via write+delete breaks all incoming links. Graph actions make safe rename possible by finding and updating referencing files first.
 
+## Research
+
+- [ ] Canvas — Obsidian's visual canvas feature, potential for graph/spatial workflows
+- [ ] Dataview + Bases — Dataview plugin for structured queries and Bases (Obsidian's native database views over notes with properties)
+
 ## Security
 
 - [ ] Prompt injection defense — NFKC normalization + invisible/BIDI strip, chat-template token stripping, randomized nonce wrapper on all vault content reaching the LLM (same pattern as imap-stream-mcp `injection_defense.py`)

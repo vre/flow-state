@@ -1,5 +1,7 @@
 # Obsidian Slim MCP
 
+> **In stealth mode** — not yet fully productized.
+
 Obsidian vault operations via Local REST API. Single-tool MCP server for Claude Desktop/Code.
 
 - **Full vault access** — read, write, append, patch, delete, search across notes

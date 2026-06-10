@@ -156,7 +156,8 @@ ORC drives. HC gets results summary.
 
 2. MERGE
 - In worktree: `git pull --rebase origin main`. Resolve all conflicts in worktree. Test and validate after each rebase step — merge step on main must be clean.
-- On main: `git merge --squash .worktrees/<name>`, oneline commit message. No co-authors. Run tests on main after merge, before commit.
+- On main: `git merge --squash .worktrees/<name>`. No co-authors. Run tests on main after merge, before commit.
+- Commit message format: `<scope>: <short summary>` subject line, blank line, 2-3 sentence prose body explaining *why* and key decisions. Wrap at 72 chars. Body is mandatory for non-trivial changes.
 - Clean up: `git worktree remove .worktrees/<name> && git branch -D <name>` (-D required after squash merge).
 
 ## Writing AGENTS.md / CLAUDE.md
