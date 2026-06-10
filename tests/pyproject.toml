@@ -21,12 +21,14 @@ testpaths = [
     "imap-slim-mcp",
     "obsidian-slim-mcp",
     "chrome-control",
+    "firefox-control",
 ]
 pythonpath = [
     "../youtube-to-markdown",
     "../imap-slim-mcp",
     "../obsidian-slim-mcp",
     "../chrome-control",
+    "../firefox-control",
 ]
 python_files = "test_*.py"
 python_functions = "test_*"

@@ -29,6 +29,11 @@ def _default_socket_path() -> str:
 _STREAM_LIMIT = 16 * 1024 * 1024
 
 
+def _is_healthy_response(resp: dict) -> bool:
+    """Return True when a daemon response indicates a usable connection."""
+    return "error" not in resp
+
+
 async def send_command(req: dict, socket_path: str | None = None) -> dict:
     """Send one JSON command to the firefoxctl daemon."""
     socket_path = socket_path or _default_socket_path()
@@ -57,8 +62,9 @@ async def _wait_for_socket(socket_path: str, timeout: float, port: int) -> None:
     while time.monotonic() < deadline:
         if os.path.exists(socket_path):
             try:
-                await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=socket_path), timeout=10)
-                return
+                resp = await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=socket_path), timeout=10)
+                if _is_healthy_response(resp):
+                    return
             except Exception:
                 pass
         await asyncio.sleep(0.3)
@@ -80,13 +86,16 @@ async def ensure_daemon_running(
 
     if os.path.exists(socket_path):
         try:
-            await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=socket_path), timeout=5)
-            return socket_path
+            resp = await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=socket_path), timeout=5)
+            if _is_healthy_response(resp):
+                return socket_path
         except Exception:
-            try:
-                os.unlink(socket_path)
-            except OSError:
-                pass
+            pass
+
+        try:
+            os.unlink(socket_path)
+        except OSError:
+            pass
 
     if not os.path.exists(FIREFOXCTL):
         raise RuntimeError(f"firefoxctl not found at {FIREFOXCTL}")
@@ -116,13 +125,17 @@ class daemon_context:
     async def __aenter__(self) -> str:
         if os.path.exists(self.socket_path):
             try:
-                await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=self.socket_path), timeout=5)
-                return self.socket_path
+                resp = await asyncio.wait_for(send_command({"cmd": "list"}, socket_path=self.socket_path), timeout=5)
+                if _is_healthy_response(resp):
+                    return self.socket_path
             except Exception:
-                try:
-                    os.unlink(self.socket_path)
-                except OSError:
-                    pass
+                pass
+
+            # Stale socket or dead daemon — remove and start fresh
+            try:
+                os.unlink(self.socket_path)
+            except OSError:
+                pass
 
         if not os.path.exists(FIREFOXCTL):
             print(
