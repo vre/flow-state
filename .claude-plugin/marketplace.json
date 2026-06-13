@@ -28,6 +28,15 @@
       "keywords": ["email", "imap", "mcp"]
     },
     {
+      "name": "hermes-tweet",
+      "source": "./hermes-tweet",
+      "description": "Hermes Agent X/Twitter workflows for research, listening, and guarded actions.",
+      "version": "0.1.6",
+      "category": "social-automation",
+      "keywords": ["hermes-agent", "twitter", "x", "social-media", "research", "automation"],
+      "skills": ["./"]
+    },
+    {
       "name": "chrome-control",
       "source": "./chrome-control",
       "description": "Control Chrome via CDP — debug web apps, run JavaScript, take screenshots, monitor console. Connects to your running Chrome session (M144+) or launches a separate instance.",

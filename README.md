@@ -6,6 +6,7 @@
 |--------|------|---------|
 | [Youtube to Markdown](#youtube-to-markdown) | skill | `/plugin install youtube-to-markdown@flow-state` |
 | [IMAP Slim MCP](#imap-slim-mcp) | mcp | `/plugin install imap-slim-mcp@flow-state` |
+| [Hermes Tweet](#hermes-tweet) | skill | `/plugin install hermes-tweet@flow-state` |
 | [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
 | [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
 
@@ -38,6 +39,18 @@
 - 🏢 **Multi-account** — multiple account support with named switching
 
 [Full documentation →](imap-slim-mcp/README.md)
+
+## Hermes Tweet
+
+> **Public X/Twitter workflows for Hermes Agent.**
+> Research public conversations, monitor topics, and prepare guarded actions.
+
+- 🔎 **Research** — plan public X/Twitter queries and analyze live public data
+- 📣 **Social listening** — monitor topics, accounts, campaigns, and audience signals
+- 🔐 **Guarded actions** — draft posts, replies, reposts, likes, follows, or deletes for approval
+- 🧩 **Hermes native** — uses the Hermes Tweet plugin plus PyPI fallback setup
+
+[Full documentation →](hermes-tweet/README.md)
 
 ## Chrome Control
 
