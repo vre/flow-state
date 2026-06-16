@@ -43,7 +43,7 @@ import aiohttp
 from injection_defense import sanitize_result
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 9222
+DEFAULT_PORT = 9223
 
 
 class BiDiError(RuntimeError):
