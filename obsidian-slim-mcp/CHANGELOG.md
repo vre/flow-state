@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.0] - 2026-06-19
+
+### Added
+- Connection/setup diagnostics: failed calls return actionable onboarding messages instead of raw errors. Distinguishes missing API key, no server reachable (incl. the disabled-HTTP-port trap), HTTP pointed at the HTTPS port, TLS/certificate errors, and key rejected (401/403 — key wrong, or port belongs to a different vault).
+- `help` topic `setup` — first-time Obsidian/connection walkthrough.
+
+### Changed
+- `list`/`read` now propagate endpoint-wide errors (connection, auth, missing key) instead of swallowing them per-path, so setup help surfaces on the first failed call. Per-file 404s still return per-path errors.
+- Server `instructions` note one-server-per-vault and point to `help setup`.
+- README prerequisites clarify the HTTP server must be enabled (port 27123 ships disabled) and that port + key are a per-vault pair.
+
 ## [0.2.0] - 2026-05-04
 
 ### Added

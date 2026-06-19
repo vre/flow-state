@@ -12,8 +12,11 @@ Obsidian vault operations via Local REST API. Single-tool MCP server for Claude 
 
 ## Prerequisites
 
-- [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin enabled
-- `OBSIDIAN_API_KEY` env var set to the plugin's API key
+- [Obsidian Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin installed and enabled
+- **Enable the HTTP server** in the plugin settings. The plugin serves HTTPS on port **27124** by default and ships plain HTTP (port **27123**) *disabled* — this MCP defaults to `http://127.0.0.1:27123`, so the HTTP server must be turned on. HTTP is fine on localhost and avoids self-signed-cert hassle.
+- `OBSIDIAN_API_KEY` set to the plugin's API key and `OBSIDIAN_API_URL` to that vault's port. **Port and key are a pair — always copy both from the same vault's plugin settings.**
+
+Stuck? The MCP's error messages walk you through setup, or run `{action: "help", payload: "setup"}`.
 
 ## Install
 
@@ -81,6 +84,17 @@ CLI supports the same via flags or env vars:
 ```bash
 obsidian-cli --vault-url http://127.0.0.1:27125 --api-key work-key list
 ```
+
+## Troubleshooting
+
+The MCP returns actionable messages instead of raw errors. The common cases:
+
+- **`OBSIDIAN_API_KEY is not set`** — set the key (and `OBSIDIAN_API_URL`); the message says whether a server is already reachable.
+- **Nothing answering at the URL** — Obsidian closed, plugin disabled, or (most often) the HTTP server is off / you pointed at the wrong port. The plugin's HTTP port (27123) is disabled by default.
+- **Key rejected (401/403)** — either the key is wrong, *or* the key is fine but the port belongs to a **different vault**. The MCP can't tell which: re-copy the Server Port and API key together from the vault you intend to use.
+- **TLS / certificate error** — you pointed `https://` at the cert-protected port; switch to the plain HTTP endpoint on localhost.
+
+Run `{action: "help", payload: "setup"}` for the full setup walkthrough.
 
 ## Actions
 

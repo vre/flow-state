@@ -24,7 +24,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 mcp = FastMCP(
     "obsidian_slim_mcp",
-    instructions=("Use when reading, writing, searching, or managing notes in an Obsidian vault via the Local REST API plugin."),
+    instructions=(
+        "Use when reading, writing, searching, or managing notes in an Obsidian vault "
+        "via the Local REST API plugin. One server instance = one vault (the port in "
+        "OBSIDIAN_API_URL). If a call fails with a connection or auth error, the error "
+        "text carries the fix; for first-time setup run {action:'help', payload:'setup'}."
+    ),
 )
 
 
@@ -111,7 +116,9 @@ HELP_TOPICS = {
 {action: "read", payload: "index.md"} — read a file
 {action: "search", payload: "meeting notes"} — search vault
 {action: "help", payload: "patch"} — detailed help on patch
+{action: "help", payload: "setup"} — first-time Obsidian/connection setup
 """,
+    "setup": api.SETUP_GUIDE,
     "list": """# list — List directory contents
 
 ## Payload
@@ -535,6 +542,9 @@ async def use_obsidian(params: ObsidianAction) -> str:
     except ValueError as e:
         return f"Error: {e}"
     except Exception as e:
+        hint = await api.explain_error(e)
+        if hint:
+            return hint
         return f"Error: {e}. Try: action=help for usage."
 
 

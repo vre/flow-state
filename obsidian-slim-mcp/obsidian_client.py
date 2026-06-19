@@ -15,6 +15,75 @@ import yaml
 DEFAULT_BASE_URL = "http://127.0.0.1:27123"
 
 
+SETUP_GUIDE = """# Obsidian setup for this MCP (HTTP / localhost — recommended)
+
+1. In Obsidian: Settings → Community plugins → install "Local REST API", enable it.
+2. Open its settings. By default it serves HTTPS on port 27124; plain HTTP is OFF.
+3. Turn on "Enable Non-encrypted (HTTP) Server". HTTP is enough on localhost —
+   traffic never leaves the machine, and it avoids the self-signed-certificate
+   hassle of HTTPS. Note the HTTP port (default 27123).
+4. Per vault: every Obsidian vault that runs the plugin needs its OWN unique
+   "Server Port". Two open vaults on the same port collide — one wins, the other
+   looks broken.
+5. Copy the API key from the plugin settings. Configure this MCP with the port
+   and key FROM THE SAME VAULT — they are a pair, always copy them together:
+     OBSIDIAN_API_URL=http://127.0.0.1:<that vault's HTTP port>
+     OBSIDIAN_API_KEY=<that vault's API key>"""
+
+
+_NO_KEY_REACHABLE = (
+    "A Local REST API server is reachable at {url}, but OBSIDIAN_API_KEY is not "
+    "set — set it (from this vault's plugin settings) and you're done.\n\n"
+)
+
+_NO_KEY_UNREACHABLE = "OBSIDIAN_API_KEY is not set, and nothing is answering at {url} yet — both need fixing.\n\n"
+
+_UNAUTHED_MSG = (
+    "Reached a Local REST API server at {url}, but it rejected the key (HTTP "
+    "{code}). Two possible causes — this MCP cannot tell which:\n"
+    "  (a) the API key is wrong or stale for this vault, or\n"
+    "  (b) the key is fine, but {url}'s port belongs to a DIFFERENT vault that\n"
+    "      does not know this key.\n"
+    "Fix: open the vault you intend to use → its Local REST API settings → copy\n"
+    "BOTH the Server Port and the API key (they are a pair) and set them together:\n"
+    "  OBSIDIAN_API_URL=http://127.0.0.1:<that vault's port>\n"
+    "  OBSIDIAN_API_KEY=<that vault's key>"
+)
+
+_NO_SERVER_MSG = (
+    "Nothing is answering at {url}. Likely causes:\n"
+    "  - Obsidian is not open, or the Local REST API plugin is not enabled.\n"
+    "  - The HTTP server is off: the plugin ships HTTP (27123) DISABLED and only\n"
+    "    HTTPS (27124) on by default. If {url} is http://...:27123 you must enable\n"
+    "    the HTTP server first.\n"
+    "  - {url}'s port belongs to a different (closed) vault.\n\n"
+)
+
+_WRONG_PORT_MSG = (
+    "{url} points at port 27124 over plain HTTP, but 27124 is the plugin's HTTPS\n"
+    "port. Either switch this MCP to the HTTP port (default 27123, after enabling\n"
+    "the HTTP server), or use https://127.0.0.1:27124 and trust the self-signed\n"
+    "certificate.\n\n"
+)
+
+_HTTPS_CERT_MSG = (
+    "TLS/certificate error talking to {url}. The plugin uses a self-signed\n"
+    "certificate. On localhost the simplest fix is the plain HTTP endpoint: enable\n"
+    "the HTTP server and set OBSIDIAN_API_URL=http://127.0.0.1:27123. (Otherwise\n"
+    "trust the cert at {url}/obsidian-local-rest-api.crt.)\n\n"
+)
+
+# httpx transport errors that mean the whole endpoint is unreachable/misconfigured
+# (as opposed to a per-file 404). Used both to re-raise from batch helpers and to
+# classify in explain_error().
+_TRANSPORT_ERRORS = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadError,
+    httpx.RemoteProtocolError,
+)
+
+
 def _base_url() -> str:
     return os.environ.get("OBSIDIAN_API_URL", DEFAULT_BASE_URL).rstrip("/")
 
@@ -157,6 +226,8 @@ async def list_dirs(paths: list[str]) -> dict[str, dict]:
             r.raise_for_status()
             return path, r.json()
         except Exception as e:
+            if _is_endpoint_error(e):
+                raise
             return path, {"error": f"ERROR: {e}"}
 
     async with _client() as c:
@@ -209,6 +280,8 @@ async def read_files(
             r.raise_for_status()
             return path, r.json() if as_json else r.text
         except Exception as e:
+            if _is_endpoint_error(e):
+                raise
             return path, f"ERROR: {e}"
 
     async with _client() as c:
@@ -620,3 +693,58 @@ async def server_status() -> dict[str, Any]:
         r = await c.get("/")
         r.raise_for_status()
         return r.json()
+
+
+# --- Diagnostics ---
+
+
+def _is_endpoint_error(exc: BaseException) -> bool:
+    """True if exc means the whole endpoint is unreachable or unauthorized.
+
+    Such errors affect every request identically, so batch helpers re-raise them
+    instead of swallowing them per-path — letting the MCP layer surface setup help.
+    A per-file 404 is NOT an endpoint error.
+    """
+    if isinstance(exc, RuntimeError) and "OBSIDIAN_API_KEY" in str(exc):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (401, 403)
+    return isinstance(exc, _TRANSPORT_ERRORS)
+
+
+async def _server_reachable() -> bool:
+    """Probe GET / (no auth). True if a server answers at the configured URL."""
+    try:
+        async with _client() as c:
+            r = await c.get("/")
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
+async def explain_error(exc: BaseException) -> str | None:
+    """Translate a transport/config error into an actionable setup message.
+
+    Returns an enriched, onboarding-oriented message, or None when the error is a
+    normal operation error (e.g. 404 file not found) the caller should surface as-is.
+    """
+    url = _base_url()
+
+    # No API key configured — probe to report whether a server is even up.
+    if isinstance(exc, RuntimeError) and "OBSIDIAN_API_KEY" in str(exc):
+        head = _NO_KEY_REACHABLE if await _server_reachable() else _NO_KEY_UNREACHABLE
+        return head.format(url=url) + SETUP_GUIDE
+
+    # Key rejected — port/key/vault mismatch (cannot tell which from the response).
+    if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (401, 403):
+        return _UNAUTHED_MSG.format(url=url, code=exc.response.status_code)
+
+    # Transport problem — distinguish wrong-protocol from no-server by URL shape.
+    if isinstance(exc, _TRANSPORT_ERRORS):
+        if url.startswith("https"):
+            return _HTTPS_CERT_MSG.format(url=url) + SETUP_GUIDE
+        if ":27124" in url:
+            return _WRONG_PORT_MSG.format(url=url) + SETUP_GUIDE
+        return _NO_SERVER_MSG.format(url=url) + SETUP_GUIDE
+
+    return None

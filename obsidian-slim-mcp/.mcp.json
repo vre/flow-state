@@ -8,7 +8,8 @@
       "obsidian-slim-mcp"
     ],
     "env": {
-      "OBSIDIAN_API_KEY": "YOUR_API_KEY_HERE"
+      "OBSIDIAN_API_KEY": "YOUR_API_KEY_HERE",
+      "OBSIDIAN_API_URL": "http://127.0.0.1:27123"
     }
   }
 }
