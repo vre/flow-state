@@ -6,6 +6,7 @@
 |--------|------|---------|
 | [Youtube to Markdown](#youtube-to-markdown) | skill | `/plugin install youtube-to-markdown@flow-state` |
 | [IMAP Slim MCP](#imap-slim-mcp) | mcp | `/plugin install imap-slim-mcp@flow-state` |
+| [Xquik X/Twitter Data](#xquik-xtwitter-data) | skill | `/plugin install x-twitter-scraper@flow-state` |
 | [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
 | [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
 
@@ -38,6 +39,18 @@
 - 🏢 **Multi-account** — multiple account support with named switching
 
 [Full documentation →](imap-slim-mcp/README.md)
+
+## Xquik X/Twitter Data
+
+> **X/Twitter Data, Routed Through Xquik.**
+> Plan API, MCP, SDK, webhook, export, monitor, and confirmation-gated action workflows.
+
+- 🔎 **Focused routing** - choose the narrowest Xquik path for each data workflow
+- 🔌 **Agent-ready setup** - MCP, SDK, OpenAPI, webhook, and dashboard integration guidance
+- 🔐 **Explicit approval gates** - private reads, persistent work, and writes require confirmation
+- 🧭 **Current docs first** - checks Xquik docs and OpenAPI before unfamiliar calls
+
+[Full documentation →](x-twitter-scraper/README.md)
 
 ## Chrome Control
 

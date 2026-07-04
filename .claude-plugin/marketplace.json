@@ -28,6 +28,15 @@
       "keywords": ["email", "imap", "mcp"]
     },
     {
+      "name": "x-twitter-scraper",
+      "source": "./x-twitter-scraper",
+      "description": "Plan Xquik X/Twitter data workflows through REST API routing, MCP setup, SDKs, webhooks, exports, monitoring, and confirmation-gated actions.",
+      "version": "1.0.0",
+      "category": "social-data",
+      "keywords": ["x", "twitter", "xquik", "api", "mcp", "sdk", "webhooks", "monitoring", "exports"],
+      "skills": ["./"]
+    },
+    {
       "name": "chrome-control",
       "source": "./chrome-control",
       "description": "Control Chrome via CDP — debug web apps, run JavaScript, take screenshots, monitor console. Connects to your running Chrome session (M144+) or launches a separate instance.",
