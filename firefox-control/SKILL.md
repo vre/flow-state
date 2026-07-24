@@ -1,12 +1,12 @@
 ---
 name: firefox-control
-description: Use when you need to automate Firefox via WebDriver BiDi — tab listing, JS evaluation, screenshots, DOM helpers. TEST TOOL — Firefox sets navigator.webdriver=true.
+description: Use to automate web browsing via Firefox WebDriver BiDi — tab listing, JS evaluation, screenshots, DOM helpers.
 ---
 
 # Firefox Control
 
 Control Firefox via WebDriver BiDi on port 9223. Direct BiDi WebSocket,
-no geckodriver. Port 9223 because Chrome CDP occupies 9222.
+no geckodriver. Use port 9223 because more popular Chrome CDP occupies 9222.
 
 Launch Firefox: `firefox --remote-debugging-port 9223`
 
@@ -16,6 +16,9 @@ system. No toggle exists. Use Chrome CDP for production automation.
 ## Usage
 
 Just run a command — the daemon auto-starts on first call and connects to Firefox on port 9223. If Firefox isn't running or doesn't have remote debugging enabled, the error message will say so.
+
+Full command list: `uv run firefoxctl.py --help`
+Per-command help: `uv run firefoxctl.py COMMAND --help`
 
 Always use `uv run` (PEP 723 inline dependencies):
 
