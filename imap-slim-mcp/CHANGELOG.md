@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+- `mcp` is pinned below 2. The dependency was `mcp>=1.0.0` with no upper bound, and mcp 2.x renamed
+  `FastMCP` to `MCPServer`, removing `mcp.server.fastmcp` entirely - so a fresh install resolved
+  2.1.1 and the server died at import with `ModuleNotFoundError: No module named
+  'mcp.server.fastmcp'`. The plugin was dead on arrival for anyone installing it today; existing
+  installs only worked because their environment still held a 1.x resolved earlier. Migrating to
+  the 2.x API is a separate decision
+
 ### Changed
 - `format` is now a **required top-level parameter** on draft actions, not a key inside the payload
   JSON. Everything inside `payload` is a JSON string, so none of it ever reached the tool schema -
