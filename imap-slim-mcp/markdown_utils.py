@@ -7,6 +7,7 @@ Pure functions for:
 """
 
 import re
+from typing import Literal
 
 import markdown
 from pymdownx import emoji
@@ -18,6 +19,7 @@ MARKDOWN_EXTENSIONS = [
     "pymdownx.mark",  # ==highlight==
     "pymdownx.betterem",  # smarter bold/italic
     "pymdownx.emoji",  # :emoji: shortcodes
+    "nl2br",  # a newline inside a paragraph becomes <br>, as every mail composer does
 ]
 
 # Extension configurations
@@ -28,6 +30,15 @@ MARKDOWN_EXTENSION_CONFIGS = {
 }
 
 VALID_FORMATS = {"markdown", "plain"}
+
+# A line that is nothing but a run of one marker character, optionally indented
+# and optionally quoted: an ASCII rule or a setext underline, not emphasis.
+_MARKER_RUN_LINE = re.compile(r"^[ \t]*(?:>[ \t]*)*([*_=~])\1{2,}[ \t]*$")
+
+# Keeps every separator as its own element so CRLF, LF and bare CR all survive.
+# splitlines() is not used: it also recognises other Unicode line breaks and
+# would rewrite them.
+_LINE_SPLIT = re.compile(r"(\r\n|\n|\r)")
 
 # URL pattern for autolinking (no email - avoids obfuscation issues)
 # Negative lookbehind: skip URLs already in href="..."
@@ -97,29 +108,12 @@ def preprocess_markdown(text: str) -> str:
     return "\n".join(result)
 
 
-def markdown_to_plain(text: str) -> str:
-    """Convert markdown to pre-markdown plain text (Gmail style).
+def _apply_plain_substitutions(text: str) -> str:
+    """The five conversions, over the whole body and in this order.
 
-    Converts:
-    - **bold** or __bold__ -> *bold*
-    - [text](url) -> text <url>
-    - ~~strike~~ -> text (markers removed for screen reader accessibility)
-    - ==highlight== -> text (markers removed for screen reader accessibility)
-
-    Preserves:
-    - *italic* (unchanged)
-    - Lists, headings, blockquotes (unchanged)
-    - Checkboxes (unchanged)
-
-    Args:
-        text: Markdown text
-
-    Returns:
-        Pre-markdown plain text suitable for email text/plain part
+    Whole-body matters: the link expression spans newlines because both negated
+    classes match them, so per-line processing would silently drop multi-line links.
     """
-    if not text:
-        return text
-
     # **bold** or __bold__ -> *bold*
     text = re.sub(r"\*\*(.+?)\*\*", r"*\1*", text)
     text = re.sub(r"__(.+?)__", r"*\1*", text)
@@ -136,14 +130,70 @@ def markdown_to_plain(text: str) -> str:
     return text
 
 
-def convert_body(body: str, format_type: str = "markdown") -> tuple[str | None, str]:
-    """Convert email body to HTML and plain text.
+def markdown_to_plain(text: str) -> str:
+    """Convert markdown to pre-markdown plain text (Gmail style).
 
-    Eliminates duplication between create_draft and modify_draft.
+    Converts:
+    - **bold** or __bold__ -> *bold*
+    - [text](url) -> text <url>
+    - ~~strike~~ -> text (markers removed for screen reader accessibility)
+    - ==highlight== -> text (markers removed for screen reader accessibility)
+
+    Preserves:
+    - *italic* (unchanged)
+    - Lists, headings, blockquotes (unchanged)
+    - A line that is only a run of markers: an ASCII rule such as "=====" is not
+      emphasis, and the unguarded expressions turned it into "=".
 
     Args:
-        body: Raw body text (markdown or plain)
-        format_type: "markdown" (default) or "plain"
+        text: Markdown text
+
+    Returns:
+        Pre-markdown plain text suitable for email text/plain part
+    """
+    if not text:
+        return text
+
+    nonce = "0"
+    while True:
+        base = f"\x00{nonce}\x00"
+        if base in text:
+            nonce += "0"
+            continue
+
+        parts = _LINE_SPLIT.split(text)
+        saved: dict[str, str] = {}
+        for index in range(0, len(parts), 2):
+            if _MARKER_RUN_LINE.match(parts[index]):
+                token = f"{base}{len(saved)}\x00"
+                saved[token] = parts[index]
+                parts[index] = token
+
+        converted = _apply_plain_substitutions("".join(parts))
+
+        # The base being absent from the input is not enough: a substitution can
+        # synthesise a token. "\x00==0==\x00==0==\x00" becomes "\x000\x000\x00",
+        # which is token 0, and restoring would rewrite that user text.
+        if any(converted.count(token) != 1 for token in saved):
+            nonce += "0"
+            continue
+
+        for token, original in saved.items():
+            converted = converted.replace(token, original)
+        return converted
+
+
+def convert_body(body: str, format_type: Literal["markdown", "plain"]) -> tuple[str | None, str]:
+    """Convert email body to HTML and plain text.
+
+    Eliminates duplication between create_draft and modify_draft. There is
+    deliberately no default: a silent default is what let a caller send markdown
+    believing it was sending plain text.
+
+    Args:
+        body: Raw body text
+        format_type: "markdown" renders HTML plus a plain alternative; "plain"
+            sends the body verbatim with no HTML part.
 
     Returns:
         Tuple of (html_body, plain_body)
@@ -152,8 +202,8 @@ def convert_body(body: str, format_type: str = "markdown") -> tuple[str | None, 
     """
     if format_type not in VALID_FORMATS:
         raise ValueError(
-            f"Unknown format '{format_type}'. Use 'markdown' (default, converts to HTML) or 'plain' (text only). "
-            "Write your email in markdown - we handle the HTML conversion."
+            f"Unknown format '{format_type}'. Use 'markdown' (renders HTML plus a plain alternative) "
+            "or 'plain' (sent verbatim, no HTML). Both are explicit; there is no default."
         )
 
     if format_type == "markdown":

@@ -21,6 +21,7 @@ Usage with Claude Desktop/Code:
 import json
 import re
 from pathlib import Path
+from typing import Literal
 
 import html2text
 from imap_client import (
@@ -122,6 +123,13 @@ def classify_connection_error(exc: BaseException) -> str | None:
     return None
 
 
+def _format_description(format_type: str) -> str:
+    """One line naming what the body was actually turned into."""
+    if format_type == "plain":
+        return "plain text only"
+    return "markdown \u2192 HTML + plain text"
+
+
 def format_flags(flags: list[str]) -> str:
     """Format IMAP flags for display: [seen,flagged] #keyword."""
     std_flags = []
@@ -212,7 +220,7 @@ class MailAction(BaseModel):
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,format?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
@@ -220,6 +228,10 @@ class MailAction(BaseModel):
     )
     account: str | None = Field(
         default=None, description="Account name for multi-account setups. Use 'accounts' action to list. Default account used if omitted."
+    )
+    format: Literal["markdown", "plain"] | None = Field(
+        default=None,
+        description="Body format, required for draft. 'markdown': rendered to HTML plus a plain alternative; a newline is a line break, a blank line a paragraph. 'plain': sent exactly as written, no HTML.",
     )
 
     @field_validator("action")
@@ -235,6 +247,15 @@ class MailAction(BaseModel):
     def validate_preview_required(self) -> "MailAction":
         if self.action in {"list", "search"} and self.preview is None:
             raise ValueError("preview parameter required for list/search (true=include body snippets, false=headers only)")
+        return self
+
+    @model_validator(mode="after")
+    def validate_format_required(self) -> "MailAction":
+        if self.action == "draft" and self.format is None:
+            raise ValueError(
+                "format parameter required for draft: 'markdown' (rendered to HTML plus a plain "
+                "alternative; newline = line break) or 'plain' (sent exactly as written, no HTML)"
+            )
         return self
 
 
@@ -263,7 +284,7 @@ List inbox: {action: "list", folder: "INBOX", preview: false}
 List with snippets: {action: "list", folder: "INBOX", preview: true}
 Read message: {action: "read", folder: "INBOX", payload: "123"}
 Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com", preview: true}
-Create draft: {action: "draft", folder: "INBOX", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
+Create draft: {action: "draft", folder: "INBOX", format: "markdown", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
 Edit draft: {action: "edit", folder: "Drafts", payload: '{"id":1253,"replacements":[{"old":"foo","new":"bar"}]}'}
 Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 """,
@@ -336,31 +357,39 @@ Output includes `[att:N]` when a message has attachments. Set `preview: true` to
 Creates a new draft or modifies an existing one.
 
 ## Create New Draft
-- payload: JSON with to, subject, body (required), in_reply_to, cc, format, attachments (optional)
+- format: "markdown" or "plain" - REQUIRED, top-level parameter, not inside the payload
+- payload: JSON with to, subject, body (required), in_reply_to, cc, attachments (optional)
 
-{action: "draft", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
+{action: "draft", format: "markdown", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
 
 ## Attachments
 - attachments: list of absolute file paths
 - Max 25 MB per file. MIME type auto-detected.
 - Works with both create and modify
 
-{action: "draft", payload: '{"to":"x@y.com","subject":"Report","body":"See attached","attachments":["/path/to/file.pdf"]}'}
+{action: "draft", format: "markdown", payload: '{"to":"x@y.com","subject":"Report","body":"See attached","attachments":["/path/to/file.pdf"]}'}
 
-## Format
-- "markdown" (default): HTML + plain text. Supports: **bold**, *italic*, ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes
-- "plain": plain text only
+## Format (required, top-level)
+- "markdown": renders an HTML part plus a plain-text alternative. Supports **bold**, *italic*,
+  ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes.
+  A newline inside a paragraph becomes a line break; a blank line starts a new paragraph.
+  Markdown block syntax still wins: "Title" followed by a line of "=" is a heading, not a rule.
+  Fenced code blocks and tables are NOT supported yet.
+- "plain": the body is sent exactly as written, plain text only, no HTML part. Nothing is
+  interpreted, so ASCII art and rule lines survive untouched.
+- There is no default. Omitting it is an error.
 
 ## Modify Existing Draft
-- payload: JSON with id (required), body (required), subject/to/cc/format/attachments (optional)
+- format: required here too
+- payload: JSON with id (required), body (required), subject/to/cc/attachments (optional)
 - Preserves In-Reply-To, References, and existing attachments
 
-{action: "draft", folder: "Drafts", payload: '{"id":1253,"body":"Updated..."}'}
+{action: "draft", folder: "Drafts", format: "markdown", payload: '{"id":1253,"body":"Updated..."}'}
 
 ## Forward Attachment Workflow
 1. Use 'read' to see attachments
 2. Use 'attachment' to download: {action: "attachment", payload: "msg_id:index"}
-3. Use 'draft' with attachments: the downloaded file path
+3. Use 'draft' with attachments and a format: the downloaded file path
 
 ## Reply Workflow
 1. Use 'read' to get message (note message_id for replies)
@@ -494,7 +523,7 @@ async def use_mail(params: MailAction) -> str:
       {action:"read", folder:"INBOX", payload:"123:1"} - include previous quoted layer
       {action:"read", folder:"INBOX", payload:"123:full"} - read full message without truncation
       {action:"search", folder:"INBOX", payload:"from:x@y.com", preview:true}
-      {action:"draft", payload:'{"to":"x","subject":"y","body":"z"}'}
+      {action:"draft", format:"markdown", payload:'{"to":"x","subject":"y","body":"**md** body"}'} - format is required: markdown renders HTML+plain (newline=<br>), plain is sent verbatim
       {action:"edit", folder:"Drafts", payload:'{"id":1253,"replacements":[{"old":"x","new":"y"}]}'}
       {action:"flag", folder:"INBOX", payload:"123:+Flagged,-Seen"} - toggle flags (Seen/Flagged/Deleted/etc). Marks only, no expunge
       {action:"attachment", folder:"INBOX", payload:"123:0"} - save email attachment to temp file, returns path
@@ -835,6 +864,14 @@ uv run --directory {plugin_dir} python setup.py
             except json.JSONDecodeError as e:
                 return f"Error: Invalid JSON in payload: {e}"
 
+            # Only a key of a decoded object: payload='"format"' decodes to a
+            # string, where there is no key to forbid.
+            if isinstance(draft_data, dict) and "format" in draft_data:
+                return (
+                    "Error: 'format' no longer goes inside the payload. Pass it as a top-level "
+                    'parameter instead: {action:"draft", format:"markdown"|"plain", payload:\'{...}\'}'
+                )
+
             # Modify existing draft if 'id' provided
             if "id" in draft_data:
                 if not folder:
@@ -843,7 +880,7 @@ uv run --directory {plugin_dir} python setup.py
                     return "Error: 'body' required for modify"
 
                 body = draft_data["body"]
-                format_type = draft_data.get("format", "markdown")
+                format_type = params.format
                 html_body, plain_body = convert_body(body, format_type)
 
                 # Parse and validate attachments
@@ -871,6 +908,7 @@ uv run --directory {plugin_dir} python setup.py
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
+**Format:** {_format_description(format_type)}
 **Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""
@@ -882,7 +920,7 @@ Open Thunderbird → Drafts to review and send."""
                 return f"Error: Missing required fields: {', '.join(missing)}"
 
             body = draft_data["body"]
-            format_type = draft_data.get("format", "markdown")
+            format_type = params.format
             html_body, plain_body = convert_body(body, format_type)
 
             # Parse and validate attachments
@@ -909,6 +947,7 @@ Open Thunderbird → Drafts to review and send."""
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
+**Format:** {_format_description(format_type)}
 **Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""

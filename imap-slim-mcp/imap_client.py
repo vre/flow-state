@@ -24,7 +24,6 @@ import keyring
 from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
 from imapclient.exceptions import IMAPClientAbortError
-from markdown_utils import convert_body
 
 SERVICE_NAME = "imap-slim"
 _LEGACY_SERVICE_NAME = "imap-stream"
@@ -1496,6 +1495,20 @@ def edit_draft(folder: str, message_id: int, replacements: list[dict], account: 
 
         plain_body, html_body = _extract_draft_bodies(original_msg)
 
+    # Surgical replacement runs on the plain part, and the HTML part would have
+    # to be regenerated from it. The plain part is the lossy projection, so a
+    # single edit turns <strong> into <em> and drops <del> and <mark> entirely.
+    # Nothing stores the source, so this cannot be done correctly - refuse.
+    # Not a test of "was this markdown": a rich-text draft from any mail client
+    # has an HTML body too, and it is just as unpreservable.
+    if html_body is not None:
+        raise IMAPError(
+            f"Message {message_id} has an HTML body, which a text replacement cannot preserve - "
+            "bold would become italic and strikethrough and highlight would be dropped. "
+            'Send the whole body instead: {action:"draft", format:..., payload:\'{"id":'
+            f'{message_id},"body":"..."}}\'}}'
+        )
+
     for idx, repl in enumerate(replacements):
         if not isinstance(repl, dict) or "old" not in repl or "new" not in repl:
             raise IMAPError(f"Replacement [{idx}] must be an object with 'old' and 'new' fields")
@@ -1518,15 +1531,11 @@ def edit_draft(folder: str, message_id: int, replacements: list[dict], account: 
 
         plain_body = plain_body.replace(old, new, 1)
 
-    new_html = None
-    if html_body is not None:
-        new_html, _ = convert_body(plain_body, "markdown")
-
     result = modify_draft(
         folder=folder,
         message_id=message_id,
         body=plain_body,
-        html=new_html,
+        html=None,
         account=account,
         prefetched_draft=(envelope, original_msg),
     )

@@ -111,13 +111,10 @@ class TestConvertBody:
         assert html is None
         assert plain == "Plain text only"
 
-    def test_default_format_is_markdown(self):
-        """Default format should be markdown."""
-        body = "**Bold**"
-        html, plain = convert_body(body)
-
-        assert html is not None
-        assert "<strong>Bold</strong>" in html
+    def test_there_is_no_default_format(self):
+        """Superseded: a silent default let callers send markdown believing it was plain."""
+        with pytest.raises(TypeError):
+            convert_body("**Bold**")
 
     def test_markdown_with_strikethrough(self):
         """Markdown should support strikethrough extension."""
@@ -194,3 +191,121 @@ class TestMarkdownConstants:
     def test_emoji_config_uses_unicode(self):
         """Emoji config should use unicode output, not CDN."""
         assert "pymdownx.emoji" in MARKDOWN_EXTENSION_CONFIGS
+
+
+class TestPlainIsOnlyPlain:
+    """AC3: plain mode interprets nothing."""
+
+    def test_ascii_art_survives_byte_for_byte(self):
+        art = "  +---+---+\n  | X | O |\n  +---+---+\n  ===== 5 =====\n\ttabbed\n"
+        html, plain = convert_body(art, "plain")
+        assert html is None
+        assert plain == art
+
+
+class TestLineBreaks:
+    """AC4: a newline inside a paragraph is a line break."""
+
+    def test_signature_block_keeps_its_breaks(self):
+        body = "Terveisin\nVille Reijonen\nItio Consulting Oy"
+        html, plain = convert_body(body, "markdown")
+        assert "Terveisin<br />" in html
+        assert "Ville Reijonen<br />" in html
+        assert plain == body
+
+    def test_blank_line_still_separates_paragraphs(self):
+        html, _ = convert_body("one\n\ntwo", "markdown")
+        assert html.count("<p>") == 2
+        assert "<br />" not in html
+
+
+class TestSupportedBlocks:
+    """AC5: blocks this renderer actually supports."""
+
+    def test_list_and_paragraph(self):
+        html, _ = convert_body("- a\n- b\n\npara one\nline two", "markdown")
+        assert "<ul>" in html and "<li>a</li>" in html and "<li>b</li>" in html
+        list_html = html[html.index("<ul>") : html.index("</ul>")]
+        assert "<br />" not in list_html
+        assert "<p>para one<br />" in html
+
+    def test_heading_and_blockquote(self):
+        assert "<h1>Otsikko</h1>" in convert_body("# Otsikko\n\nteksti", "markdown")[0]
+        assert "<blockquote>" in convert_body("teksti\n\n> lainaus", "markdown")[0]
+
+    def test_consecutive_quote_lines_split_known_limitation(self):
+        """Pinned so cut 1b changes it deliberately.
+
+        preprocess_markdown inserts a blank line between consecutive '>' lines, so
+        nl2br cannot make a quoted line break. Two paragraphs, one blockquote.
+        """
+        html, _ = convert_body("> first\n> second", "markdown")
+        assert html.count("<blockquote>") == 1
+        assert html.count("<p>") == 2
+
+
+class TestMarkerRunLines:
+    """AC6: an ASCII rule is not emphasis."""
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "=====",
+            "~~~~~",
+            "*****",
+            "_____",
+            "______",
+            "~~~~~~",
+            "******",
+            "=======",
+            "  =====  ",
+            "\t*****\t",
+            "> =====",
+            ">> *****",
+            "> > _____",
+            "=====\n",
+            "=====\r",
+            "a\r=====\rb",
+            "Terveisin\n=====\nVille",
+            "Terveisin\r\n=====\r\nVille\r\n",
+            "\x000\x00 literal\n=====\n",
+            "\x0000\x00 literal\n=====\n",
+            "\x0001\x00 literal\n=====\n=====\n",
+        ],
+    )
+    def test_marker_run_lines_are_untouched(self, text):
+        assert markdown_to_plain(text) == text
+
+    def test_many_protected_lines_do_not_collide(self):
+        body = "\n".join(["====="] * 11 + ["a ==x== b"])
+        assert markdown_to_plain(body) == "\n".join(["====="] * 11 + ["a x b"])
+
+    def test_a_substitution_cannot_synthesise_the_shield_token(self):
+        """The prefix rule keeps tokens out of the input; it cannot stop the
+        substitutions from manufacturing one. '\\x00==0==\\x00==0==\\x00' collapses
+        to exactly token 0, and restoring it would rewrite the user's text."""
+        assert markdown_to_plain("\x00==0==\x00==0==\x00\n=====") == "\x000\x000\x00\n====="
+
+    @pytest.mark.parametrize(
+        "text,want",
+        [
+            ("***bold italic***", "**bold italic**"),
+            ("~~a~~~~b~~", "ab"),
+            ("==a====b==", "ab"),
+            ("**a****b**", "*a**b*"),
+            ("**bold**", "*bold*"),
+            ("a ~~b~~ c", "a b c"),
+            ("a ==x== b", "a x b"),
+            ("[t](http://x)", "t <http://x>"),
+            ("[long label\ncontinued](https://example.com)", "long label\ncontinued <https://example.com>"),
+            (
+                "[alpha\n=====\nomega](https://example.com)\n~~~~~",
+                "alpha\n=====\nomega <https://example.com>\n~~~~~",
+            ),
+            ("**bold\ncontinued**", "**bold\ncontinued**"),
+            ("# Heading\n\n- list item\n\n> quote", "# Heading\n\n- list item\n\n> quote"),
+            ("", ""),
+        ],
+    )
+    def test_inline_behaviour_is_unchanged(self, text, want):
+        assert markdown_to_plain(text) == want

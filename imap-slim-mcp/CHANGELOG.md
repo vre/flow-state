@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Changed
+- `format` is now a **required top-level parameter** on draft actions, not a key inside the payload
+  JSON. Everything inside `payload` is a JSON string, so none of it ever reached the tool schema -
+  no type, no enum, no description - which is why a session had no way to learn that its draft body
+  was markdown without opening the help. It now appears in the served schema with its two values
+- There is no default format at any layer, including `convert_body`. A silent default is what let a
+  caller send markdown while believing it was sending plain text
+- `format` inside the draft payload is now an explicit error naming the new parameter
+- `edit` refuses any draft that carries an HTML body. It re-rendered the HTML from the stored plain
+  part, which is the lossy projection, so one replacement to an unrelated word turned `<strong>`
+  into `<em>` and dropped `<del>` and `<mark>` entirely. Nothing stores the source, so it cannot be
+  done correctly - send the whole body with a draft-modify instead. Editing a plain draft is
+  unchanged
+
+### Fixed
+- A newline inside a paragraph is now a line break in the HTML part (`nl2br`). A signature block
+  arrived as one running line, and the HTML and plain alternatives of the same message disagreed
+- A line that is only a run of `=`, `~`, `*` or `_` survives into the plain part. `=====` became
+  `=`, `*****` became `***`, `_____` became `*_*` - an ASCII rule is not emphasis. Indented and
+  quoted rules, CRLF and bare CR are all covered
+
 ### Fixed
 - Connection recovery: a call made after an idle pause paid a full 30 s socket timeout before it could
   reconnect. A connection believed dead is now dropped with `shutdown()`, which sends nothing, and one

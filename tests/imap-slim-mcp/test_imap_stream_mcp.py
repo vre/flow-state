@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -501,6 +502,7 @@ class TestDraftAttachmentPayload:
         await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":["/tmp/file.pdf"]}',
             )
         )
@@ -515,6 +517,7 @@ class TestDraftAttachmentPayload:
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":"/tmp/file.pdf"}',
             )
         )
@@ -541,6 +544,7 @@ class TestDraftAttachmentPayload:
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 payload='{"to":"r@example.com","subject":"Report","body":"See attached","attachments":["/tmp/report.pdf","/tmp/data.csv"]}',
             )
         )
@@ -565,6 +569,7 @@ class TestDraftAttachmentPayload:
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 folder="Drafts",
                 payload='{"id":1,"body":"Updated","attachments":["/tmp/new.txt"]}',
             )
@@ -580,6 +585,7 @@ class TestDraftAttachmentPayload:
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":[123]}',
             )
         )
@@ -593,32 +599,42 @@ class TestDraftFormatValidation:
     """Tests for draft format validation and error handling."""
 
     @patch("imap_stream_mcp.create_draft")
-    async def test_draft_invalid_format_returns_clean_error(self, mock_create):
-        """Invalid format should return actionable error without exception type prefix."""
+    async def test_format_inside_payload_is_rejected(self, mock_create):
+        """Superseded: format is a top-level parameter, not a payload key."""
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"**text**","format":"html"}',
             )
         )
 
-        assert "Error: Unknown format 'html'" in result
-        assert "ValueError:" not in result
+        assert "no longer goes inside the payload" in result
+        assert "top-level" in result
         mock_create.assert_not_called()
 
     @patch("imap_stream_mcp.modify_draft")
-    async def test_modify_draft_invalid_format_returns_error(self, mock_modify):
-        """Invalid format in modify payload should fail before modify_draft call."""
+    async def test_format_inside_modify_payload_is_rejected(self, mock_modify):
+        """Same for the modify branch."""
         result = await use_mail(
             MailAction(
                 action="draft",
+                format="markdown",
                 folder="Drafts",
                 payload='{"id":1,"body":"**Updated**","format":"html"}',
             )
         )
 
-        assert "Error: Unknown format 'html'" in result
+        assert "no longer goes inside the payload" in result
         mock_modify.assert_not_called()
+
+    def test_draft_without_format_is_rejected(self):
+        """Choosing is mandatory; there is no silent default."""
+        with pytest.raises(ValidationError) as exc:
+            MailAction(action="draft", payload='{"to":"a","subject":"b","body":"c"}')
+
+        message = str(exc.value)
+        assert "format" in message and "markdown" in message and "plain" in message
 
     @patch("imap_stream_mcp.create_draft")
     async def test_draft_plain_format_still_works(self, mock_create):
@@ -634,12 +650,16 @@ class TestDraftFormatValidation:
         result = await use_mail(
             MailAction(
                 action="draft",
-                payload='{"to":"r@example.com","subject":"Test","body":"plain body","format":"plain"}',
+                format="plain",
+                payload='{"to":"r@example.com","subject":"Test","body":"plain body"}',
             )
         )
 
         assert "# Draft Created" in result
+        assert "**Format:** plain text only" in result
         mock_create.assert_called_once()
+        assert mock_create.call_args.kwargs["html"] is None, "plain must not produce an HTML part"
+        assert mock_create.call_args.kwargs["body"] == "plain body"
 
 
 class TestEditAction:
@@ -765,9 +785,104 @@ class TestEditAction:
         result = await use_mail(
             MailAction(
                 action="draft",
-                payload='{"to":"r@example.com","subject":"Test","body":"**bold**","format":"markdown"}',
+                format="markdown",
+                payload='{"to":"r@example.com","subject":"Test","body":"**bold**"}',
             )
         )
 
         assert "# Draft Created" in result
         mock_create.assert_called_once()
+
+
+class TestTopLevelFormatControlsTheDraft:
+    """AC1/AC7: the parameter must reach the message, not just the validator.
+
+    Without these the suite passes while params.format is ignored and both
+    branches still read the superseded payload key.
+    """
+
+    RESULT = {
+        "status": "created",
+        "folder": "Drafts",
+        "to": "r@example.com",
+        "subject": "Test",
+        "message_id": "<x@y>",
+        "preserved_reply_to": False,
+    }
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_create_plain_sends_no_html(self, mock_create):
+        mock_create.return_value = dict(self.RESULT)
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                format="plain",
+                payload='{"to":"r@example.com","subject":"T","body":"**not bold**"}',
+            )
+        )
+        assert mock_create.call_args.kwargs["html"] is None
+        assert mock_create.call_args.kwargs["body"] == "**not bold**"
+        assert "**Format:** plain text only" in result
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_create_markdown_sends_both(self, mock_create):
+        mock_create.return_value = dict(self.RESULT)
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                format="markdown",
+                payload='{"to":"r@example.com","subject":"T","body":"**bold**"}',
+            )
+        )
+        assert "<strong>bold</strong>" in mock_create.call_args.kwargs["html"]
+        assert mock_create.call_args.kwargs["body"] == "*bold*"
+        assert "**Format:** markdown" in result
+
+    @patch("imap_stream_mcp.modify_draft")
+    async def test_modify_plain_sends_no_html(self, mock_modify):
+        mock_modify.return_value = dict(self.RESULT)
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                folder="Drafts",
+                format="plain",
+                payload='{"id":1,"body":"**not bold**"}',
+            )
+        )
+        assert mock_modify.call_args.kwargs["html"] is None
+        assert mock_modify.call_args.kwargs["body"] == "**not bold**"
+        assert "**Format:** plain text only" in result
+
+    @patch("imap_stream_mcp.modify_draft")
+    async def test_modify_markdown_sends_both(self, mock_modify):
+        mock_modify.return_value = dict(self.RESULT)
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                folder="Drafts",
+                format="markdown",
+                payload='{"id":1,"body":"**bold**"}',
+            )
+        )
+        assert "<strong>bold</strong>" in mock_modify.call_args.kwargs["html"]
+        assert "**Format:** markdown" in result
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_the_word_format_in_the_body_is_harmless(self, mock_create):
+        mock_create.return_value = dict(self.RESULT)
+        result = await use_mail(
+            MailAction(
+                action="draft",
+                format="plain",
+                payload='{"to":"r@example.com","subject":"T","body":"the word format is harmless"}',
+            )
+        )
+        assert "# Draft Created" in result
+        mock_create.assert_called_once()
+
+    @patch("imap_stream_mcp.create_draft")
+    async def test_a_payload_that_is_not_an_object_does_not_trip_the_key_check(self, mock_create):
+        """payload='"format"' decodes to a string: there is no key to forbid."""
+        result = await use_mail(MailAction(action="draft", format="plain", payload='"format"'))
+        assert "no longer goes inside the payload" not in result
+        mock_create.assert_not_called()

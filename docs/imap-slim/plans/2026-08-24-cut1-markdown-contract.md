@@ -1,3 +1,9 @@
+# SUPERSEDED by 2026-08-26-cut1-body-contract.md
+
+Kept for the rejected-design record: the lookaround and per-line attempts, and why each failed.
+Scope decided by HC on 2026-08-26 (required `format` field, fenced code, tables, `edit` refusal)
+is in the successor. The marker-run shield below survives unchanged and is reproduced there.
+
 # Cut 1: markdown contract — state it, honour line breaks, stop corrupting marker-run lines
 
 Frame: `2026-08-24-frame-imap-slim-cli-daemon.md`. Cut 1 of 5. No architecture change; mergeable alone.

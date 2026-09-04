@@ -33,6 +33,7 @@ from imap_client import (
     split_quoted_tail,
     to_str,
 )
+from markdown_utils import convert_body
 
 
 class TestToStr:
@@ -2196,8 +2197,13 @@ class TestEditDraft:
 
     @patch("session._create_connection")
     @patch("imap_client.get_credentials")
-    def test_edit_draft_html_regenerated_from_edited_plain(self, mock_creds, mock_create):
-        """Draft with HTML should keep HTML part regenerated from edited plain text."""
+    def test_edit_draft_refuses_a_draft_with_an_html_body(self, mock_creds, mock_create):
+        """Superseded: regenerating HTML from the plain part silently destroys formatting.
+
+        The old behaviour re-rendered the stored plain part as markdown. That part
+        is the lossy projection, so <strong> came back as <em> and <del> and <mark>
+        vanished. Nothing stores the source, so the only honest answer is to refuse.
+        """
         mock_creds.return_value = ("server", "993", "user@example.com", "pass")
         mock_client = MockIMAPClient()
         raw = self._make_html_draft("There are 11 ducks.", "<p>There are <strong>11 ducks</strong>.</p>")
@@ -2210,13 +2216,12 @@ class TestEditDraft:
         mock_create.return_value = mock_client
         session._sessions.clear()
 
-        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+        with pytest.raises(IMAPError) as exc:
+            edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
 
-        parsed = email.message_from_bytes(mock_client.appended_messages[0]["message"])
-        html_parts = [p for p in parsed.walk() if p.get_content_type() == "text/html"]
-        assert len(html_parts) == 1
-        html_payload = html_parts[0].get_payload(decode=True).decode("utf-8", errors="replace")
-        assert "12 ducks" in html_payload
+        assert "HTML body" in str(exc.value)
+        assert "Send the whole body instead" in str(exc.value)
+        assert not mock_client.appended_messages, "the draft must be left untouched"
 
 
 class TestAttachmentRoundtrip:
@@ -2384,3 +2389,144 @@ class TestModifyFlagsTransportFailures:
 
         assert result["failed"], "a non-transport flag error should stay a per-message failure"
         assert result["modified"] == 0
+
+
+class TestEditRefusalByMimeStructure:
+    """AC8: the rule is preservation, not mode detection.
+
+    An HTML body means a text replacement cannot preserve the message, whoever
+    created it. A rich-text draft from any mail client is in the same position.
+    """
+
+    @staticmethod
+    def _plain_only(text="There are 11 ducks."):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        return msg.as_bytes()
+
+    @staticmethod
+    def _alternative(text="There are 11 ducks.", html="<p>There are 11 ducks.</p>"):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        msg.add_alternative(html, subtype="html")
+        return msg.as_bytes()
+
+    @staticmethod
+    def _related_with_inline_image(text="There are 11 ducks."):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        msg.add_alternative('<p>There are 11 ducks. <img src="cid:img1"></p>', subtype="html")
+        msg.get_payload()[1].add_related(b"\x89PNG", maintype="image", subtype="png", cid="<img1>")
+        return msg.as_bytes()
+
+    @staticmethod
+    def _html_only():
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content("<p>There are 11 ducks.</p>", subtype="html")
+        return msg.as_bytes()
+
+    @staticmethod
+    def _plain_with_html_attachment(text="There are 11 ducks."):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        msg.add_attachment(b"<html>report</html>", maintype="text", subtype="html", filename="report.html")
+        return msg.as_bytes()
+
+    @staticmethod
+    def _empty_html_part(text="There are 11 ducks."):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        msg.add_alternative("", subtype="html")
+        return msg.as_bytes()
+
+    def _run(self, mock_creds, mock_create, raw):
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        client = MockIMAPClient()
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        client.add_message("Drafts", 1, envelope, raw_email=raw, flags=[b"\\Draft"])
+        mock_create.return_value = client
+        session._sessions.clear()
+        return client
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_plain_only_draft_is_edited(self, mock_creds, mock_create):
+        client = self._run(mock_creds, mock_create, self._plain_only())
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+        assert client.appended_messages, "the edit should have written a new draft"
+
+    @pytest.mark.parametrize(
+        "builder",
+        ["_alternative", "_related_with_inline_image", "_html_only", "_empty_html_part"],
+        ids=["multipart/alternative", "multipart/related+inline image", "html only", "empty html part"],
+    )
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_html_bearing_drafts_are_refused(self, mock_creds, mock_create, builder):
+        client = self._run(mock_creds, mock_create, getattr(self, builder)())
+        with pytest.raises(IMAPError) as exc:
+            edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+        assert "HTML body" in str(exc.value)
+        assert not client.appended_messages, "the draft must be left untouched"
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_a_named_html_attachment_is_not_the_body(self, mock_creds, mock_create):
+        client = self._run(mock_creds, mock_create, self._plain_with_html_attachment())
+        edit_draft("Drafts", 1, replacements=[{"old": "11 ducks", "new": "12 ducks"}])
+        assert client.appended_messages, "an attachment must not block editing the plain body"
+
+
+class TestGeneratedMimeStructure:
+    """AC3/AC4: convert_body returning html=None is not proof the message lacks one."""
+
+    def _create(self, mock_creds, mock_create, body, html):
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        client = MockIMAPClient()
+        mock_create.return_value = client
+        session._sessions.clear()
+        create_draft("INBOX", to="r@example.com", subject="T", body=body, html=html)
+        return email.message_from_bytes(client.appended_messages[0]["message"])
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_plain_draft_has_no_html_part(self, mock_creds, mock_create):
+        body = "  +---+\n  ===== 5 =====\n\ttabbed\n"
+        html_body, plain_body = convert_body(body, "plain")
+        parsed = self._create(mock_creds, mock_create, plain_body, html_body)
+
+        types = [p.get_content_type() for p in parsed.walk()]
+        assert "text/html" not in types
+        payload = [p for p in parsed.walk() if p.get_content_type() == "text/plain"][0]
+        assert payload.get_payload(decode=True).decode().rstrip("\n") == body.rstrip("\n")
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_markdown_draft_has_both_parts_with_the_right_contents(self, mock_creds, mock_create):
+        body = "Terveisin\nVille Reijonen"
+        html_body, plain_body = convert_body(body, "markdown")
+        parsed = self._create(mock_creds, mock_create, plain_body, html_body)
+
+        types = [p.get_content_type() for p in parsed.walk()]
+        assert "text/plain" in types and "text/html" in types
+        plain = [p for p in parsed.walk() if p.get_content_type() == "text/plain"][0]
+        html = [p for p in parsed.walk() if p.get_content_type() == "text/html"][0]
+        # set_content() terminates the body with a newline, so compare without it
+        assert plain.get_payload(decode=True).decode().rstrip("\n") == body.rstrip("\n")
+        assert "<br />" in html.get_payload(decode=True).decode()

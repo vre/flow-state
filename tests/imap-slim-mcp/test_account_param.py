@@ -91,7 +91,7 @@ class TestAccountPassthrough:
         from imap_stream_mcp import use_mail
 
         payload = json.dumps({"to": "a@b.com", "subject": "test", "body": "hi"})
-        params = MailAction(action="draft", folder="INBOX", payload=payload, account=self.ACCOUNT)
+        params = MailAction(action="draft", format="markdown", folder="INBOX", payload=payload, account=self.ACCOUNT)
         asyncio.run(use_mail(params))
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
@@ -111,7 +111,7 @@ class TestAccountPassthrough:
         from imap_stream_mcp import use_mail
 
         payload = json.dumps({"id": 1, "body": "updated"})
-        params = MailAction(action="draft", folder="Drafts", payload=payload, account=self.ACCOUNT)
+        params = MailAction(action="draft", format="markdown", folder="Drafts", payload=payload, account=self.ACCOUNT)
         asyncio.run(use_mail(params))
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
