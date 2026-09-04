@@ -19,16 +19,19 @@ Usage with Claude Desktop/Code:
 """
 
 import json
+import re
 from pathlib import Path
 
 import html2text
 from imap_client import (
+    ConnectionFailure,
     IMAPError,
     cleanup_attachments,
     create_draft,
     download_attachment,
     edit_draft,
     get_default_account,
+    is_transport_failure,
     list_accounts,
     list_folders,
     list_messages,
@@ -38,6 +41,7 @@ from imap_client import (
     read_message,
     search_messages,
 )
+from imapclient.exceptions import LoginError
 from injection_defense import sanitize_external_text, wrap_untrusted
 from markdown_utils import convert_body
 from mcp.server.fastmcp import FastMCP
@@ -59,6 +63,63 @@ def _format_attachment_line(attachments: list[dict]) -> str:
             size_str = f"{size} B"
         parts.append(f"{att['name']} ({size_str})")
     return f"\n**Attachments:** {', '.join(parts)}"
+
+
+# Quota messages must mention connections. "Maximum login attempts exceeded"
+# contains both "maximum" and "exceeded" and is not a quota message.
+_QUOTA_PATTERN = re.compile(
+    r"too many connections|maximum number of connections|connection limit|too many concurrent",
+    re.IGNORECASE,
+)
+
+
+def _find_cause(exc: BaseException, wanted: type) -> BaseException | None:
+    """First exception of the wanted type in the chain, or None."""
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, wanted):
+            return current
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def classify_connection_error(exc: BaseException) -> str | None:
+    """Name a connection failure for the caller, or None if it is not one.
+
+    Three causes need three different actions, and today they all arrive as one
+    opaque string. Called from both exception handlers in use_mail, because
+    `except IMAPError` precedes `except Exception` and would otherwise consume
+    the wrapped failures this exists to catch.
+    """
+    where = ""
+    if isinstance(exc, ConnectionFailure):
+        where = f" (stage: {exc.stage}, after {exc.elapsed:.1f}s)"
+
+    login_error = _find_cause(exc, LoginError)
+    if login_error is not None:
+        text = str(login_error)
+        if _QUOTA_PATTERN.search(text):
+            return (
+                f"**Connection limit reached**{where}. The server refused a new connection because "
+                "the account's quota is in use - other Claude sessions or your mail client are "
+                f"holding it. Close one and retry.\n\nServer said: {text}"
+            )
+        return (
+            f"**Login rejected by the server**{where}. This can be wrong credentials, but also a "
+            "disabled account, a policy block, or a required second factor - the server does not "
+            f"say which.\n\nServer said: {text}"
+        )
+
+    if is_transport_failure(exc):
+        return (
+            f"**Connection to the mail server was lost**{where}. The cached connection was dropped "
+            "and will be rebuilt on the next call. If this repeats on every call, the network path "
+            "to the server is down."
+        )
+
+    return None
 
 
 def format_flags(flags: list[str]) -> str:
@@ -932,6 +993,9 @@ Use Read tool for images, pdf/docx skills for documents."""
     except ValueError as e:
         return f"Error: {e}"
     except IMAPError as e:
+        classified = classify_connection_error(e)
+        if classified:
+            return classified
         error_msg = str(e)
         # Provide friendly setup guide for unconfigured credentials
         if "not configured" in error_msg.lower():
@@ -964,6 +1028,9 @@ After setup, try: `{{action: "folders"}}` to verify connection.
 """
         return f"Error: {e}"
     except Exception as e:
+        classified = classify_connection_error(e)
+        if classified:
+            return classified
         return f"Error: {type(e).__name__}: {e}"
 
 

@@ -9,6 +9,7 @@ import email
 import email.header
 import email.message
 import email.utils
+import errno
 import json
 import mimetypes
 import os
@@ -22,6 +23,7 @@ import html2text
 import keyring
 from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
+from imapclient.exceptions import IMAPClientAbortError
 from markdown_utils import convert_body
 
 SERVICE_NAME = "imap-slim"
@@ -156,6 +158,62 @@ def parse_flag_query(query: str) -> str | None:
         IMAP search criterion string or None if not a flag query.
     """
     return _FLAG_QUERY_MAP.get(query.lower().strip())
+
+
+class ConnectionFailure(Exception):
+    """A connection-stage failure, carrying where it happened and how long it took.
+
+    Raised by the session lease so the reporting boundary can name the stage
+    without re-deriving it. The original exception is always the ``__cause__``.
+    """
+
+    def __init__(self, stage: str, elapsed: float):
+        self.stage = stage
+        self.elapsed = elapsed
+        super().__init__(f"IMAP {stage} failed after {elapsed:.1f}s")
+
+
+# Socket errnos that mean the transport died. TimeoutError and ConnectionError
+# cover most of it, but ENOTCONN and EHOSTUNREACH arrive as plain OSError.
+_TRANSPORT_ERRNOS = frozenset(
+    {
+        errno.ECONNABORTED,
+        errno.ECONNRESET,
+        errno.EHOSTUNREACH,
+        errno.ENETDOWN,
+        errno.ENETRESET,
+        errno.ENETUNREACH,
+        errno.ENOTCONN,
+        errno.EPIPE,
+        errno.ETIMEDOUT,
+    }
+)
+
+
+def _is_transport_exc(exc: BaseException) -> bool:
+    """Whether one exception (ignoring its chain) means the transport died."""
+    if isinstance(exc, ConnectionFailure | IMAPClientAbortError):
+        return True
+    # A rejected command is not a dead socket, so IMAPClientError is excluded.
+    if isinstance(exc, TimeoutError | ConnectionError):
+        return True
+    return isinstance(exc, OSError) and exc.errno in _TRANSPORT_ERRNOS
+
+
+def is_transport_failure(exc: BaseException, *, stage: str = "command") -> bool:
+    """Whether this failure, or anything it was raised from, is a dead transport.
+
+    Walks the chain because the read paths wrap failures into IMAPError, which is
+    a plain Exception - matching on the outermost type alone misses them.
+    """
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if _is_transport_exc(current):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
 
 
 class IMAPError(Exception):
@@ -614,6 +672,8 @@ def read_message(folder: str, message_id: int, account: str = None, full: bool =
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         # Fetch full message
@@ -730,6 +790,8 @@ def download_attachment(folder: str, message_id: int, attachment_index: int, acc
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         messages = client.fetch([message_id], ["RFC822"])
@@ -758,25 +820,28 @@ def download_attachment(folder: str, message_id: int, attachment_index: int, acc
         content_type = part.get_content_type()
         payload = part.get_payload(decode=True)
 
-        # Save to temp directory
-        temp_dir = Path(tempfile.gettempdir()) / "streammail"
-        temp_dir.mkdir(exist_ok=True)
+    # Local file I/O runs OUTSIDE the lease. A disk TimeoutError or ETIMEDOUT is
+    # indistinguishable by type or errno from an IMAP one, so keeping it out is
+    # the only way a slow filesystem cannot be reported as a lost connection.
+    # Save to temp directory
+    temp_dir = Path(tempfile.gettempdir()) / "streammail"
+    temp_dir.mkdir(exist_ok=True)
 
-        # Sanitize filename, avoid collision with existing files
-        safe_filename = re.sub(r"[^\w\-_\.]", "_", filename)
-        file_path = temp_dir / safe_filename
-        if file_path.exists():
-            stem = file_path.stem
-            suffix = file_path.suffix
-            counter = 1
-            while file_path.exists():
-                file_path = temp_dir / f"{stem}_{counter}{suffix}"
-                counter += 1
+    # Sanitize filename, avoid collision with existing files
+    safe_filename = re.sub(r"[^\w\-_\.]", "_", filename)
+    file_path = temp_dir / safe_filename
+    if file_path.exists():
+        stem = file_path.stem
+        suffix = file_path.suffix
+        counter = 1
+        while file_path.exists():
+            file_path = temp_dir / f"{stem}_{counter}{suffix}"
+            counter += 1
 
-        with open(file_path, "wb") as f:
-            f.write(payload)
+    with open(file_path, "wb") as f:
+        f.write(payload)
 
-        return {"saved_to": str(file_path), "filename": filename, "content_type": content_type, "size": len(payload)}
+    return {"saved_to": str(file_path), "filename": filename, "content_type": content_type, "size": len(payload)}
 
 
 def cleanup_attachments() -> dict:
@@ -825,6 +890,8 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         # Build IMAP search criteria
@@ -1186,6 +1253,8 @@ def modify_draft(
         try:
             client.select_folder(folder, readonly=False)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         if prefetched_draft is None:
@@ -1407,6 +1476,8 @@ def edit_draft(folder: str, message_id: int, replacements: list[dict], account: 
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         messages = client.fetch([message_id], ["RFC822", "ENVELOPE", "FLAGS"])
@@ -1489,6 +1560,8 @@ def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remo
         try:
             client.select_folder(folder, readonly=False)
         except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         for msg_id in message_ids:
@@ -1505,6 +1578,8 @@ def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remo
                     try:
                         client.add_flags([msg_id], imap_flags)
                     except Exception as e:
+                        if is_transport_failure(e, stage="command"):
+                            raise
                         result["failed"].append({"id": msg_id, "operation": "add_flags", "flags": add_flags, "error": str(e)})
                         continue
 
@@ -1514,6 +1589,8 @@ def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remo
                     try:
                         client.remove_flags([msg_id], imap_flags)
                     except Exception as e:
+                        if is_transport_failure(e, stage="command"):
+                            raise
                         result["failed"].append({"id": msg_id, "operation": "remove_flags", "flags": remove_flags, "error": str(e)})
                         continue
 
@@ -1527,10 +1604,14 @@ def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remo
                         from session import update_cached_flags
 
                         update_cached_flags(session.account, folder, msg_id, current_flags)
-                except Exception:
+                except Exception as exc:
+                    if is_transport_failure(exc, stage="command"):
+                        raise
                     pass  # Cache update failure is not critical
 
             except Exception as e:
+                if is_transport_failure(e, stage="command"):
+                    raise
                 result["failed"].append({"id": msg_id, "error": str(e)})
 
     return result

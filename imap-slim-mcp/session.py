@@ -10,9 +10,11 @@ from dataclasses import dataclass, field
 
 from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
-from imapclient.exceptions import IMAPClientError
 
-CONNECTION_IDLE_TIMEOUT = 300  # 5 minutes
+# Kept well below any plausible server idle-reaping window. Beyond this a
+# connection is discarded unprobed, because discovering death costs a full
+# socket timeout while discarding costs nothing.
+CONNECTION_MAX_IDLE = 60
 
 _sessions: dict[str, "AccountSession"] = {}
 _sessions_lock = threading.Lock()
@@ -87,12 +89,39 @@ def update_cached_flags(account: str, folder: str, message_id: int, new_flags: l
 
 
 def _create_connection(account: str) -> IMAPClient:
-    """Create new IMAP connection for account."""
-    from imap_client import get_credentials
+    """Create a new IMAP connection.
+
+    Credential lookup is the config stage and propagates unchanged, so the
+    "not configured" setup guide still reaches the caller. Only the network
+    portion becomes a ConnectionFailure.
+
+    Args:
+        account: Account name.
+
+    Returns:
+        A logged-in IMAPClient.
+
+    Raises:
+        ConnectionFailure: stage "connect", if the socket or login fails.
+    """
+    from imap_client import ConnectionFailure, get_credentials
 
     server, port, username, password = get_credentials(account)
-    client = IMAPClient(server, port=int(port), ssl=True, timeout=30)
-    client.login(username, password)
+
+    started = time.monotonic()
+    client = None
+    try:
+        client = IMAPClient(server, port=int(port), ssl=True, timeout=30)
+        client.login(username, password)
+    except Exception as exc:
+        if client is not None:
+            # Without this the client is a local that nothing can ever close,
+            # so a rejected login leaks a server slot until garbage collection.
+            try:
+                client.shutdown()
+            except Exception:
+                pass
+        raise ConnectionFailure("connect", time.monotonic() - started) from exc
     return client
 
 
@@ -126,30 +155,48 @@ class AccountSession:
     lock: threading.RLock = field(default_factory=threading.RLock)
 
     def get_connection(self) -> IMAPClient:
-        """Get or create IMAP connection."""
-        now = time.time()
+        """Get or create an IMAP connection, holding the session lock."""
+        with self.lock:
+            return self._acquire()
 
-        if self.connection:
-            if now - self.last_activity > CONNECTION_IDLE_TIMEOUT:
-                self._close_connection()
+    def _acquire(self) -> IMAPClient:
+        """Return a connection believed live. Caller must hold self.lock."""
+        from imap_client import is_transport_failure
+
+        if self.connection is not None:
+            if time.time() - self.last_activity > CONNECTION_MAX_IDLE:
+                self._discard_connection()
             else:
                 try:
                     self.connection.noop()
-                except Exception:
-                    self._close_connection()
+                except Exception as exc:
+                    if not is_transport_failure(exc, stage="probe"):
+                        raise
+                    self._discard_connection()
 
-        if not self.connection:
-            try:
-                self.connection = _create_connection(self.account)
-            except Exception:
-                self.connection = None
-                raise
+        if self.connection is None:
+            self.connection = _create_connection(self.account)
 
-        self.last_activity = now
+        # Stamped after the slow work, not before it: a replacement must not be
+        # born already aged by the probe and login that produced it.
+        self.last_activity = time.time()
         return self.connection
 
+    def _discard_connection(self):
+        """Drop a connection believed dead. Sends nothing.
+
+        LOGOUT is itself an IMAP command: on a silent socket it blocks for the
+        full socket timeout, which is the cost this whole path exists to avoid.
+        """
+        if self.connection:
+            try:
+                self.connection.shutdown()
+            except Exception:
+                pass
+            self.connection = None
+
     def _close_connection(self):
-        """Close connection without clearing caches."""
+        """Close a connection believed healthy, releasing the server's slot."""
         if self.connection:
             try:
                 self.connection.logout()
@@ -158,18 +205,36 @@ class AccountSession:
             self.connection = None
 
     @contextmanager
-    def connection_ctx(self):
-        """Context manager for IMAP operations.
+    def _lease(self, stage: str = "command"):
+        """Hold the lock, the connection and the failure policy for one operation.
 
-        Yields connection for use. On error, closes connection but preserves caches.
+        The lease covers the whole operation rather than just handing out a
+        connection: one IMAP connection is a single protocol stream, so two
+        callers using it concurrently interleave their responses, and either
+        one's failure would otherwise discard the connection the other is using.
+
+        Args:
+            stage: Reported on failure, one of "probe", "connect", "command".
         """
-        try:
-            conn = self.get_connection()
-            yield conn
+        from imap_client import ConnectionFailure, is_transport_failure
+
+        with self.lock:
+            conn = self._acquire()
+            started = time.monotonic()
+            try:
+                yield conn
+            except Exception as exc:
+                if is_transport_failure(exc, stage=stage):
+                    self._discard_connection()
+                    raise ConnectionFailure(stage, time.monotonic() - started) from exc
+                raise
             self.last_activity = time.time()
-        except (OSError, IMAPClientError, ConnectionError):
-            self._close_connection()
-            raise
+
+    @contextmanager
+    def connection_ctx(self):
+        """Public lease for one IMAP operation."""
+        with self._lease() as conn:
+            yield conn
 
     def get_folders(self) -> list[dict]:
         """Get folder list, using cache if available.
@@ -180,8 +245,8 @@ class AccountSession:
         if self.folder_cache:
             return self.folder_cache.folders
 
-        conn = self.get_connection()
-        folders = conn.list_folders()
+        with self._lease() as conn:
+            folders = conn.list_folders()
 
         self.folder_cache = FolderCache(
             folders=[{"name": _to_str(name), "flags": [_to_str(f) for f in flags]} for flags, _, name in folders], fetched_at=time.time()
@@ -199,14 +264,19 @@ class AccountSession:
         Returns:
             List of message summaries (newest first)
         """
-        conn = self.get_connection()
+        with self._lease() as conn:
+            return self._fetch_messages(conn, folder, limit, preview)
+
+    def _fetch_messages(self, conn: IMAPClient, folder: str, limit: int, preview: bool) -> list[dict]:
+        """Cache-validate and fetch. Caller must hold the lease."""
+        from imap_client import IMAPError, is_transport_failure
 
         # Use select_folder to get atomic state for validation
         try:
             select_res = conn.select_folder(folder, readonly=True)
         except Exception as e:
-            from imap_client import IMAPError
-
+            if is_transport_failure(e, stage="command"):
+                raise
             raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
 
         # Parse metadata from select response
@@ -261,7 +331,9 @@ class AccountSession:
                 for section, group_ids in section_groups.items():
                     try:
                         group_data = conn.fetch(group_ids, [f"BODY.PEEK[{section}]<0.600>"])
-                    except Exception:
+                    except Exception as exc:
+                        if is_transport_failure(exc, stage="command"):
+                            raise
                         continue
                     for msg_id, payload in group_data.items():
                         if isinstance(payload, dict):
@@ -270,7 +342,9 @@ class AccountSession:
                 for msg_id, (section, charset, encoding, is_html) in snippet_info.items():
                     raw = get_body_peek(snippet_raw.get(msg_id, {}), section)
                     snippets[msg_id] = extract_snippet(raw, charset, encoding, is_html) if raw else ""
-            except Exception:
+            except Exception as exc:
+                if is_transport_failure(exc, stage="command"):
+                    raise
                 snippets = {}
 
         messages = []

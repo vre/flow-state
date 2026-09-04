@@ -1,6 +1,8 @@
 """Pytest configuration and shared fixtures for streammail tests."""
 
+import socket
 import sys
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -9,6 +11,12 @@ import pytest
 
 # Add imap-slim-mcp directory to Python path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-slim-mcp"))
+
+from imapclient import IMAPClient  # noqa: E402  (needs the path insert above)
+
+# Short socket timeout for the fake-server tests: production uses 30s, and the
+# point of these tests is that no blocking command is sent at all.
+SILENT_SERVER_TIMEOUT = 3
 
 
 @dataclass
@@ -61,6 +69,17 @@ class MockIMAPClient:
         self.logged_in: bool = False
         self.appended_messages: list[dict] = []
         self.deleted_messages: list[int] = []
+        self.noop_count: int = 0
+        self.shutdown_count: int = 0
+
+    def noop(self):
+        """Liveness probe. Silent success means the connection is reusable."""
+        self.noop_count += 1
+
+    def shutdown(self):
+        """Non-graceful close: drops the socket without sending LOGOUT."""
+        self.shutdown_count += 1
+        self.logged_in = False
 
     def login(self, username: str, password: str):
         """Mock login."""
@@ -279,3 +298,104 @@ Content-Type: text/html; charset=utf-8
 
 --boundary123--
 """
+
+
+class SilentIMAPServer:
+    """Fake IMAP server that completes LOGIN then goes permanently silent.
+
+    Models an idle-reaped connection: the socket stays open, the server never
+    answers again. Records every command line it receives so tests can assert
+    on what was actually sent rather than only on elapsed time.
+    """
+
+    def __init__(self):
+        self._sock = socket.socket()
+        self._sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self._sock.bind(("127.0.0.1", 0))
+        self._sock.listen(8)
+        self.port = self._sock.getsockname()[1]
+        self.commands: list[str] = []
+        self.ready = threading.Event()
+        self._conns: list[socket.socket] = []
+        self._stop = False
+        self._thread = threading.Thread(target=self._serve, daemon=True)
+        self._thread.start()
+
+    def _serve(self):
+        self.ready.set()
+        while not self._stop:
+            try:
+                conn, _ = self._sock.accept()
+            except OSError:
+                return
+            self._conns.append(conn)
+            threading.Thread(target=self._session, args=(conn,), daemon=True).start()
+
+    def _session(self, conn):
+        try:
+            handle = conn.makefile("rwb")
+            conn.sendall(b"* OK [CAPABILITY IMAP4rev1 AUTH=PLAIN] fake ready\r\n")
+            while True:
+                line = handle.readline()
+                if not line:
+                    return
+                text = line.decode("utf-8", "replace").strip()
+                self.commands.append(text)
+                tag = line.split(b" ", 1)[0]
+                upper = line.upper()
+                if b"CAPABILITY" in upper:
+                    conn.sendall(b"* CAPABILITY IMAP4rev1\r\n" + tag + b" OK done\r\n")
+                elif b"LOGIN" in upper:
+                    conn.sendall(tag + b" OK LOGIN completed\r\n")
+                    return  # from here on: silence, socket stays open
+        except OSError:
+            return
+
+    def received(self, verb: str) -> bool:
+        """True if any received command line contains the given IMAP verb."""
+        return any(verb.upper() in c.upper() for c in self.commands)
+
+    def close(self):
+        self._stop = True
+        for conn in self._conns:
+            try:
+                conn.close()
+            except OSError:
+                pass
+        try:
+            self._sock.close()
+        except OSError:
+            pass
+        self._thread.join(timeout=2)
+
+
+@pytest.fixture
+def silent_imap_server():
+    """A server that logs in then stops responding. Yields the server object."""
+    server = SilentIMAPServer()
+    server.ready.wait(timeout=5)
+    try:
+        yield server
+    finally:
+        server.close()
+
+
+@pytest.fixture
+def connected_to_silent(silent_imap_server):
+    """Factory building real IMAPClients logged into the silent server."""
+    clients = []
+
+    def build():
+        client = IMAPClient("127.0.0.1", port=silent_imap_server.port, ssl=False, timeout=SILENT_SERVER_TIMEOUT)
+        client.login("u", "p")
+        clients.append(client)
+        return client
+
+    try:
+        yield silent_imap_server, build
+    finally:
+        for client in clients:
+            try:
+                client.shutdown()
+            except Exception:
+                pass

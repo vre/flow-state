@@ -2346,3 +2346,41 @@ class TestKeyringMigration:
         first_set_count = mock_kr.set_password.call_count
         _migrate_legacy()
         assert mock_kr.set_password.call_count == first_set_count
+
+
+class TestModifyFlagsTransportFailures:
+    """Cut 2 AC7: no handler inside a lease may swallow a transport failure."""
+
+    def test_add_flags_timeout_is_raised_not_recorded(self):
+        from unittest.mock import Mock, patch
+
+        import pytest
+        from imap_client import ConnectionFailure, modify_flags
+        from imapclient import IMAPClient
+
+        client = Mock(spec=IMAPClient)
+        client.search.return_value = [1]
+        client.add_flags.side_effect = TimeoutError("timed out")
+
+        with patch("session._create_connection", return_value=client):
+            with pytest.raises(ConnectionFailure):
+                modify_flags("INBOX", [1], ["Flagged"], [], account="test")
+
+        client.shutdown.assert_called_once()
+
+    def test_ordinary_flag_error_is_still_recorded_per_message(self):
+        from unittest.mock import Mock, patch
+
+        from imap_client import modify_flags
+        from imapclient import IMAPClient
+        from imapclient.exceptions import IMAPClientError
+
+        client = Mock(spec=IMAPClient)
+        client.search.return_value = [1]
+        client.add_flags.side_effect = IMAPClientError("cannot set flag")
+
+        with patch("session._create_connection", return_value=client):
+            result = modify_flags("INBOX", [1], ["Flagged"], [], account="test")
+
+        assert result["failed"], "a non-transport flag error should stay a per-message failure"
+        assert result["modified"] == 0

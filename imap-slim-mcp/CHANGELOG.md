@@ -1,5 +1,28 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+- Connection recovery: a call made after an idle pause paid a full 30 s socket timeout before it could
+  reconnect. A connection believed dead is now dropped with `shutdown()`, which sends nothing, and one
+  idle past `CONNECTION_MAX_IDLE` (60 s, was 300 s) is dropped without being probed. Measured against a
+  fake server that completes LOGIN then goes silent: 30 s before, 0.2 s after
+- `LOGOUT` is no longer sent to a connection suspected dead - it is an IMAP command and blocks for the
+  full socket timeout on a silent socket
+- One IMAP connection is a single protocol stream, so the lease now holds the session lock for the whole
+  operation. `get_folders` and `get_messages` previously ran their commands outside any lock
+- Transport failures are no longer swallowed inside a lease: `modify_flags` recorded them as per-message
+  errors and the snippet preview turned them into empty results, in both cases leaving the dead
+  connection cached for the next call to trip over
+- A rejected login no longer leaks its client - it was a local that nothing could close, holding a server
+  slot until garbage collection
+- `download_attachment` writes its file outside the connection lease, so a slow filesystem cannot be
+  reported as a lost server connection
+
+### Added
+- Connection failures now name their cause - stale socket, rejected login, or connection quota - and the
+  stage they failed at, instead of a single opaque `Error: TimeoutError: timed out`
+
 ## [1.0.0] - 2026-05-30
 
 ### Fixed
