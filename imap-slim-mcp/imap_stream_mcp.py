@@ -374,7 +374,8 @@ Creates a new draft or modifies an existing one.
   ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes.
   A newline inside a paragraph becomes a line break; a blank line starts a new paragraph.
   Markdown block syntax still wins: "Title" followed by a line of "=" is a heading, not a rule.
-  Fenced code blocks and tables are NOT supported yet.
+  Fenced code blocks (```) and pipe tables are supported. Fence content is sent exactly as
+  written, in both the HTML and the plain part. Fences must start at the left margin.
 - "plain": the body is sent exactly as written, plain text only, no HTML part. Nothing is
   interpreted, so ASCII art and rule lines survive untouched.
 - There is no default. Omitting it is an error.

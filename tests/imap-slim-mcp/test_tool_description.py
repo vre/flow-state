@@ -112,3 +112,18 @@ class TestDraftHelpMatchesBehaviour:
         assert "line break" in draft_help
         assert "block syntax" in draft_help
         assert "no default" in draft_help
+
+
+class TestHelpNamesCodeAndTables:
+    """AC8: the help said these were unsupported; they are now supported."""
+
+    def test_help_does_not_claim_they_are_unsupported(self):
+        draft_help = HELP_TOPICS["draft"]
+        assert "NOT supported" not in draft_help
+        assert "not supported yet" not in draft_help.lower()
+
+    def test_help_names_them(self):
+        draft_help = HELP_TOPICS["draft"].lower()
+        assert "code block" in draft_help
+        assert "table" in draft_help
+        assert "left margin" in draft_help, "the column-zero requirement must be stated"

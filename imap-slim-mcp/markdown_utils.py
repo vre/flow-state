@@ -20,6 +20,8 @@ MARKDOWN_EXTENSIONS = [
     "pymdownx.betterem",  # smarter bold/italic
     "pymdownx.emoji",  # :emoji: shortcodes
     "nl2br",  # a newline inside a paragraph becomes <br>, as every mail composer does
+    "fenced_code",  # ``` blocks
+    "tables",  # pipe tables
 ]
 
 # Extension configurations
@@ -40,19 +42,87 @@ _MARKER_RUN_LINE = re.compile(r"^[ \t]*(?:>[ \t]*)*([*_=~])\1{2,}[ \t]*$")
 # would rewrite them.
 _LINE_SPLIT = re.compile(r"(\r\n|\n|\r)")
 
+# Fence delimiters, at column zero only: python-markdown's fenced_code does not
+# recognise an indented fence, and a 4-space one becomes an indented code block
+# containing literal backticks. The opener may carry any trailing text - "c#",
+# "foo.bar" and "{.python #ex}" are all valid language tags - while the closer
+# must be bare.
+_FENCE_OPEN = re.compile(r"^(`{3,}|~{3,})(.*)$")
+_FENCE_CLOSE = re.compile(r"^(`{3,}|~{3,})[ \t]*$")
+
+# A table header row and the separator beneath it. The extension accepts both
+# "| a | b |" and "a | b", and rejects a separator with no pipe, so ":---:" on
+# its own must not be mistaken for one.
+_TABLE_ROW = re.compile(r"^[^\n]*\|[^\n]*$")
+_TABLE_SEP = re.compile(r"^[ \t]*:?-+:?[ \t]*(\|[ \t]*:?-+:?[ \t]*)+\|?[ \t]*$|^[ \t]*\|[ \t|:-]*\|[ \t]*$")
+
+# Blockquote marker with the 0-3 leading spaces markdown allows. Four spaces is
+# indented code, not a quote.
+_QUOTE_LINE = re.compile(r"^ {0,3}>")
+
+
+def _line_records(text: str) -> list[tuple[str, str]]:
+    """Split into (content, separator) pairs, preserving each line's exact ending.
+
+    Both callers use this, so they cannot disagree about where lines end: one of
+    them previously split on "\n" alone and would leave a stray "\r" attached.
+    """
+    parts = _LINE_SPLIT.split(text)
+    records = []
+    for i in range(0, len(parts), 2):
+        records.append((parts[i], parts[i + 1] if i + 1 < len(parts) else ""))
+    return records
+
+
+def _fenced_flags(records: list[tuple[str, str]]) -> list[bool]:
+    """Mark the lines of every CLOSED fence region, left to right.
+
+    Reproduces the extension rather than approximating it: the closer must repeat
+    the opener's delimiter exactly, anything else - including a delimiter of the
+    other character - is content, and an opener with no closer is not a fence.
+    """
+    flags = [False] * len(records)
+    index = 0
+    while index < len(records):
+        opener = _FENCE_OPEN.match(records[index][0])
+        if opener:
+            delimiter = opener.group(1)
+            for close_at in range(index + 1, len(records)):
+                closer = _FENCE_CLOSE.match(records[close_at][0])
+                if closer and closer.group(1) == delimiter:
+                    for line in range(index, close_at + 1):
+                        flags[line] = True
+                    index = close_at
+                    break
+        index += 1
+    return flags
+
+
 # URL pattern for autolinking (no email - avoids obfuscation issues)
 # Negative lookbehind: skip URLs already in href="..."
 URL_PATTERN = re.compile(r'(?<!href=")(https?://[^\s<>"]+)')
 
+# Regions autolinking must not enter. <a> is included because the visible text of
+# an existing anchor would otherwise be matched and nested inside a second one.
+_NO_AUTOLINK = re.compile(r"(<pre\b.*?</pre>|<code\b.*?</code>|<a\b.*?</a>)", re.DOTALL)
+
 
 def autolink_urls(html: str) -> str:
-    """Convert bare URLs to links in HTML, skip already linked URLs."""
+    """Convert bare URLs to links, leaving code and existing anchors alone.
+
+    The guard lives here rather than in the caller so a future caller cannot
+    forget it. This is NOT a general HTML parser: it assumes balanced, lowercase
+    markup with no literal "</code>" inside an attribute, which holds because the
+    only input is what python-markdown produced one line earlier in convert_body.
+    """
 
     def replace_url(match):
         url = match.group(1)
         return f'<a href="{url}">{url}</a>'
 
-    return URL_PATTERN.sub(replace_url, html)
+    return "".join(
+        segment if _NO_AUTOLINK.fullmatch(segment) else URL_PATTERN.sub(replace_url, segment) for segment in _NO_AUTOLINK.split(html)
+    )
 
 
 def preprocess_markdown(text: str) -> str:
@@ -71,41 +141,62 @@ def preprocess_markdown(text: str) -> str:
     if not text:
         return text
 
-    lines = text.split("\n")
+    records = _line_records(text)
+    fenced = _fenced_flags(records)
     result = []
     prev_was_blank = True  # Start as if there was a blank line
     prev_was_list_item = False
+    prev_was_quote = False
 
-    for line in lines:
+    for index, (line, separator) in enumerate(records):
+        if fenced[index]:
+            # Verbatim. Inserting a blank line here put it inside the code block.
+            # The opening delimiter still needs separating from preceding text,
+            # like any other block start.
+            if (index == 0 or not fenced[index - 1]) and not prev_was_blank:
+                result.append("\n")
+            result.append(line + separator)
+            prev_was_blank = False
+            prev_was_list_item = False
+            prev_was_quote = False
+            continue
+
         stripped = line.strip()
         is_blank = stripped == ""
 
-        # Check if line is a list item
         is_list_item = (
             stripped.startswith("- ") or stripped.startswith("* ") or stripped.startswith("+ ") or bool(re.match(r"^\d+\. ", stripped))
         )
-
-        # Check if line starts other block elements (not list items)
-        is_other_block = (
-            stripped.startswith("> ")  # blockquote
-            or stripped.startswith("```")  # code block
-            or stripped.startswith("#")  # heading
+        is_quote = bool(_QUOTE_LINE.match(line))
+        is_heading = stripped.startswith("#")
+        # An unpaired ``` is ordinary text, not a block start: it is never
+        # flagged as fenced, so it never reaches the branch above.
+        is_table_start = (
+            bool(_TABLE_ROW.match(line))
+            and index + 1 < len(records)
+            and not fenced[index + 1]
+            and bool(_TABLE_SEP.match(records[index + 1][0]))
         )
 
-        # Add blank line before block element if previous line wasn't blank
-        # For list items: only at list START (not between items)
         needs_blank = False
-        if is_other_block and not prev_was_blank or is_list_item and not prev_was_blank and not prev_was_list_item:
+        if (is_heading or is_table_start) and not prev_was_blank:
+            needs_blank = True
+        elif is_list_item and not prev_was_blank and not prev_was_list_item:
+            needs_blank = True
+        elif is_quote and not prev_was_blank and not prev_was_quote:
+            # Only at the START of a quote: a blank between consecutive "> " lines
+            # split one quoted paragraph into two and killed the line break.
             needs_blank = True
 
         if needs_blank:
-            result.append("")
+            result.append("\n")
 
-        result.append(line)
+        result.append(line + separator)
         prev_was_blank = is_blank
         prev_was_list_item = is_list_item
+        prev_was_quote = is_quote
 
-    return "\n".join(result)
+    return "".join(result)
 
 
 def _apply_plain_substitutions(text: str) -> str:
@@ -144,6 +235,8 @@ def markdown_to_plain(text: str) -> str:
     - Lists, headings, blockquotes (unchanged)
     - A line that is only a run of markers: an ASCII rule such as "=====" is not
       emphasis, and the unguarded expressions turned it into "=".
+    - Fenced code blocks: the substitutions rewrote the author's code in the
+      plain alternative.
 
     Args:
         text: Markdown text
@@ -161,15 +254,22 @@ def markdown_to_plain(text: str) -> str:
             nonce += "0"
             continue
 
-        parts = _LINE_SPLIT.split(text)
+        records = _line_records(text)
+        fenced = _fenced_flags(records)
         saved: dict[str, str] = {}
-        for index in range(0, len(parts), 2):
-            if _MARKER_RUN_LINE.match(parts[index]):
+        pieces = []
+        for index, (line, separator) in enumerate(records):
+            # Fenced regions and marker-run lines are protected by the same
+            # scheme. Marker detection runs only outside fences, so the spans
+            # cannot overlap and a token can never end up nested inside another.
+            if fenced[index] or _MARKER_RUN_LINE.match(line):
                 token = f"{base}{len(saved)}\x00"
-                saved[token] = parts[index]
-                parts[index] = token
+                saved[token] = line
+                pieces.append(token + separator)
+            else:
+                pieces.append(line + separator)
 
-        converted = _apply_plain_substitutions("".join(parts))
+        converted = _apply_plain_substitutions("".join(pieces))
 
         # The base being absent from the input is not enough: a substitution can
         # synthesise a token. "\x00==0==\x00==0==\x00" becomes "\x000\x000\x00",

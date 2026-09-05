@@ -30,12 +30,15 @@ class TestPreprocessMarkdown:
         result = preprocess_markdown(text)
         assert result == "Some text\n\n# Heading"
 
-    def test_adds_blank_line_before_code_block(self):
-        """Test blank line is added before code block (opening and closing)."""
+    def test_fenced_content_is_copied_verbatim(self):
+        """Superseded: the old rule inserted a blank line before the CLOSING fence too.
+
+        Its own comment flagged that as odd. With fenced_code enabled it is not
+        odd, it is corruption: the blank line lands inside the code block. The
+        opening delimiter still gets separated from preceding text.
+        """
         text = "Some text\n```python\ncode\n```"
-        result = preprocess_markdown(text)
-        # Note: closing ``` also treated as block start
-        assert result == "Some text\n\n```python\ncode\n\n```"
+        assert preprocess_markdown(text) == "Some text\n\n```python\ncode\n```"
 
     def test_no_duplicate_blank_line_if_already_exists(self):
         """Test no extra blank line if one already exists."""

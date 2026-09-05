@@ -2,7 +2,25 @@
 
 ## [Unreleased]
 
+### Added
+- Fenced code blocks and pipe tables in markdown mode. Enabling the two extensions was the small
+  part; they exposed four defects that existed all along and were invisible only because the
+  extensions were off:
+  - `preprocess_markdown` had no fence state and injected blank lines *inside* fenced content
+  - `markdown_to_plain` ran its five substitutions over fenced code, so the plain alternative
+    rewrote the author's `**literal**`, `~~literal~~`, `==literal==` and links
+  - `autolink_urls` inserted an anchor inside `<pre><code>`, and nested a second anchor around the
+    visible text of an existing one
+  - a table with no blank line above it was not parsed as a table
+- Fence recognition matches python-markdown rather than approximating it: column zero only, the
+  closing delimiter run must repeat the opener exactly, a language tag may contain `#`, `.` or
+  attribute syntax, a `~~~` inside a backtick fence is content, and an unterminated fence is not a
+  fence. That last rule is what keeps a lone `~~~~~` working as the ASCII rule line it was
+
 ### Fixed
+- A line break between two consecutive `>` lines now survives. Preprocessing inserted a blank line
+  between them, splitting one quoted paragraph into two and defeating the newline rule inside
+  quotes
 - `mcp` is pinned below 2. The dependency was `mcp>=1.0.0` with no upper bound, and mcp 2.x renamed
   `FastMCP` to `MCPServer`, removing `mcp.server.fastmcp` entirely - so a fresh install resolved
   2.1.1 and the server died at import with `ModuleNotFoundError: No module named
