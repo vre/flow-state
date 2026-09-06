@@ -127,3 +127,59 @@ class TestHelpNamesCodeAndTables:
         assert "code block" in draft_help
         assert "table" in draft_help
         assert "left margin" in draft_help, "the column-zero requirement must be stated"
+
+
+class TestTheSurfaceIsDefinedOnce:
+    """Cut 4a: the dispatcher moved to actions.py so the daemon and CLI can
+    reach it without importing FastMCP. These guard the seams that move made."""
+
+    def test_use_mail_only_delegates(self):
+        import inspect
+
+        source = inspect.getsource(use_mail)
+        body = source.split('"""')[-1]
+        assert "run_action" in body
+        assert "if action ==" not in body, "dispatch logic must live in actions.py, not the wrapper"
+
+    def test_actions_imports_no_front_end(self):
+        """Checked on the AST, not by grep: a comment naming fastmcp would pass a grep.
+
+        If actions.py imported FastMCP, the CLI would pay the 40 MB it exists to avoid.
+        """
+        import ast
+        from pathlib import Path
+
+        tree = ast.parse((Path(mcp_mod.__file__).parent / "actions.py").read_text())
+        imported = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imported.add(node.module.split(".")[0])
+        assert "mcp" not in imported
+        assert "imap_stream_mcp" not in imported
+        assert "imapctl" not in imported
+
+    def test_the_served_schema_did_not_move(self):
+        """Pinned against a literal recorded before the extraction.
+
+        Comparing the schema to a freshly computed copy of itself would prove
+        nothing; this file is what makes a future change to the advertised
+        surface a deliberate edit.
+        """
+        import json
+        from pathlib import Path
+
+        recorded = json.loads((Path(__file__).parent / "use_mail_schema.json").read_text())
+        served = mcp_mod.mcp._tool_manager.get_tool("use_mail").parameters
+        assert json.dumps(served, sort_keys=True) == json.dumps(recorded, sort_keys=True)
+
+    def test_the_wrapper_is_still_what_fastmcp_introspects(self):
+        import inspect
+
+        assert inspect.iscoroutinefunction(use_mail)
+        params = list(inspect.signature(use_mail).parameters.values())
+        assert len(params) == 1
+        assert params[0].annotation is MailAction
+        assert inspect.signature(use_mail).return_annotation is str
+        assert "EXTERNAL_EMAIL" in (use_mail.__doc__ or ""), "the untrusted-content notice must stay on the wrapper"

@@ -9,7 +9,6 @@ reason an already-installed plugin keeps working after the directory was renamed
 
 from pathlib import Path
 
-import imap_stream_mcp
 import render
 
 REPO = Path(__file__).resolve().parent.parent.parent
@@ -56,8 +55,10 @@ class TestRenderHoldsTheSharedHelpers:
         for name in self.SHARED:
             assert hasattr(render, name), f"render.{name} missing"
 
-    def test_the_mcp_module_imports_rather_than_redefines(self):
+    def test_the_action_layer_imports_rather_than_redefines(self):
+        """Cut 4a moved the dispatcher into actions.py, so that is what uses the
+        shared helpers now; imap_stream_mcp is only the FastMCP wrapper."""
+        import actions
+
         for name in self.SHARED:
-            mine = getattr(imap_stream_mcp, name)
-            theirs = getattr(render, name)
-            assert mine is theirs, f"{name} is a copy, not the shared one"
+            assert getattr(actions, name) is getattr(render, name), f"{name} is a copy, not the shared one"

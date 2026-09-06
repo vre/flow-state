@@ -24,12 +24,12 @@ class TestAccountPassthrough:
     @pytest.fixture
     def _patch_accounts(self):
         with (
-            patch("imap_stream_mcp.list_accounts", return_value=["default", "work"]),
-            patch("imap_stream_mcp.get_default_account", return_value="default"),
+            patch("actions.list_accounts", return_value=["default", "work"]),
+            patch("actions.get_default_account", return_value="default"),
         ):
             yield
 
-    @patch("imap_stream_mcp.list_messages")
+    @patch("actions.list_messages")
     def test_list_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = []
         import asyncio
@@ -41,7 +41,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     def test_read_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "from": ["a@b.com"],
@@ -65,7 +65,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.search_messages")
+    @patch("actions.search_messages")
     def test_search_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = []
         import asyncio
@@ -77,7 +77,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     def test_create_draft_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "to": "a@b.com",
@@ -96,7 +96,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.modify_draft")
+    @patch("actions.modify_draft")
     def test_modify_draft_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "to": "a@b.com",
@@ -116,7 +116,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.edit_draft")
+    @patch("actions.edit_draft")
     def test_edit_draft_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "subject": "test",
@@ -134,7 +134,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.modify_flags")
+    @patch("actions.modify_flags")
     def test_flag_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "modified": 1,
@@ -151,7 +151,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.download_attachment")
+    @patch("actions.download_attachment")
     def test_attachment_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = {
             "filename": "test.pdf",
@@ -168,7 +168,7 @@ class TestAccountPassthrough:
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
 
-    @patch("imap_stream_mcp.list_folders")
+    @patch("actions.list_folders")
     def test_folders_passes_account(self, mock_fn, _patch_accounts):
         mock_fn.return_value = [{"name": "INBOX", "flags": []}]
         import asyncio

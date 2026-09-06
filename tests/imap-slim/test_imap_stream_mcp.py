@@ -20,8 +20,8 @@ pytestmark = pytest.mark.anyio
 class TestAccountsAction:
     """Tests for accounts action."""
 
-    @patch("imap_stream_mcp.list_accounts")
-    @patch("imap_stream_mcp.get_default_account")
+    @patch("actions.list_accounts")
+    @patch("actions.get_default_account")
     async def test_accounts_shows_multiple_accounts(self, mock_default, mock_list):
         """Should show list of accounts with default marked."""
         mock_list.return_value = ["work", "personal"]
@@ -33,8 +33,8 @@ class TestAccountsAction:
         assert "personal" in result
         assert "default" in result.lower()
 
-    @patch("imap_stream_mcp.list_accounts")
-    @patch("imap_stream_mcp.get_default_account")
+    @patch("actions.list_accounts")
+    @patch("actions.get_default_account")
     async def test_accounts_single_account_shows_hint(self, mock_default, mock_list):
         """Should show setup hint when only one account."""
         mock_list.return_value = ["default"]
@@ -45,8 +45,8 @@ class TestAccountsAction:
         # Single account should show the account but also hint about adding more
         assert "default" in result.lower()
 
-    @patch("imap_stream_mcp.list_accounts")
-    @patch("imap_stream_mcp.get_default_account")
+    @patch("actions.list_accounts")
+    @patch("actions.get_default_account")
     async def test_accounts_no_accounts_shows_setup(self, mock_default, mock_list):
         """Should show setup instructions when no accounts."""
         mock_list.return_value = []
@@ -94,7 +94,7 @@ class TestMailActionValidation:
 class TestListAndSearchAttachmentIndicator:
     """Tests for attachment + snippet formatting in list/search outputs."""
 
-    @patch("imap_stream_mcp.list_messages")
+    @patch("actions.list_messages")
     async def test_list_shows_att_indicator_only_for_positive_counts(self, mock_list):
         """list should append [att:N] when attachment_count > 0."""
         mock_list.return_value = [
@@ -126,7 +126,7 @@ class TestListAndSearchAttachmentIndicator:
         assert "**[124]** Without attachment" in result
         assert "[att:0]" not in result
 
-    @patch("imap_stream_mcp.search_messages")
+    @patch("actions.search_messages")
     async def test_search_shows_att_indicator_only_for_positive_counts(self, mock_search):
         """search should append [att:N] when attachment_count > 0."""
         mock_search.return_value = [
@@ -158,7 +158,7 @@ class TestListAndSearchAttachmentIndicator:
         assert "**[457]** No attachment" in result
         assert "[att:0]" not in result
 
-    @patch("imap_stream_mcp.list_messages")
+    @patch("actions.list_messages")
     async def test_list_sanitizes_injection_like_snippet(self, mock_list):
         """Snippet with injection pattern should be sanitized and trigger banner."""
         mock_list.return_value = [
@@ -179,7 +179,7 @@ class TestListAndSearchAttachmentIndicator:
         assert "<|" not in result
         assert "Potential prompt injection" in result
 
-    @patch("imap_stream_mcp.search_messages")
+    @patch("actions.search_messages")
     async def test_search_sanitizes_injection_like_snippet(self, mock_search):
         """Search snippet with injection pattern should be sanitized and trigger banner."""
         mock_search.return_value = [
@@ -204,7 +204,7 @@ class TestListAndSearchAttachmentIndicator:
 class TestReadActionWrapping:
     """Tests that read action uses context poisoning protection."""
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_wraps_email_content(self, mock_read):
         """Should wrap email content with nonce delimiter and no security notice for clean mail."""
         mock_read.return_value = {
@@ -230,7 +230,7 @@ class TestReadActionWrapping:
         assert "Potential prompt injection" not in result
         assert "SECURITY NOTICE" not in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_strips_malicious_subject(self, mock_read):
         """Should strip injection attempts in subject and warn."""
         mock_read.return_value = {
@@ -257,7 +257,7 @@ class TestReadActionWrapping:
         assert "SECURITY NOTICE" in result
         assert "Potential prompt injection" in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_shows_attachments_outside_wrapper(self, mock_read):
         """Attachments info should be outside the email wrapper."""
         mock_read.return_value = {
@@ -285,7 +285,7 @@ class TestReadActionWrapping:
         # Attachments should be AFTER the email wrapper closes
         assert attachments_pos > email_end
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_separates_attachments_and_inline_images(self, mock_read):
         """read action should show real attachments and inline images separately with indices."""
         mock_read.return_value = {
@@ -313,7 +313,7 @@ class TestReadActionWrapping:
         assert "[0] image001.png" in result
         assert "[1] image002.png" in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_payload_full_modifier_calls_read_message_with_full(self, mock_read):
         """read with :full should call read_message(..., full=True)."""
         mock_read.return_value = {
@@ -337,7 +337,7 @@ class TestReadActionWrapping:
 
         mock_read.assert_called_once_with("INBOX", 123, account=None, full=True, depth=0)
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_payload_numeric_modifier_calls_read_message_with_depth(self, mock_read):
         """read with :1 should call read_message(..., depth=1)."""
         mock_read.return_value = {
@@ -369,7 +369,7 @@ class TestReadActionWrapping:
         assert "123:1" in result
         assert "123:full" in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_truncation_notice_outside_wrapper_before_attachments(self, mock_read):
         """Truncation notice should be trusted metadata outside wrapper."""
         mock_read.return_value = {
@@ -402,7 +402,7 @@ class TestReadActionWrapping:
         assert ":1" in result
         assert ":full" in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_depth_one_notice_recommends_next_and_full(self, mock_read):
         """Depth-1 truncation notice should recommend :2 and :full."""
         mock_read.return_value = {
@@ -428,7 +428,7 @@ class TestReadActionWrapping:
         assert ":2" in result
         assert ":full" in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_short_email_without_quotes_has_no_truncation_notice(self, mock_read):
         """Short emails without quotes should not include truncation notice."""
         mock_read.return_value = {
@@ -452,7 +452,7 @@ class TestReadActionWrapping:
 
         assert "**Quoted reply chain omitted**" not in result
 
-    @patch("imap_stream_mcp.read_message")
+    @patch("actions.read_message")
     async def test_read_depth_one_without_remaining_has_no_truncation_notice(self, mock_read):
         """When :1 already returns full content, no truncation notice is shown."""
         mock_read.return_value = {
@@ -487,7 +487,7 @@ class TestReadActionWrapping:
 class TestDraftAttachmentPayload:
     """Tests for draft action attachment payload handling."""
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_attachments_parsed_from_payload(self, mock_create):
         """Attachments field parsed and passed to create_draft."""
         mock_create.return_value = {
@@ -511,7 +511,7 @@ class TestDraftAttachmentPayload:
         call_kwargs = mock_create.call_args
         assert call_kwargs.kwargs.get("attachments") == ["/tmp/file.pdf"] or call_kwargs[1].get("attachments") == ["/tmp/file.pdf"]
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_invalid_attachments_type_returns_error(self, mock_create):
         """String instead of list → error without calling create_draft."""
         result = await use_mail(
@@ -526,7 +526,7 @@ class TestDraftAttachmentPayload:
         assert "list" in result
         mock_create.assert_not_called()
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_response_includes_attachment_info(self, mock_create):
         """Response output includes attachment names and sizes."""
         mock_create.return_value = {
@@ -553,7 +553,7 @@ class TestDraftAttachmentPayload:
         assert "data.csv" in result
         assert "**Attachments:**" in result
 
-    @patch("imap_stream_mcp.modify_draft")
+    @patch("actions.modify_draft")
     async def test_modify_draft_with_attachments(self, mock_modify):
         """Modify draft passes attachments through."""
         mock_modify.return_value = {
@@ -579,7 +579,7 @@ class TestDraftAttachmentPayload:
         assert "new.txt" in result
         assert "**Attachments:**" in result
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_non_string_attachment_entries_rejected(self, mock_create):
         """Non-string entries in attachments list → error."""
         result = await use_mail(
@@ -598,7 +598,7 @@ class TestDraftAttachmentPayload:
 class TestDraftFormatValidation:
     """Tests for draft format validation and error handling."""
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_format_inside_payload_is_rejected(self, mock_create):
         """Superseded: format is a top-level parameter, not a payload key."""
         result = await use_mail(
@@ -613,7 +613,7 @@ class TestDraftFormatValidation:
         assert "top-level" in result
         mock_create.assert_not_called()
 
-    @patch("imap_stream_mcp.modify_draft")
+    @patch("actions.modify_draft")
     async def test_format_inside_modify_payload_is_rejected(self, mock_modify):
         """Same for the modify branch."""
         result = await use_mail(
@@ -636,7 +636,7 @@ class TestDraftFormatValidation:
         message = str(exc.value)
         assert "format" in message and "markdown" in message and "plain" in message
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_draft_plain_format_still_works(self, mock_create):
         """Plain format remains supported."""
         mock_create.return_value = {
@@ -694,7 +694,7 @@ class TestEditAction:
         assert "must be a numeric message ID" in non_numeric_id
         assert "must be a positive integer" in negative_id
 
-    @patch("imap_stream_mcp.edit_draft")
+    @patch("actions.edit_draft")
     async def test_edit_action_calls_edit_draft_and_formats_response(self, mock_edit):
         """Valid edit payload should call edit_draft and show change summary."""
         mock_edit.return_value = {
@@ -724,7 +724,7 @@ class TestEditAction:
         assert '"11 ducks" \u2192 "12 ducks"' in result
         assert '"480 kg" \u2192 "450 kg"' in result
 
-    @patch("imap_stream_mcp.edit_draft")
+    @patch("actions.edit_draft")
     async def test_edit_action_old_not_found_error(self, mock_edit):
         """edit_draft error should be returned as actionable message."""
         mock_edit.side_effect = Exception("old string not found. Use 'read' to verify current draft content.")
@@ -771,7 +771,7 @@ class TestEditAction:
         assert "[att:N]" in result
         assert "snippet" in result.lower()
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_draft_markdown_format_still_works(self, mock_create):
         """Markdown format remains supported."""
         mock_create.return_value = {
@@ -810,7 +810,7 @@ class TestTopLevelFormatControlsTheDraft:
         "preserved_reply_to": False,
     }
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_create_plain_sends_no_html(self, mock_create):
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
@@ -824,7 +824,7 @@ class TestTopLevelFormatControlsTheDraft:
         assert mock_create.call_args.kwargs["body"] == "**not bold**"
         assert "**Format:** plain text only" in result
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_create_markdown_sends_both(self, mock_create):
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
@@ -838,7 +838,7 @@ class TestTopLevelFormatControlsTheDraft:
         assert mock_create.call_args.kwargs["body"] == "*bold*"
         assert "**Format:** markdown" in result
 
-    @patch("imap_stream_mcp.modify_draft")
+    @patch("actions.modify_draft")
     async def test_modify_plain_sends_no_html(self, mock_modify):
         mock_modify.return_value = dict(self.RESULT)
         result = await use_mail(
@@ -853,7 +853,7 @@ class TestTopLevelFormatControlsTheDraft:
         assert mock_modify.call_args.kwargs["body"] == "**not bold**"
         assert "**Format:** plain text only" in result
 
-    @patch("imap_stream_mcp.modify_draft")
+    @patch("actions.modify_draft")
     async def test_modify_markdown_sends_both(self, mock_modify):
         mock_modify.return_value = dict(self.RESULT)
         result = await use_mail(
@@ -867,7 +867,7 @@ class TestTopLevelFormatControlsTheDraft:
         assert "<strong>bold</strong>" in mock_modify.call_args.kwargs["html"]
         assert "**Format:** markdown" in result
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_the_word_format_in_the_body_is_harmless(self, mock_create):
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
@@ -880,7 +880,7 @@ class TestTopLevelFormatControlsTheDraft:
         assert "# Draft Created" in result
         mock_create.assert_called_once()
 
-    @patch("imap_stream_mcp.create_draft")
+    @patch("actions.create_draft")
     async def test_a_payload_that_is_not_an_object_does_not_trip_the_key_check(self, mock_create):
         """payload='"format"' decodes to a string: there is no key to forbid."""
         result = await use_mail(MailAction(action="draft", format="plain", payload='"format"'))

@@ -1,0 +1,113 @@
+{
+  "$defs": {
+    "MailAction": {
+      "description": "Input for use_mail tool - Jesse Vincent style single-tool pattern.",
+      "properties": {
+        "account": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Account name for multi-account setups. Use 'accounts' action to list. Default account used if omitted.",
+          "title": "Account"
+        },
+        "action": {
+          "description": "Action: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help",
+          "title": "Action",
+          "type": "string"
+        },
+        "folder": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')",
+          "title": "Folder"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "enum": [
+                "markdown",
+                "plain"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Body format, required for draft. 'markdown': rendered to HTML plus a plain alternative; a newline is a line break, a blank line a paragraph. 'plain': sent exactly as written, no HTML.",
+          "title": "Format"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 20,
+          "description": "Max results for list/search",
+          "title": "Limit"
+        },
+        "payload": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+          "title": "Payload"
+        },
+        "preview": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Include body snippet (~100 chars) in list/search results. Required for list and search actions.",
+          "title": "Preview"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "title": "MailAction",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "params": {
+      "$ref": "#/$defs/MailAction"
+    }
+  },
+  "required": [
+    "params"
+  ],
+  "title": "use_mailArguments",
+  "type": "object"
+}

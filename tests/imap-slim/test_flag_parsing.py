@@ -68,7 +68,7 @@ class TestParseFlagPayload:
     """Test flag payload parsing from MCP action."""
 
     def test_single_message_single_add_flag(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("123:+Flagged")
         assert msg_ids == [123]
@@ -76,7 +76,7 @@ class TestParseFlagPayload:
         assert remove == []
 
     def test_single_message_single_remove_flag(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("123:-Seen")
         assert msg_ids == [123]
@@ -84,7 +84,7 @@ class TestParseFlagPayload:
         assert remove == ["Seen"]
 
     def test_single_message_multiple_flags(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("123:+Flagged,-Seen")
         assert msg_ids == [123]
@@ -92,7 +92,7 @@ class TestParseFlagPayload:
         assert remove == ["Seen"]
 
     def test_batch_messages_single_flag(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("123,124,125:+Flagged")
         assert msg_ids == [123, 124, 125]
@@ -100,7 +100,7 @@ class TestParseFlagPayload:
         assert remove == []
 
     def test_batch_messages_multiple_flags(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("1,2,3:+Flagged,+Answered,-Seen")
         assert msg_ids == [1, 2, 3]
@@ -108,7 +108,7 @@ class TestParseFlagPayload:
         assert remove == ["Seen"]
 
     def test_keyword_flags(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload("123:+$label1,-$label2")
         assert msg_ids == [123]
@@ -116,7 +116,7 @@ class TestParseFlagPayload:
         assert remove == ["$label2"]
 
     def test_whitespace_handling(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         msg_ids, add, remove = parse_flag_payload(" 123 : +Flagged , -Seen ")
         assert msg_ids == [123]
@@ -124,25 +124,25 @@ class TestParseFlagPayload:
         assert remove == ["Seen"]
 
     def test_invalid_format_no_colon(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         with pytest.raises(ValueError, match="Invalid.*format"):
             parse_flag_payload("123+Flagged")
 
     def test_invalid_format_no_flags(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         with pytest.raises(ValueError, match="No flags"):
             parse_flag_payload("123:")
 
     def test_invalid_message_id(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         with pytest.raises(ValueError, match="Invalid message ID"):
             parse_flag_payload("abc:+Flagged")
 
     def test_invalid_flag_no_prefix(self):
-        from imap_stream_mcp import parse_flag_payload
+        from actions import parse_flag_payload
 
         with pytest.raises(ValueError, match="must start with"):
             parse_flag_payload("123:Flagged")
