@@ -42,7 +42,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
   "mcpServers": {
     "imap-slim": {
       "command": "uv",
-      "args": ["--directory", "/path/to/imap-slim-mcp", "run", "imap-slim"]
+      "args": ["--directory", "/path/to/imap-slim", "run", "imap-slim"]
     }
   }
 }
@@ -50,12 +50,12 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Other Coding Agents
 
-Tell your LLM to install the MCP server from `https://github.com/vre/flow-state/imap-slim-mcp`
+Tell your LLM to install the MCP server from `https://github.com/vre/flow-state/imap-slim`
 
 ### Manual
 
 ```bash
-cd flow-state/imap-slim-mcp
+cd flow-state/imap-slim
 uv sync
 claude mcp add imap-slim -- uv --directory $(pwd) run imap-slim
 ```

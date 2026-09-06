@@ -37,7 +37,7 @@
 - 🔐 **Secure** — credentials in OS keychain (or env variables for Docker/CI)
 - 🏢 **Multi-account** — multiple account support with named switching
 
-[Full documentation →](imap-slim-mcp/README.md)
+[Full documentation →](imap-slim/README.md)
 
 ## Chrome Control
 

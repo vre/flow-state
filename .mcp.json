@@ -5,7 +5,7 @@
       "command": "uv",
       "args": [
         "--directory",
-        "./imap-slim-mcp",
+        "./imap-slim",
         "run",
         "imap-slim"
       ],

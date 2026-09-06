@@ -19,20 +19,17 @@ Usage with Claude Desktop/Code:
 """
 
 import json
-import re
 from pathlib import Path
 from typing import Literal
 
 import html2text
 from imap_client import (
-    ConnectionFailure,
     IMAPError,
     cleanup_attachments,
     create_draft,
     download_attachment,
     edit_draft,
     get_default_account,
-    is_transport_failure,
     list_accounts,
     list_folders,
     list_messages,
@@ -42,114 +39,17 @@ from imap_client import (
     read_message,
     search_messages,
 )
-from imapclient.exceptions import LoginError
 from injection_defense import sanitize_external_text, wrap_untrusted
 from markdown_utils import convert_body
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
-
-def _format_attachment_line(attachments: list[dict]) -> str:
-    """Format attachment info for draft response."""
-    if not attachments:
-        return ""
-    parts = []
-    for att in attachments:
-        size = att["size"]
-        if size >= 1024 * 1024:
-            size_str = f"{size / (1024 * 1024):.1f} MB"
-        elif size >= 1024:
-            size_str = f"{size / 1024:.0f} KB"
-        else:
-            size_str = f"{size} B"
-        parts.append(f"{att['name']} ({size_str})")
-    return f"\n**Attachments:** {', '.join(parts)}"
-
-
-# Quota messages must mention connections. "Maximum login attempts exceeded"
-# contains both "maximum" and "exceeded" and is not a quota message.
-_QUOTA_PATTERN = re.compile(
-    r"too many connections|maximum number of connections|connection limit|too many concurrent",
-    re.IGNORECASE,
+from render import (
+    POTENTIAL_INJECTION_WARNING,
+    classify_connection_error,
+    format_attachment_line,
+    format_description,
+    format_flags,
 )
-
-
-def _find_cause(exc: BaseException, wanted: type) -> BaseException | None:
-    """First exception of the wanted type in the chain, or None."""
-    seen: set[int] = set()
-    current: BaseException | None = exc
-    while current is not None and id(current) not in seen:
-        seen.add(id(current))
-        if isinstance(current, wanted):
-            return current
-        current = current.__cause__ or current.__context__
-    return None
-
-
-def classify_connection_error(exc: BaseException) -> str | None:
-    """Name a connection failure for the caller, or None if it is not one.
-
-    Three causes need three different actions, and today they all arrive as one
-    opaque string. Called from both exception handlers in use_mail, because
-    `except IMAPError` precedes `except Exception` and would otherwise consume
-    the wrapped failures this exists to catch.
-    """
-    where = ""
-    if isinstance(exc, ConnectionFailure):
-        where = f" (stage: {exc.stage}, after {exc.elapsed:.1f}s)"
-
-    login_error = _find_cause(exc, LoginError)
-    if login_error is not None:
-        text = str(login_error)
-        if _QUOTA_PATTERN.search(text):
-            return (
-                f"**Connection limit reached**{where}. The server refused a new connection because "
-                "the account's quota is in use - other Claude sessions or your mail client are "
-                f"holding it. Close one and retry.\n\nServer said: {text}"
-            )
-        return (
-            f"**Login rejected by the server**{where}. This can be wrong credentials, but also a "
-            "disabled account, a policy block, or a required second factor - the server does not "
-            f"say which.\n\nServer said: {text}"
-        )
-
-    if is_transport_failure(exc):
-        return (
-            f"**Connection to the mail server was lost**{where}. The cached connection was dropped "
-            "and will be rebuilt on the next call. If this repeats on every call, the network path "
-            "to the server is down."
-        )
-
-    return None
-
-
-def _format_description(format_type: str) -> str:
-    """One line naming what the body was actually turned into."""
-    if format_type == "plain":
-        return "plain text only"
-    return "markdown \u2192 HTML + plain text"
-
-
-def format_flags(flags: list[str]) -> str:
-    """Format IMAP flags for display: [seen,flagged] #keyword."""
-    std_flags = []
-    tags = []
-    for f in flags:
-        if f.startswith("\\"):
-            std_flags.append(f[1:].lower())
-        else:
-            tags.append(f)
-    parts = []
-    if std_flags:
-        parts.append(f"[{','.join(std_flags)}]")
-    if tags:
-        parts.append(" ".join(f"#{t}" for t in tags))
-    return " ".join(parts)
-
-
-# Context poisoning protection - see injection_defense module
-POTENTIAL_INJECTION_WARNING = "**SECURITY NOTICE:** Potential prompt injection patterns detected; suspicious content removed or escaped."
-POTENTIAL_INJECTION_NOTICE = "[Suspicious patterns removed or escaped]"
 
 
 def parse_flag_payload(payload: str) -> tuple[list[int], list[str], list[str]]:
@@ -904,12 +804,12 @@ uv run --directory {plugin_dir} python setup.py
                 )
 
                 reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
-                att_info = _format_attachment_line(result.get("attachments", []))
+                att_info = format_attachment_line(result.get("attachments", []))
                 return f"""# Draft Modified{reply_info}
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
-**Format:** {_format_description(format_type)}
+**Format:** {format_description(format_type)}
 **Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""
@@ -943,12 +843,12 @@ Open Thunderbird → Drafts to review and send."""
                 account=params.account,
             )
 
-            att_info = _format_attachment_line(result.get("attachments", []))
+            att_info = format_attachment_line(result.get("attachments", []))
             return f"""# Draft Created
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
-**Format:** {_format_description(format_type)}
+**Format:** {format_description(format_type)}
 **Saved to:** {result["folder"]}
 
 Open Thunderbird → Drafts to review and send."""

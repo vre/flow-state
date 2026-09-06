@@ -21,7 +21,7 @@
     },
     {
       "name": "imap-slim-mcp",
-      "source": "./imap-slim-mcp",
+      "source": "./imap-slim",
       "description": "Lightweight IMAP email MCP server. ~500 tokens vs 15,000+. Multi-account support. Read, search, draft, flag emails with markdown support.",
       "version": "1.0.0",
       "category": "productivity",

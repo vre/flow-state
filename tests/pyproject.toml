@@ -12,20 +12,20 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-imap-slim-mcp = { path = "../imap-slim-mcp" }
+imap-slim-mcp = { path = "../imap-slim" }
 obsidian-slim-mcp = { path = "../obsidian-slim-mcp" }
 
 [tool.pytest.ini_options]
 testpaths = [
     "youtube-to-markdown",
-    "imap-slim-mcp",
+    "imap-slim",
     "obsidian-slim-mcp",
     "chrome-control",
     "firefox-control",
 ]
 pythonpath = [
     "../youtube-to-markdown",
-    "../imap-slim-mcp",
+    "../imap-slim",
     "../obsidian-slim-mcp",
     "../chrome-control",
     "../firefox-control",

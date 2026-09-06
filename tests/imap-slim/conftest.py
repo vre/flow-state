@@ -10,7 +10,7 @@ from typing import Any
 import pytest
 
 # Add imap-slim-mcp directory to Python path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-slim-mcp"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "imap-slim"))
 
 from imapclient import IMAPClient  # noqa: E402  (needs the path insert above)
 

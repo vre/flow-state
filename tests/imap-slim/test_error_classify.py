@@ -9,8 +9,8 @@ import errno
 
 import pytest
 from imap_client import ConnectionFailure, IMAPError, is_transport_failure
-from imap_stream_mcp import classify_connection_error
 from imapclient.exceptions import IMAPClientAbortError, IMAPClientError, LoginError
+from render import classify_connection_error
 
 
 class TestTransportPredicate:
