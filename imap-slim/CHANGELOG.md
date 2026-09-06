@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [1.1.0] - 2026-09-07
+
+The draft body contract is now explicit and visible, connection recovery is roughly 150x faster,
+and the same mail actions are available as a skill-backed CLI that costs a session nothing until
+it runs a command.
+
+**Breaking:** `format` is required on every draft and is a top-level parameter, not a payload key.
 
 ### Added
 - Fenced code blocks and pipe tables in markdown mode. Enabling the two extensions was the small

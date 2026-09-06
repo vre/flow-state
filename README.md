@@ -6,6 +6,7 @@
 |--------|------|---------|
 | [Youtube to Markdown](#youtube-to-markdown) | skill | `/plugin install youtube-to-markdown@flow-state` |
 | [IMAP Slim MCP](#imap-slim-mcp) | mcp | `/plugin install imap-slim-mcp@flow-state` |
+| [IMAP Slim CLI](#imap-slim-mcp) | skill | `/plugin install imap-slim-cli@flow-state` |
 | [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
 | [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
 
@@ -36,6 +37,9 @@
 - ✍️ **Draft replies** — markdown converted to HTML + plain text alternatives
 - 🔐 **Secure** — credentials in OS keychain (or env variables for Docker/CI)
 - 🏢 **Multi-account** — multiple account support with named switching
+
+Same actions are available as a skill-backed CLI (`imap-slim-cli`), which loads nothing into a
+session until a command runs. Install either, or both.
 
 [Full documentation →](imap-slim/README.md)
 

@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Knowledge work, context management, and productivity tools/skills/etc. for Claude Code",
-    "version": "20260531.1000",
+    "version": "20260907.1000",
     "pluginRoot": "./"
   },
   "plugins": [
@@ -16,34 +16,83 @@
       "description": "Transform YouTube video to storagable knowledge. Choose from summary only, transcript only, comments only, or full extraction. Get tight summary, cleaned transcript, curated comment insights, and watch guide with WATCH/SKIM/READ-ONLY gate. Browse channels to batch-extract or refresh comments. Modular architecture runs independent steps in parallel.",
       "version": "3.0.0",
       "category": "media-extraction",
-      "keywords": ["youtube", "transcript", "captions", "markdown", "summary", "chapters", "comments", "channel"],
-      "skills": ["./"]
+      "keywords": [
+        "youtube",
+        "transcript",
+        "captions",
+        "markdown",
+        "summary",
+        "chapters",
+        "comments",
+        "channel"
+      ],
+      "skills": [
+        "./"
+      ]
     },
     {
       "name": "imap-slim-mcp",
       "source": "./imap-slim",
-      "description": "Lightweight IMAP email MCP server. ~500 tokens vs 15,000+. Multi-account support. Read, search, draft, flag emails with markdown support.",
-      "version": "1.0.0",
+      "description": "Lightweight IMAP email MCP server. Read, search, flag and draft mail; markdown or plain bodies, chosen explicitly. Multi-account. See imap-slim-cli for the same actions as a skill, which costs no context until used.",
+      "version": "1.1.0",
       "category": "productivity",
-      "keywords": ["email", "imap", "mcp"]
+      "keywords": [
+        "email",
+        "imap",
+        "mcp"
+      ],
+      "mcpServers": "./mcp-server.json"
+    },
+    {
+      "name": "imap-slim-cli",
+      "source": "./imap-slim",
+      "description": "Same IMAP mail access as imap-slim-mcp, as a skill-backed CLI. Costs no context until a command runs, where an enabled MCP server loads its tool schema into every session.",
+      "version": "1.1.0",
+      "category": "productivity",
+      "keywords": [
+        "email",
+        "imap",
+        "cli",
+        "skill"
+      ],
+      "skills": [
+        "./"
+      ]
     },
     {
       "name": "chrome-control",
       "source": "./chrome-control",
-      "description": "Control Chrome via CDP — debug web apps, run JavaScript, take screenshots, monitor console. Connects to your running Chrome session (M144+) or launches a separate instance.",
+      "description": "Control Chrome via CDP \u2014 debug web apps, run JavaScript, take screenshots, monitor console. Connects to your running Chrome session (M144+) or launches a separate instance.",
       "version": "1.0.0",
       "category": "browser-automation",
-      "keywords": ["chrome", "cdp", "devtools", "debugging", "screenshots", "browser"],
-      "skills": ["./"]
+      "keywords": [
+        "chrome",
+        "cdp",
+        "devtools",
+        "debugging",
+        "screenshots",
+        "browser"
+      ],
+      "skills": [
+        "./"
+      ]
     },
     {
       "name": "firefox-control",
       "source": "./firefox-control",
-      "description": "TEST TOOL: Control Firefox via WebDriver BiDi. Direct WebSocket, no geckodriver. Daemon mode with persistent connection. navigator.webdriver=true kills production use — proves BiDi works, documents why Firefox fails for agent automation.",
+      "description": "TEST TOOL: Control Firefox via WebDriver BiDi. Direct WebSocket, no geckodriver. Daemon mode with persistent connection. navigator.webdriver=true kills production use \u2014 proves BiDi works, documents why Firefox fails for agent automation.",
       "version": "0.1.0",
       "category": "browser-automation",
-      "keywords": ["firefox", "bidi", "webdriver", "browser", "automation"],
-      "skills": ["./"]
+      "keywords": [
+        "firefox",
+        "bidi",
+        "webdriver",
+        "browser",
+        "automation"
+      ],
+      "skills": [
+        "./"
+      ]
     }
   ]
 }
