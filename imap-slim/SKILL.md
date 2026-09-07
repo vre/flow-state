@@ -18,6 +18,10 @@ uv run --directory ${CLAUDE_PLUGIN_ROOT} imap-slim-cli --help
 The first command builds the plugin's virtual environment and takes a few seconds; later ones are
 immediate. `${CLAUDE_PLUGIN_ROOT}` is substituted for you.
 
+If a command reports that credentials are not configured, that is set up once by the user with
+`uv run --directory ${CLAUDE_PLUGIN_ROOT} python setup.py` — it is interactive and asks for a
+password, so it is not something to run on their behalf.
+
 Output is **markdown, meant to be read**, not machine-parseable. Exit code 0 means the command
 succeeded, 1 means the action failed and the message is on stderr, 2 means the arguments were wrong.
 

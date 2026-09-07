@@ -108,3 +108,15 @@ When releasing a plugin update from a worktree branch:
 5. For prompt-only workflow changes:
    - run interactive extraction regression checks
    - verify context/token behavior with historian session inspection
+
+## Environment traps
+
+- **`tests/uv.lock` is not tracked** — `.gitignore` ignores every lockfile. A fresh worktree
+  re-resolves and can pick different versions, so copy `tests/uv.lock` from main during worktree
+  setup or the environment differs from the one the suite was green on.
+- **`uv run --frozen` reuses the lock and never re-resolves.** It is the right flag for reproducing
+  an environment and the wrong one for proving a packaging change: a broken `pyproject.toml` passed
+  in a worktree and failed on main, where nothing was frozen.
+- **Pin a dependency that renames its public API.** `mcp>=1.0.0` resolved to 2.x, which removed
+  `mcp.server.fastmcp`, and both MCP plugins were dead on any fresh install while existing
+  environments kept working. Unbounded upper ranges hide this until someone installs.

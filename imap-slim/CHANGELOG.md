@@ -1,183 +1,48 @@
 # Changelog
 
-## [2.2.2] - 2026-09-07
-
-### Fixed
-- **The default account is now marked wherever accounts are listed.** Only `--list` showed it, so
-  every interactive prompt that offered a choice between accounts hid the consequence of picking
-  none of them. A name pasted back with its ` (default)` marker still resolves.
-
-## [2.2.1] - 2026-09-07
-
-### Fixed
-- **`setup.py` prompts show the current value again.** 2.2.0 put existing values in the readline
-  edit buffer instead of in brackets; the buffer never rendered, so `  Account name: ` appeared
-  empty and there was no way to see what pressing Enter would keep. All prompts now use the
-  bracket form, and readline is gone.
-
-## [2.2.0] - 2026-09-07
-
-### Added
-- **`setup.py` can remove an account and set the default from its interactive menu.** Both existed
-  only as command-line flags, which meant they existed only for someone who thought to run
-  `--help`.
-- **Updating an account pre-fills every field, editable in place.** Correcting one character in a
-  server name meant retyping the server, the port, the username and the password. The account name
-  is editable too, so an account can be renamed and its keys move with it.
-- Every current or suggested value is shown in brackets: `Port [993]: `, `Account name [foo]: `.
-  Enter keeps it, typing replaces it. Readline pre-filling the edit buffer was tried and removed
-  in 2.2.1 - it never rendered, so the prompt showed nothing after the colon and there was no way
-  to see what an empty answer would keep.
-- **An empty password keeps the stored one.** It cannot be pre-filled - it is never read back - so
-  the prompt says what an empty answer does.
-
-### Notes
-- Renaming onto an existing account name is refused, and the source account is left untouched.
-- Removal from the menu asks for confirmation first.
-- `setup.py` had no tests at all; it has eleven now.
-
-## [2.1.0] - 2026-09-07
-
-### Added
-- **Read operations retry once on a fresh connection.** A connection can die between the liveness
-  probe and the command; that race cannot be probed away, only retried through. `read`, `search`
-  and `attachment` now recover from it instead of surfacing an error.
-- `AccountSession.run_op(operation, retry=...)`. A context manager cannot do this - an exception
-  thrown back at its `yield` can be suppressed or transformed, but the caller's `with` body cannot
-  be run again - so an operation that wants a retry passes its body as a callable.
-
-### Notes
-- **Retry is opt-in and off by default.** `create`, `replace` and `flag` never replay: an appended
-  message would be duplicated and an expunge cannot be undone. A test asserts they do not use the
-  retrying runner.
-
-## [2.0.1] - 2026-09-07
-
-### Fixed
-- **`replace` could permanently delete messages it was not replacing.** It ended with a bare
-  `EXPUNGE`, which RFC 3501 defines as removing *every* message carrying `\Deleted` in the selected
-  mailbox - not the one just marked. Demonstrated on a live account: two drafts that had only been
-  marked, and which the README described as recoverable, were destroyed by a later replace.
-  It now uses `uid_expunge` (RFC 4315) to remove only the draft it superseded
-- **Without UIDPLUS, nothing is expunged at all.** There is no scoped form to fall back to, so the
-  superseded draft is left marked `\Deleted` for the user's mail client to clear, and the response
-  says so. Expunging everything is not an acceptable fallback for expunging one thing
-- **`replace` is confined to the Drafts folder.** The folder came from the caller and only the
-  target message was checked for the `\Draft` flag, so an expunge could be pointed at any folder
-  holding the user's own `\Deleted` messages. A non-Drafts folder is now refused before anything
-  is written
-
 ## [2.0.0] - 2026-09-07
 
-**Breaking: the action names now describe what IMAP actually does.** There is no edit — messages
-are immutable — so what was called editing was always a replace.
+Everything below is relative to 1.0.0. The intermediate versions this work passed through were
+never published.
 
-### Changed
-- `draft` without an id is now **`create`** (an `APPEND`)
-- `draft` with an id is now **`replace`** (an `APPEND`, then an expunge of the draft it supersedes)
-- `replace` reports "Draft Replaced" and, as before, gives the draft a **new id** — the old one is
-  stale the moment a replace succeeds
+**Breaking:**
 
-### Removed
-- **`edit`.** It fetched a draft, substituted text, and performed the same replace, which made its
-  name a promise the protocol cannot keep: in-place mutation with a stable identity. It was already
-  refused for any draft with an HTML body, and for a plain draft it did nothing the caller could not
-  do by sending the body again
-
-### Notes
-- The expunge inside `replace` is the only deletion this client performs, and it is not exposed as
-  an action. `flag ... +Deleted` marks a message and nothing more; your mail client does the
-  deleting. `cleanup` removes downloaded attachment temp files locally and never touches the server
-
-## [1.1.1] - 2026-09-07
+- `draft` and `edit` are replaced by `create` and `replace`. IMAP messages are immutable, so what
+  was called editing always appended a new version and expunged the old. A replaced draft gets a
+  new id.
+- `format` is a required top-level parameter, not a payload key, with no default. Everything inside
+  `payload` is a JSON string and never reaches the tool schema, so the contract was undiscoverable
+  and the default silently produced HTML for callers who meant plain text.
 
 ### Fixed
-- **Legacy keychain migration could destroy working credentials.** `_migrate_legacy` copied every
-  key from the old `imap-stream` service into `imap-slim` unconditionally and then deleted the
-  source, so a stale legacy entry replaced live credentials with itself and the originals were
-  gone. It runs from `_keyring_get`, so any credential read could trigger it. It now refuses to
-  run at all when the current service already holds accounts, never overwrites an existing key,
-  and deletes a source key only after verifying its copy landed intact
-- **The test suite reached the real login keychain.** An autouse fixture now replaces
-  `imap_client.keyring` with an in-memory store for every test. A suite that can read live
-  credentials could also trigger the migration above, which is how running tests became capable
-  of destroying them
 
-## [1.1.0] - 2026-09-07
-
-The draft body contract is now explicit and visible, connection recovery is roughly 150x faster,
-and the same mail actions are available as a skill-backed CLI that costs a session nothing until
-it runs a command.
-
-**Breaking:** `format` is required on every draft and is a top-level parameter, not a payload key.
+- **Legacy keychain migration destroyed working credentials.** It copied every `imap-stream` key
+  over `imap-slim` unconditionally and deleted the source, on every credential read. It now refuses
+  when the current service holds accounts, never overwrites, and deletes a source key only after
+  verifying its copy.
+- **`replace` could permanently delete messages it was not replacing.** A bare `EXPUNGE` removes
+  every `\Deleted` message in the mailbox. It now uses `uid_expunge` for exactly the superseded
+  draft, is refused outside the Drafts folder, and expunges nothing at all without UIDPLUS.
+- **`mcp>=1.0.0` made fresh installs dead on arrival.** mcp 2.x removed `mcp.server.fastmcp`; the
+  dependency is pinned `<2`.
+- A call made after an idle pause paid a full 30 s socket timeout before recovering. A connection
+  believed dead is now discarded without sending anything: ~0.2 s.
+- Line breaks were lost from the HTML part, so a signature block arrived as one running line.
+- A line of only `=`, `~`, `*` or `_` was mangled in the plain part - `=====` became `=`.
+- `edit` silently degraded formatting: bold became italic, strikethrough and highlight vanished.
+- Both READMEs claimed "No destructive operations - No EXPUNGE" while the code had expunged for
+  as long as it existed.
 
 ### Added
-- Fenced code blocks and pipe tables in markdown mode. Enabling the two extensions was the small
-  part; they exposed four defects that existed all along and were invisible only because the
-  extensions were off:
-  - `preprocess_markdown` had no fence state and injected blank lines *inside* fenced content
-  - `markdown_to_plain` ran its five substitutions over fenced code, so the plain alternative
-    rewrote the author's `**literal**`, `~~literal~~`, `==literal==` and links
-  - `autolink_urls` inserted an anchor inside `<pre><code>`, and nested a second anchor around the
-    visible text of an existing one
-  - a table with no blank line above it was not parsed as a table
-- Fence recognition matches python-markdown rather than approximating it: column zero only, the
-  closing delimiter run must repeat the opener exactly, a language tag may contain `#`, `.` or
-  attribute syntax, a `~~~` inside a backtick fence is content, and an unterminated fence is not a
-  fence. That last rule is what keeps a lone `~~~~~` working as the ASCII rule line it was
 
-### Fixed
-- A line break between two consecutive `>` lines now survives. Preprocessing inserted a blank line
-  between them, splitting one quoted paragraph into two and defeating the newline rule inside
-  quotes
-- `mcp` is pinned below 2. The dependency was `mcp>=1.0.0` with no upper bound, and mcp 2.x renamed
-  `FastMCP` to `MCPServer`, removing `mcp.server.fastmcp` entirely - so a fresh install resolved
-  2.1.1 and the server died at import with `ModuleNotFoundError: No module named
-  'mcp.server.fastmcp'`. The plugin was dead on arrival for anyone installing it today; existing
-  installs only worked because their environment still held a 1.x resolved earlier. Migrating to
-  the 2.x API is a separate decision
-
-### Changed
-- `format` is now a **required top-level parameter** on draft actions, not a key inside the payload
-  JSON. Everything inside `payload` is a JSON string, so none of it ever reached the tool schema -
-  no type, no enum, no description - which is why a session had no way to learn that its draft body
-  was markdown without opening the help. It now appears in the served schema with its two values
-- There is no default format at any layer, including `convert_body`. A silent default is what let a
-  caller send markdown while believing it was sending plain text
-- `format` inside the draft payload is now an explicit error naming the new parameter
-- `edit` refuses any draft that carries an HTML body. It re-rendered the HTML from the stored plain
-  part, which is the lossy projection, so one replacement to an unrelated word turned `<strong>`
-  into `<em>` and dropped `<del>` and `<mark>` entirely. Nothing stores the source, so it cannot be
-  done correctly - send the whole body with a draft-modify instead. Editing a plain draft is
-  unchanged
-
-### Fixed
-- A newline inside a paragraph is now a line break in the HTML part (`nl2br`). A signature block
-  arrived as one running line, and the HTML and plain alternatives of the same message disagreed
-- A line that is only a run of `=`, `~`, `*` or `_` survives into the plain part. `=====` became
-  `=`, `*****` became `***`, `_____` became `*_*` - an ASCII rule is not emphasis. Indented and
-  quoted rules, CRLF and bare CR are all covered
-
-### Fixed
-- Connection recovery: a call made after an idle pause paid a full 30 s socket timeout before it could
-  reconnect. A connection believed dead is now dropped with `shutdown()`, which sends nothing, and one
-  idle past `CONNECTION_MAX_IDLE` (60 s, was 300 s) is dropped without being probed. Measured against a
-  fake server that completes LOGIN then goes silent: 30 s before, 0.2 s after
-- `LOGOUT` is no longer sent to a connection suspected dead - it is an IMAP command and blocks for the
-  full socket timeout on a silent socket
-- One IMAP connection is a single protocol stream, so the lease now holds the session lock for the whole
-  operation. `get_folders` and `get_messages` previously ran their commands outside any lock
-- Transport failures are no longer swallowed inside a lease: `modify_flags` recorded them as per-message
-  errors and the snippet preview turned them into empty results, in both cases leaving the dead
-  connection cached for the next call to trip over
-- A rejected login no longer leaks its client - it was a local that nothing could close, holding a server
-  slot until garbage collection
-- `download_attachment` writes its file outside the connection lease, so a slow filesystem cannot be
-  reported as a lost server connection
-
-### Added
-- Connection failures now name their cause - stale socket, rejected login, or connection quota - and the
-  stage they failed at, instead of a single opaque `Error: TimeoutError: timed out`
+- **`imap-slim-cli`**, the same actions as a skill-backed CLI. An enabled MCP server loads ~814
+  tokens into every session; the skill costs ~41 until a command runs. Both dispatch through one
+  `run_action`, so they cannot drift.
+- Fenced code blocks and pipe tables, with fence content sent exactly as written in both parts.
+- Read operations retry once on a fresh connection. Writes never replay.
+- `setup.py` manages accounts interactively: remove, set default, and edit any field without
+  retyping, including renaming an account.
+- Decisions with tradeoffs are recorded in `docs/imap-slim/adrs/`.
 
 ## [1.0.0] - 2026-05-30
 

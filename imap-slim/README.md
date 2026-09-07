@@ -137,6 +137,11 @@ Add to your MCP config:
 - **No credential leaks** - Password fetched by script only when IMAP connection opens, LLM never sees the password
 - **Encrypted connection** - SSL/TLS required
 
+## For maintainers
+
+Decisions with tradeoffs are in [docs/imap-slim/adrs/](../docs/imap-slim/adrs/); what is not
+verified is in [TODO.md](TODO.md).
+
 ## Project Structure
 
 ```
