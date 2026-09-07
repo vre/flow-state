@@ -2257,100 +2257,106 @@ class TestAttachmentRoundtrip:
 
 
 class TestKeyringMigration:
-    """Tests for legacy imap-stream → imap-slim keychain migration."""
+    """Legacy imap-stream -> imap-slim migration.
 
-    def setup_method(self):
-        import imap_client
+    Exercised against a real in-memory store rather than a MagicMock: migration
+    now verifies each copy before deleting the source, and a mock that does not
+    remember what was written cannot express that contract.
+    """
 
-        imap_client._migrated = False
+    LEGACY = {
+        "accounts": '["work"]',
+        "default_account": "work",
+        "work:imap_server": "mail.example.com",
+        "work:imap_port": "993",
+        "work:imap_username": "user@example.com",
+        "work:imap_password": "secret",
+    }
 
-    @patch("imap_client.keyring")
-    def test_migrate_copies_and_deletes_legacy(self, mock_kr):
-        """Migration copies all legacy entries to new name, then deletes them."""
+    def _seed_legacy(self, fake):
+        from imap_client import _LEGACY_SERVICE_NAME
+
+        for key, val in self.LEGACY.items():
+            fake.set_password(_LEGACY_SERVICE_NAME, key, val)
+
+    def test_migrate_copies_and_deletes_legacy(self, fake_keyring):
+        """An unconfigured install adopts the legacy entries and clears them."""
         from imap_client import _LEGACY_SERVICE_NAME, SERVICE_NAME, _migrate_legacy
 
-        legacy_data = {
-            (_LEGACY_SERVICE_NAME, "accounts"): '["work"]',
-            (_LEGACY_SERVICE_NAME, "default_account"): "work",
-            (_LEGACY_SERVICE_NAME, "work:imap_server"): "mail.example.com",
-            (_LEGACY_SERVICE_NAME, "work:imap_port"): "993",
-            (_LEGACY_SERVICE_NAME, "work:imap_username"): "user@example.com",
-            (_LEGACY_SERVICE_NAME, "work:imap_password"): "secret",
+        self._seed_legacy(fake_keyring)
+
+        _migrate_legacy()
+
+        for key, val in self.LEGACY.items():
+            assert fake_keyring.get_password(SERVICE_NAME, key) == val
+            assert fake_keyring.get_password(_LEGACY_SERVICE_NAME, key) is None
+
+    def test_migration_never_overwrites_a_configured_install(self, fake_keyring):
+        """The regression this whole change exists for.
+
+        Migration used to copy every legacy key unconditionally and then delete
+        the source. A stale legacy entry therefore replaced live credentials with
+        itself and destroyed the originals - on every credential read, since that
+        is where migration is triggered from.
+        """
+        from imap_client import _LEGACY_SERVICE_NAME, SERVICE_NAME, _migrate_legacy
+
+        live = {
+            "accounts": '["work"]',
+            "default_account": "work",
+            "work:imap_server": "imap.real-server.example",
+            "work:imap_port": "993",
+            "work:imap_username": "real@example.com",
+            "work:imap_password": "the-real-password",
         }
-        mock_kr.get_password.side_effect = lambda svc, key: legacy_data.get((svc, key))
-        mock_kr.errors.PasswordDeleteError = KeyError
+        for key, val in live.items():
+            fake_keyring.set_password(SERVICE_NAME, key, val)
+        self._seed_legacy(fake_keyring)
 
         _migrate_legacy()
 
-        set_calls = {(c.args[0], c.args[1]) for c in mock_kr.set_password.call_args_list}
-        assert (SERVICE_NAME, "accounts") in set_calls
-        assert (SERVICE_NAME, "work:imap_server") in set_calls
-        assert (SERVICE_NAME, "work:imap_password") in set_calls
+        for key, val in live.items():
+            assert fake_keyring.get_password(SERVICE_NAME, key) == val, f"{key} was overwritten"
+        # and the legacy entries are left alone rather than deleted
+        assert fake_keyring.get_password(_LEGACY_SERVICE_NAME, "work:imap_server") == "mail.example.com"
 
-        del_calls = {(c.args[0], c.args[1]) for c in mock_kr.delete_password.call_args_list}
-        assert (_LEGACY_SERVICE_NAME, "accounts") in del_calls
-        assert (_LEGACY_SERVICE_NAME, "work:imap_server") in del_calls
+    def test_a_single_surviving_key_is_not_overwritten(self, fake_keyring):
+        """Even a partially configured install keeps what it has."""
+        from imap_client import SERVICE_NAME, _migrate_legacy
 
-    @patch("imap_client.keyring")
-    def test_no_legacy_data_skips_migration(self, mock_kr):
-        """No migration when legacy keychain is empty."""
-        from imap_client import _migrate_legacy
-
-        mock_kr.get_password.return_value = None
+        fake_keyring.set_password(SERVICE_NAME, "accounts", '["work"]')
+        fake_keyring.set_password(SERVICE_NAME, "work:imap_password", "keep-me")
+        self._seed_legacy(fake_keyring)
 
         _migrate_legacy()
 
-        mock_kr.set_password.assert_not_called()
-        mock_kr.delete_password.assert_not_called()
+        assert fake_keyring.get_password(SERVICE_NAME, "work:imap_password") == "keep-me"
 
-    @patch("imap_client.keyring")
-    def test_keyring_get_uses_new_name_first(self, mock_kr):
-        """_keyring_get returns new-name value without touching legacy."""
+    def test_no_legacy_data_skips_migration(self, fake_keyring):
+        from imap_client import SERVICE_NAME, _migrate_legacy
+
+        _migrate_legacy()
+
+        assert fake_keyring.get_password(SERVICE_NAME, "accounts") is None
+
+    def test_keyring_get_uses_new_name_first(self, fake_keyring):
+        """A hit under the current name must not touch legacy at all."""
         from imap_client import SERVICE_NAME, _keyring_get
 
-        mock_kr.get_password.side_effect = lambda svc, key: "val" if svc == SERVICE_NAME else None
+        fake_keyring.set_password(SERVICE_NAME, "accounts", "val")
+        self._seed_legacy(fake_keyring)
 
-        result = _keyring_get("accounts")
+        assert _keyring_get("accounts") == "val"
+        # legacy untouched
+        assert fake_keyring.get_password("imap-stream", "accounts") == '["work"]'
 
-        assert result == "val"
-        assert mock_kr.get_password.call_count == 1
+    def test_keyring_get_triggers_migration_on_miss(self, fake_keyring):
+        from imap_client import SERVICE_NAME, _keyring_get
 
-    @patch("imap_client.keyring")
-    def test_keyring_get_triggers_migration_on_miss(self, mock_kr):
-        """_keyring_get triggers migration when new name returns None."""
-        from imap_client import _LEGACY_SERVICE_NAME, SERVICE_NAME, _keyring_get
+        self._seed_legacy(fake_keyring)
 
-        call_count = [0]
-
-        def fake_get(svc, key):
-            if svc == SERVICE_NAME:
-                call_count[0] += 1
-                # First call: miss. After migration: hit.
-                return "migrated" if call_count[0] > 1 else None
-            if svc == _LEGACY_SERVICE_NAME and key == "accounts":
-                return '["default"]'
-            return None
-
-        mock_kr.get_password.side_effect = fake_get
-        mock_kr.errors.PasswordDeleteError = KeyError
-
-        result = _keyring_get("accounts")
-
-        assert result == "migrated"
-        assert mock_kr.set_password.called
-
-    @patch("imap_client.keyring")
-    def test_migration_runs_only_once(self, mock_kr):
-        """Second call to _migrate_legacy is a no-op."""
-        from imap_client import _LEGACY_SERVICE_NAME, _migrate_legacy
-
-        mock_kr.get_password.side_effect = lambda svc, key: ('["a"]' if svc == _LEGACY_SERVICE_NAME and key == "accounts" else None)
-        mock_kr.errors.PasswordDeleteError = KeyError
-
-        _migrate_legacy()
-        first_set_count = mock_kr.set_password.call_count
-        _migrate_legacy()
-        assert mock_kr.set_password.call_count == first_set_count
+        assert _keyring_get("accounts") == '["work"]'
+        assert fake_keyring.get_password(SERVICE_NAME, "work:imap_password") == "secret"
 
 
 class TestModifyFlagsTransportFailures:

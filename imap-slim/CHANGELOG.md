@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.1] - 2026-09-07
+
+### Fixed
+- **Legacy keychain migration could destroy working credentials.** `_migrate_legacy` copied every
+  key from the old `imap-stream` service into `imap-slim` unconditionally and then deleted the
+  source, so a stale legacy entry replaced live credentials with itself and the originals were
+  gone. It runs from `_keyring_get`, so any credential read could trigger it. It now refuses to
+  run at all when the current service already holds accounts, never overwrites an existing key,
+  and deletes a source key only after verifying its copy landed intact
+- **The test suite reached the real login keychain.** An autouse fixture now replaces
+  `imap_client.keyring` with an in-memory store for every test. A suite that can read live
+  credentials could also trigger the migration above, which is how running tests became capable
+  of destroying them
+
 ## [1.1.0] - 2026-09-07
 
 The draft body contract is now explicit and visible, connection recovery is roughly 150x faster,

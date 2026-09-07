@@ -399,3 +399,42 @@ def connected_to_silent(silent_imap_server):
                 client.shutdown()
             except Exception:
                 pass
+
+
+class _FakeKeyring:
+    """In-memory stand-in for the real keychain.
+
+    The suite must never reach the user's login keychain. It holds live mail
+    credentials, and imap_client's read path can *write* to it - a migration
+    runs on every credential read - so a test that merely reads can mutate real
+    data. An autouse fixture installs this for every test.
+    """
+
+    class errors:  # mirrors keyring.errors.PasswordDeleteError
+        class PasswordDeleteError(Exception):
+            pass
+
+    def __init__(self):
+        self.store: dict[tuple[str, str], str] = {}
+
+    def get_password(self, service, key):
+        return self.store.get((service, key))
+
+    def set_password(self, service, key, value):
+        self.store[(service, key)] = value
+
+    def delete_password(self, service, key):
+        if (service, key) not in self.store:
+            raise self.errors.PasswordDeleteError(key)
+        del self.store[(service, key)]
+
+
+@pytest.fixture(autouse=True)
+def fake_keyring(monkeypatch):
+    """Isolate every test from the real keychain, and hand back the fake."""
+    import imap_client
+
+    fake = _FakeKeyring()
+    monkeypatch.setattr(imap_client, "keyring", fake)
+    monkeypatch.setattr(imap_client, "_migrated", False)
+    return fake

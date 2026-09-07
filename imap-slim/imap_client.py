@@ -31,11 +31,25 @@ _migrated = False
 
 
 def _migrate_legacy():
-    """Copy all keychain entries from legacy service name to new."""
+    """Copy legacy keychain entries to the current service name, if and only if
+    the current service holds nothing.
+
+    Migration is a one-way move for an unconfigured install. It must never write
+    over a working configuration: this function previously copied every legacy
+    key unconditionally and then deleted the source, so a stale legacy entry
+    left over from an old setup silently replaced live credentials with it and
+    destroyed the originals. It runs on every credential read, so the blast
+    radius was every read.
+    """
     global _migrated
     if _migrated:
         return
     _migrated = True
+
+    # An install that already has accounts is configured. Nothing to migrate
+    # into, and anything we wrote would be destroying what is already there.
+    if keyring.get_password(SERVICE_NAME, "accounts"):
+        return
 
     legacy_accounts = keyring.get_password(_LEGACY_SERVICE_NAME, "accounts")
     if not legacy_accounts:
@@ -47,20 +61,37 @@ def _migrate_legacy():
         for suffix in ["imap_server", "imap_port", "imap_username", "imap_password"]:
             keys_to_copy.append(f"{acc}:{suffix}")
 
-    copied = 0
+    copied = []
     for key in keys_to_copy:
         val = keyring.get_password(_LEGACY_SERVICE_NAME, key)
-        if val is not None:
-            keyring.set_password(SERVICE_NAME, key, val)
-            copied += 1
+        if val is None:
+            continue
+        # Never overwrite a key that already exists under the current name.
+        if keyring.get_password(SERVICE_NAME, key) is not None:
+            continue
+        keyring.set_password(SERVICE_NAME, key, val)
+        copied.append((key, val))
 
-    if copied:
-        for key in keys_to_copy:
-            try:
-                keyring.delete_password(_LEGACY_SERVICE_NAME, key)
-            except keyring.errors.PasswordDeleteError:
-                pass
-        print(f"Migrated {copied} keychain entries from '{_LEGACY_SERVICE_NAME}' to '{SERVICE_NAME}'", file=sys.stderr)
+    if not copied:
+        return
+
+    # Delete the source only for keys whose copy is verified present and equal.
+    # A half-migrated keychain that still has its legacy copy is recoverable;
+    # one that deleted the source after a failed write is not.
+    for key, val in copied:
+        if keyring.get_password(SERVICE_NAME, key) != val:
+            print(
+                f"Migration of '{key}' could not be verified; leaving '{_LEGACY_SERVICE_NAME}' intact",
+                file=sys.stderr,
+            )
+            return
+
+    for key, _val in copied:
+        try:
+            keyring.delete_password(_LEGACY_SERVICE_NAME, key)
+        except keyring.errors.PasswordDeleteError:
+            pass
+    print(f"Migrated {len(copied)} keychain entries from '{_LEGACY_SERVICE_NAME}' to '{SERVICE_NAME}'", file=sys.stderr)
 
 
 def _keyring_get(key: str) -> str | None:
