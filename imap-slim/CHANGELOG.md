@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.0.1] - 2026-09-07
+
+### Fixed
+- **`replace` could permanently delete messages it was not replacing.** It ended with a bare
+  `EXPUNGE`, which RFC 3501 defines as removing *every* message carrying `\Deleted` in the selected
+  mailbox - not the one just marked. Demonstrated on a live account: two drafts that had only been
+  marked, and which the README described as recoverable, were destroyed by a later replace.
+  It now uses `uid_expunge` (RFC 4315) to remove only the draft it superseded
+- **Without UIDPLUS, nothing is expunged at all.** There is no scoped form to fall back to, so the
+  superseded draft is left marked `\Deleted` for the user's mail client to clear, and the response
+  says so. Expunging everything is not an acceptable fallback for expunging one thing
+- **`replace` is confined to the Drafts folder.** The folder came from the caller and only the
+  target message was checked for the `\Draft` flag, so an expunge could be pointed at any folder
+  holding the user's own `\Deleted` messages. A non-Drafts folder is now refused before anything
+  is written
+
 ## [2.0.0] - 2026-09-07
 
 **Breaking: the action names now describe what IMAP actually does.** There is no edit — messages

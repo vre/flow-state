@@ -721,13 +721,20 @@ uv run --directory {plugin_dir} python setup.py
                 )
 
                 reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
+                leftover = (
+                    ""
+                    if result.get("superseded_expunged", True)
+                    else "\n\n**Note:** the server does not support UIDPLUS, so the superseded draft was "
+                    "left marked \\Deleted rather than expunged. A bare expunge would have removed every "
+                    "other \\Deleted message in the folder too."
+                )
                 att_info = format_attachment_line(result.get("attachments", []))
                 return f"""# Draft Replaced{reply_info}
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
 **Format:** {format_description(format_type)}
-**Saved to:** {result["folder"]}
+**Saved to:** {result["folder"]}{leftover}
 
 Open Thunderbird → Drafts to review and send."""
 

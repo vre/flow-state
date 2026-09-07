@@ -357,6 +357,26 @@ def imap_connection():
             pass
 
 
+DRAFTS_FOLDER_NAMES = ("drafts", "draft", "luonnokset")
+
+
+def is_drafts_folder(client, folder: str) -> bool:
+    """Whether `folder` is the account's Drafts folder.
+
+    Replacing a draft expunges, and expunging is the one destructive thing this
+    client does. Confining it to Drafts means a mistaken or hostile folder
+    argument cannot reach messages the user marked \\Deleted elsewhere.
+    """
+    wanted = folder.lower()
+    if wanted in DRAFTS_FOLDER_NAMES:
+        return True
+    for flags, _delimiter, name in client.list_folders():
+        if to_str(name).lower() != wanted:
+            continue
+        return b"\\Drafts" in flags or to_str(name).lower() in DRAFTS_FOLDER_NAMES
+    return False
+
+
 def to_str(value) -> str:
     """Convert bytes or str to str."""
     if value is None:
@@ -1279,6 +1299,14 @@ def modify_draft(
 
     session = get_session(account)
     with session.connection_ctx() as client:
+        # Refuse before selecting: replace expunges, and the expunge must never
+        # be pointed at a folder holding the user's own \\Deleted messages.
+        if not is_drafts_folder(client, folder):
+            raise IMAPError(
+                f"Refusing to replace a draft in '{folder}': replace expunges, and this client "
+                "only ever expunges in the Drafts folder. Pass the Drafts folder instead."
+            )
+
         # Select folder
         try:
             client.select_folder(folder, readonly=False)
@@ -1401,7 +1429,14 @@ def modify_draft(
         client.append(drafts_folder, new_msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
 
         client.delete_messages([message_id])
-        client.expunge()
+        # A bare EXPUNGE removes EVERY \\Deleted message in the mailbox, not the
+        # one just marked. uid_expunge (RFC 4315) removes only this message.
+        # Without UIDPLUS there is no scoped form, so nothing is expunged and the
+        # superseded draft is left marked for the user's mail client to clear.
+        capabilities = {to_str(cap).upper() for cap in client.capabilities()}
+        expunged = "UIDPLUS" in capabilities
+        if expunged:
+            client.uid_expunge([message_id])
 
         # Invalidate cache for affected folders
         from session import invalidate_message_cache
@@ -1418,6 +1453,7 @@ def modify_draft(
             "subject": new_msg["Subject"],
             "message_id": new_msg["Message-ID"],
             "preserved_reply_to": bool(in_reply_to),
+            "superseded_expunged": expunged,
         }
         if all_att_info:
             response["attachments"] = all_att_info

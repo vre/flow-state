@@ -180,6 +180,14 @@ class MockIMAPClient:
         """Mark messages for deletion."""
         self.deleted_messages.extend(message_ids)
 
+    def capabilities(self):
+        """UIDPLUS by default: replace expunges only its own message where the
+        server allows a scoped expunge, and tests that need the fallback say so."""
+        return [b"IMAP4rev1", b"UIDPLUS"]
+
+    def uid_expunge(self, messages):
+        self.uid_expunged = list(getattr(self, "uid_expunged", [])) + list(messages)
+
     def expunge(self):
         """Expunge deleted messages."""
         pass

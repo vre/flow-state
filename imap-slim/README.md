@@ -122,10 +122,12 @@ Add to your MCP config:
 
 ## Security
 
-- **One deletion, and only one.** `replace` expunges the draft it supersedes — that is what makes
-  it a replace, and it is guarded by a check that the message carries the `\Draft` flag. Nothing
-  else is ever deleted, and no `expunge` action is exposed. `flag ... +Deleted` marks a message and
-  stops there; your mail client does the deleting.
+- **One deletion, and only one, scoped to one message.** `replace` expunges the draft it
+  supersedes, using `uid_expunge` so that only that message is removed. A bare `EXPUNGE` would take
+  every `\Deleted` message in the mailbox with it. `replace` is refused outside the Drafts folder,
+  and on a server without UIDPLUS nothing is expunged at all — the superseded draft is left marked.
+  No `expunge` action is exposed. `flag ... +Deleted` marks a message and stops there; your mail
+  client does the deleting.
 - **Content safety** - Email content encapsulated to prevent prompt injection / context poisoning
 - **Keychain storage** - Credentials in system keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 - **No credential leaks** - Password fetched by script only when IMAP connection opens, LLM never sees the password

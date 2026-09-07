@@ -2126,3 +2126,75 @@ class TestGeneratedMimeStructure:
         # set_content() terminates the body with a newline, so compare without it
         assert plain.get_payload(decode=True).decode().rstrip("\n") == body.rstrip("\n")
         assert "<br />" in html.get_payload(decode=True).decode()
+
+
+class TestReplaceExpungesOnlyItsOwnDraft:
+    """The one destructive operation this client performs, fenced in.
+
+    A bare EXPUNGE removes every \\Deleted message in the mailbox. During live
+    testing that destroyed two drafts the user had merely marked, which the
+    README described as a recoverable, reversible mark.
+    """
+
+    def _draft(self, text="body"):
+        msg = email.message.EmailMessage()
+        msg["Subject"] = "Draft subject"
+        msg["To"] = "recipient@example.com"
+        msg.set_content(text)
+        return msg.as_bytes()
+
+    def _client_with_draft(self, mock_creds, mock_create, folders=None):
+        mock_creds.return_value = ("server", "993", "user@example.com", "pass")
+        client = MockIMAPClient()
+        client.list_folders = lambda: folders if folders is not None else [((b"\\Drafts",), b"/", "Drafts")]
+        client.capabilities = lambda: [b"IMAP4rev1", b"UIDPLUS"]
+        client.uid_expunge_calls = []
+        client.uid_expunge = lambda ids: client.uid_expunge_calls.append(list(ids))
+        client.bare_expunge_calls = []
+        client.expunge = lambda: client.bare_expunge_calls.append(True)
+        envelope = MockEnvelope(
+            subject=b"Draft subject",
+            from_=[MockAddress(mailbox=b"user", host=b"example.com")],
+            to=[MockAddress(mailbox=b"recipient", host=b"example.com")],
+        )
+        client.add_message("Drafts", 1, envelope, raw_email=self._draft(), flags=[b"\\Draft"])
+        mock_create.return_value = client
+        session._sessions.clear()
+        return client
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_expunge_is_scoped_to_the_superseded_message(self, mock_creds, mock_create):
+        client = self._client_with_draft(mock_creds, mock_create)
+
+        result = modify_draft("Drafts", 1, body="new body")
+
+        assert client.uid_expunge_calls == [[1]], "must expunge only the draft it replaced"
+        assert client.bare_expunge_calls == [], "a bare EXPUNGE would take every \\Deleted message in the folder"
+        assert result["superseded_expunged"] is True
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_without_uidplus_nothing_is_expunged(self, mock_creds, mock_create):
+        client = self._client_with_draft(mock_creds, mock_create)
+        client.capabilities = lambda: [b"IMAP4rev1"]
+
+        result = modify_draft("Drafts", 1, body="new body")
+
+        assert client.uid_expunge_calls == []
+        assert client.bare_expunge_calls == [], "no scoped form available means expunge nothing, not everything"
+        assert result["superseded_expunged"] is False
+
+    @patch("session._create_connection")
+    @patch("imap_client.get_credentials")
+    def test_replace_refuses_a_folder_that_is_not_drafts(self, mock_creds, mock_create):
+        client = self._client_with_draft(
+            mock_creds, mock_create, folders=[((b"\\HasNoChildren",), b"/", "INBOX"), ((b"\\Drafts",), b"/", "Drafts")]
+        )
+
+        with pytest.raises(IMAPError) as exc:
+            modify_draft("INBOX", 1, body="new body")
+
+        assert "Refusing to replace" in str(exc.value)
+        assert client.uid_expunge_calls == [] and client.bare_expunge_calls == []
+        assert not client.appended_messages, "nothing may be written before the folder is validated"
