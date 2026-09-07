@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.0] - 2026-09-07
+
+### Added
+- **Read operations retry once on a fresh connection.** A connection can die between the liveness
+  probe and the command; that race cannot be probed away, only retried through. `read`, `search`
+  and `attachment` now recover from it instead of surfacing an error.
+- `AccountSession.run_op(operation, retry=...)`. A context manager cannot do this - an exception
+  thrown back at its `yield` can be suppressed or transformed, but the caller's `with` body cannot
+  be run again - so an operation that wants a retry passes its body as a callable.
+
+### Notes
+- **Retry is opt-in and off by default.** `create`, `replace` and `flag` never replay: an appended
+  message would be duplicated and an expunge cannot be undone. A test asserts they do not use the
+  retrying runner.
+
 ## [2.0.1] - 2026-09-07
 
 ### Fixed

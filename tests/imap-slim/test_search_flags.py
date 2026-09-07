@@ -126,6 +126,9 @@ class TestSearchMessagesFlagIntegration:
         mock_session = MagicMock()
         mock_session.connection_ctx.return_value.__enter__.return_value = mock_client
         mock_session.connection_ctx.return_value.__exit__.return_value = False
+        # search_messages is read-only, so it goes through run_op with retry=True.
+        # A bare MagicMock would swallow the operation without running it.
+        mock_session.run_op.side_effect = lambda operation, **kwargs: operation(mock_client)
         mock_get_session.return_value = mock_session
         mock_client.search.return_value = []
 
@@ -141,6 +144,9 @@ class TestSearchMessagesFlagIntegration:
         mock_session = MagicMock()
         mock_session.connection_ctx.return_value.__enter__.return_value = mock_client
         mock_session.connection_ctx.return_value.__exit__.return_value = False
+        # search_messages is read-only, so it goes through run_op with retry=True.
+        # A bare MagicMock would swallow the operation without running it.
+        mock_session.run_op.side_effect = lambda operation, **kwargs: operation(mock_client)
         mock_get_session.return_value = mock_session
         mock_client.search.return_value = []
 
@@ -156,6 +162,9 @@ class TestSearchMessagesFlagIntegration:
         mock_session = MagicMock()
         mock_session.connection_ctx.return_value.__enter__.return_value = mock_client
         mock_session.connection_ctx.return_value.__exit__.return_value = False
+        # search_messages is read-only, so it goes through run_op with retry=True.
+        # A bare MagicMock would swallow the operation without running it.
+        mock_session.run_op.side_effect = lambda operation, **kwargs: operation(mock_client)
         mock_get_session.return_value = mock_session
         mock_client.search.return_value = []
 

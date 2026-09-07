@@ -230,10 +230,50 @@ class AccountSession:
                 raise
             self.last_activity = time.time()
 
+    def run_op(self, operation, *, retry: bool = False, stage: str = "command"):
+        """Run one operation under a lease, optionally retrying once.
+
+        A context manager cannot do this: an exception thrown back at its yield
+        can be suppressed or transformed, but the caller's `with` body cannot be
+        run again. So an operation that wants a retry hands its body over as a
+        callable instead.
+
+        `retry` is opt-in and defaults off. A connection can die between the
+        liveness probe and the command - that race cannot be probed away, only
+        retried through - but replaying an operation that already appended a
+        message would duplicate it. Only callers that read may opt in.
+
+        Args:
+            operation: Callable taking the connection and returning a result.
+            retry: Whether to attempt once more on a fresh connection.
+            stage: Reported on failure: "probe", "connect" or "command".
+
+        Returns:
+            Whatever `operation` returns.
+
+        Raises:
+            ConnectionFailure: if the transport failed and no attempt remains.
+        """
+        from imap_client import ConnectionFailure
+
+        attempts = 2 if retry else 1
+        for attempt in range(attempts):
+            try:
+                # The public lease, not _lease: run_op is public API and should
+                # go through the same door its callers would.
+                with self.connection_ctx(stage) as conn:
+                    return operation(conn)
+            except ConnectionFailure:
+                # The lease already discarded the dead connection, so the next
+                # attempt builds a fresh one.
+                if attempt + 1 >= attempts:
+                    raise
+        raise AssertionError("unreachable")
+
     @contextmanager
-    def connection_ctx(self):
+    def connection_ctx(self, stage: str = "command"):
         """Public lease for one IMAP operation."""
-        with self._lease() as conn:
+        with self._lease(stage) as conn:
             yield conn
 
     def get_folders(self) -> list[dict]:

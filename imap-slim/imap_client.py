@@ -718,7 +718,8 @@ def read_message(folder: str, message_id: int, account: str = None, full: bool =
     from session import get_session
 
     session = get_session(account)
-    with session.connection_ctx() as client:
+
+    def _operation(client):
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
@@ -819,6 +820,9 @@ def read_message(folder: str, message_id: int, account: str = None, full: bool =
             "quoted_message_count": quoted_message_count,
             "quoted_chars_truncated": quoted_chars_truncated,
         }
+
+    # Read-only: safe to retry once if the transport dies mid-command.
+    return session.run_op(_operation, retry=True)
 
 
 def download_attachment(folder: str, message_id: int, attachment_index: int, account: str = None) -> dict:
@@ -936,7 +940,8 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
     from session import get_session
 
     session = get_session(account)
-    with session.connection_ctx() as client:
+
+    def _operation(client):
         try:
             client.select_folder(folder, readonly=True)
         except Exception as e:
@@ -1033,6 +1038,9 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
             )
 
         return results
+
+    # Read-only: safe to retry once if the transport dies mid-command.
+    return session.run_op(_operation, retry=True)
 
 
 MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024  # 25 MB

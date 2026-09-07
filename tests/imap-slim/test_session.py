@@ -600,3 +600,89 @@ class TestLoginRejectionCleanup:
                 _create_connection("test")
 
         assert isinstance(exc.value.__cause__, LoginError)
+
+
+class TestRetryOnlyWhereItIsSafe:
+    """Cut 2 deferred this: a context manager cannot re-run its `with` body, so
+    an operation that wants a retry hands its body over as a callable."""
+
+    def test_a_read_operation_is_retried_once_on_a_fresh_connection(self):
+        session = AccountSession("test")
+        created = []
+
+        def factory(_account):
+            client = Mock(spec=IMAPClient)
+            created.append(client)
+            return client
+
+        attempts = []
+
+        def operation(conn):
+            attempts.append(conn)
+            if len(attempts) == 1:
+                raise TimeoutError("died mid-command")
+            return "second attempt result"
+
+        with patch("session._create_connection", side_effect=factory):
+            assert session.run_op(operation, retry=True) == "second attempt result"
+
+        assert len(attempts) == 2, "the operation must run again"
+        assert attempts[0] is not attempts[1], "the retry must use a fresh connection"
+        assert len(created) == 2
+
+    def test_without_retry_the_operation_runs_once_and_the_failure_propagates(self):
+        session = AccountSession("test")
+        attempts = []
+
+        def operation(conn):
+            attempts.append(conn)
+            raise TimeoutError("died mid-command")
+
+        with patch("session._create_connection", return_value=Mock(spec=IMAPClient)):
+            with pytest.raises(ConnectionFailure):
+                session.run_op(operation)
+
+        assert len(attempts) == 1, "replaying a write would duplicate it; default must not retry"
+
+    def test_a_second_failure_propagates(self):
+        session = AccountSession("test")
+        attempts = []
+
+        def operation(conn):
+            attempts.append(conn)
+            raise TimeoutError("still dead")
+
+        with patch("session._create_connection", side_effect=lambda _a: Mock(spec=IMAPClient)):
+            with pytest.raises(ConnectionFailure):
+                session.run_op(operation, retry=True)
+
+        assert len(attempts) == 2, "one retry, not a loop"
+
+    def test_a_non_transport_error_is_not_retried(self):
+        """A rejected command means the server answered; running it again just
+        gets the same rejection."""
+        session = AccountSession("test")
+        attempts = []
+
+        def operation(conn):
+            attempts.append(conn)
+            raise IMAPClientError("command rejected")
+
+        with patch("session._create_connection", return_value=Mock(spec=IMAPClient)):
+            with pytest.raises(IMAPClientError):
+                session.run_op(operation, retry=True)
+
+        assert len(attempts) == 1
+
+    def test_the_writing_paths_do_not_opt_in(self):
+        """create, replace and flag must never replay: an appended message would
+        be duplicated, and an expunge cannot be undone."""
+        import ast
+        from pathlib import Path
+
+        source = (Path(__file__).resolve().parent.parent.parent / "imap-slim" / "imap_client.py").read_text()
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name in {"create_draft", "modify_draft", "modify_flags"}:
+                body = ast.get_source_segment(source, node) or ""
+                assert "run_op" not in body, f"{node.name} must not use the retrying runner"
