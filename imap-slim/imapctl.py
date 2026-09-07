@@ -61,15 +61,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--limit", type=int, default=20)
     _add_account(p)
 
-    p = sub.add_parser("draft", help="create or modify a draft")
+    p = sub.add_parser("create", help="write a new draft to Drafts")
     p.add_argument("--format", required=True, choices=["markdown", "plain"], help="required; there is no default")
-    p.add_argument("--payload", required=True, help='JSON: {"to","subject","body"} or {"id","body"}')
-    p.add_argument("--folder", help="required when modifying an existing draft, e.g. Drafts")
+    p.add_argument("--payload", required=True, help='JSON: {"to","subject","body"}')
     _add_account(p)
 
-    p = sub.add_parser("edit", help="replace text in a draft that has no HTML body")
-    p.add_argument("folder")
-    p.add_argument("--payload", required=True, help='JSON: {"id", "replacements":[{"old","new"}]}')
+    p = sub.add_parser("replace", help="supersede an existing draft; it gets a new id")
+    p.add_argument("folder", help="the folder holding the draft, e.g. Drafts")
+    p.add_argument("--format", required=True, choices=["markdown", "plain"])
+    p.add_argument("--payload", required=True, help='JSON: {"id","body"}')
     _add_account(p)
 
     p = sub.add_parser("flag", help="add or remove flags")
@@ -115,13 +115,13 @@ def to_action(args: argparse.Namespace) -> MailAction:
     elif args.command == "read":
         fields["folder"] = args.folder
         fields["payload"] = args.message
-    elif args.command == "draft":
+    elif args.command == "create":
+        fields["format"] = args.format
+        fields["payload"] = args.payload
+    elif args.command == "replace":
         fields["format"] = args.format
         fields["payload"] = args.payload
         fields["folder"] = args.folder
-    elif args.command in {"edit"}:
-        fields["folder"] = args.folder
-        fields["payload"] = args.payload
     elif args.command in {"flag", "attachment"}:
         fields["folder"] = args.folder
         fields["payload"] = args.payload

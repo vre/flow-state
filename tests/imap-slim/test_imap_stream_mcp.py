@@ -501,7 +501,7 @@ class TestDraftAttachmentPayload:
 
         await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":["/tmp/file.pdf"]}',
             )
@@ -516,7 +516,7 @@ class TestDraftAttachmentPayload:
         """String instead of list → error without calling create_draft."""
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":"/tmp/file.pdf"}',
             )
@@ -543,7 +543,7 @@ class TestDraftAttachmentPayload:
 
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"Report","body":"See attached","attachments":["/tmp/report.pdf","/tmp/data.csv"]}',
             )
@@ -568,7 +568,7 @@ class TestDraftAttachmentPayload:
 
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="replace",
                 format="markdown",
                 folder="Drafts",
                 payload='{"id":1,"body":"Updated","attachments":["/tmp/new.txt"]}',
@@ -584,7 +584,7 @@ class TestDraftAttachmentPayload:
         """Non-string entries in attachments list → error."""
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"text","attachments":[123]}',
             )
@@ -603,7 +603,7 @@ class TestDraftFormatValidation:
         """Superseded: format is a top-level parameter, not a payload key."""
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"Test","body":"**text**","format":"html"}',
             )
@@ -618,7 +618,7 @@ class TestDraftFormatValidation:
         """Same for the modify branch."""
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="replace",
                 format="markdown",
                 folder="Drafts",
                 payload='{"id":1,"body":"**Updated**","format":"html"}',
@@ -631,7 +631,7 @@ class TestDraftFormatValidation:
     def test_draft_without_format_is_rejected(self):
         """Choosing is mandatory; there is no silent default."""
         with pytest.raises(ValidationError) as exc:
-            MailAction(action="draft", payload='{"to":"a","subject":"b","body":"c"}')
+            MailAction(action="create", payload='{"to":"a","subject":"b","body":"c"}')
 
         message = str(exc.value)
         assert "format" in message and "markdown" in message and "plain" in message
@@ -649,7 +649,7 @@ class TestDraftFormatValidation:
 
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="plain",
                 payload='{"to":"r@example.com","subject":"Test","body":"plain body"}',
             )
@@ -660,138 +660,6 @@ class TestDraftFormatValidation:
         mock_create.assert_called_once()
         assert mock_create.call_args.kwargs["html"] is None, "plain must not produce an HTML part"
         assert mock_create.call_args.kwargs["body"] == "plain body"
-
-
-class TestEditAction:
-    """Tests for edit action routing and validation."""
-
-    def test_edit_is_valid_action(self):
-        """MailAction should accept edit action."""
-        action = MailAction(action="edit")
-        assert action.action == "edit"
-
-    async def test_edit_requires_folder(self):
-        """Edit action should require folder."""
-        result = await use_mail(MailAction(action="edit", payload='{"id":1,"replacements":[{"old":"a","new":"b"}]}'))
-        assert "Error: folder required" in result
-
-    async def test_edit_requires_payload(self):
-        """Edit action should require payload."""
-        result = await use_mail(MailAction(action="edit", folder="Drafts"))
-        assert "Error: payload required" in result
-
-    async def test_edit_payload_validation_errors(self):
-        """Edit action should validate required fields and id type/range."""
-        missing_id = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"replacements":[{"old":"a","new":"b"}]}'))
-        missing_replacements = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"id":1}'))
-        non_numeric_id = await use_mail(
-            MailAction(action="edit", folder="Drafts", payload='{"id":"abc","replacements":[{"old":"a","new":"b"}]}')
-        )
-        negative_id = await use_mail(MailAction(action="edit", folder="Drafts", payload='{"id":-1,"replacements":[{"old":"a","new":"b"}]}'))
-
-        assert "Error: 'id' required" in missing_id
-        assert "Error: 'replacements' required" in missing_replacements
-        assert "must be a numeric message ID" in non_numeric_id
-        assert "must be a positive integer" in negative_id
-
-    @patch("actions.edit_draft")
-    async def test_edit_action_calls_edit_draft_and_formats_response(self, mock_edit):
-        """Valid edit payload should call edit_draft and show change summary."""
-        mock_edit.return_value = {
-            "status": "modified",
-            "folder": "Drafts",
-            "to": "r@example.com",
-            "subject": "Re: Foo",
-            "message_id": "<x@y>",
-            "changes": [
-                {"old": "11 ducks", "new": "12 ducks"},
-                {"old": "480 kg", "new": "450 kg"},
-            ],
-            "preserved_reply_to": True,
-        }
-
-        result = await use_mail(
-            MailAction(
-                action="edit",
-                folder="Drafts",
-                payload='{"id":1,"replacements":[{"old":"11 ducks","new":"12 ducks"},{"old":"480 kg","new":"450 kg"}]}',
-            )
-        )
-
-        mock_edit.assert_called_once()
-        assert "Draft Edited" in result
-        assert "2 replacements applied" in result
-        assert '"11 ducks" \u2192 "12 ducks"' in result
-        assert '"480 kg" \u2192 "450 kg"' in result
-
-    @patch("actions.edit_draft")
-    async def test_edit_action_old_not_found_error(self, mock_edit):
-        """edit_draft error should be returned as actionable message."""
-        mock_edit.side_effect = Exception("old string not found. Use 'read' to verify current draft content.")
-
-        result = await use_mail(
-            MailAction(
-                action="edit",
-                folder="Drafts",
-                payload='{"id":1,"replacements":[{"old":"foo","new":"bar"}]}',
-            )
-        )
-
-        assert "Error:" in result
-        assert "read" in result
-
-    async def test_help_edit_topic_available(self):
-        """help edit should describe edit action."""
-        result = await use_mail(MailAction(action="help", payload="edit"))
-        assert "# edit - Edit Draft" in result
-        assert "replacements" in result
-
-    async def test_help_overview_includes_edit(self):
-        """help overview should list edit action."""
-        result = await use_mail(MailAction(action="help", payload="overview"))
-        assert "**edit**" in result
-
-    async def test_help_overview_mentions_attachment_indicator(self):
-        """help overview should mention list/search attachment indicator."""
-        result = await use_mail(MailAction(action="help", payload="overview"))
-        assert "attachment" in result.lower()
-        assert "list" in result.lower()
-        assert "search" in result.lower()
-        assert "snippet" in result.lower()
-
-    async def test_help_list_mentions_att_indicator(self):
-        """help list should document [att:N] and snippet output markers."""
-        result = await use_mail(MailAction(action="help", payload="list"))
-        assert "[att:N]" in result
-        assert "snippet" in result.lower()
-
-    async def test_help_search_mentions_att_indicator(self):
-        """help search should document [att:N] and snippet output markers."""
-        result = await use_mail(MailAction(action="help", payload="search"))
-        assert "[att:N]" in result
-        assert "snippet" in result.lower()
-
-    @patch("actions.create_draft")
-    async def test_draft_markdown_format_still_works(self, mock_create):
-        """Markdown format remains supported."""
-        mock_create.return_value = {
-            "status": "created",
-            "folder": "Drafts",
-            "to": "r@example.com",
-            "subject": "Test",
-            "message_id": "<x@y>",
-        }
-
-        result = await use_mail(
-            MailAction(
-                action="draft",
-                format="markdown",
-                payload='{"to":"r@example.com","subject":"Test","body":"**bold**"}',
-            )
-        )
-
-        assert "# Draft Created" in result
-        mock_create.assert_called_once()
 
 
 class TestTopLevelFormatControlsTheDraft:
@@ -815,7 +683,7 @@ class TestTopLevelFormatControlsTheDraft:
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="plain",
                 payload='{"to":"r@example.com","subject":"T","body":"**not bold**"}',
             )
@@ -829,7 +697,7 @@ class TestTopLevelFormatControlsTheDraft:
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="markdown",
                 payload='{"to":"r@example.com","subject":"T","body":"**bold**"}',
             )
@@ -843,7 +711,7 @@ class TestTopLevelFormatControlsTheDraft:
         mock_modify.return_value = dict(self.RESULT)
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="replace",
                 folder="Drafts",
                 format="plain",
                 payload='{"id":1,"body":"**not bold**"}',
@@ -858,7 +726,7 @@ class TestTopLevelFormatControlsTheDraft:
         mock_modify.return_value = dict(self.RESULT)
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="replace",
                 folder="Drafts",
                 format="markdown",
                 payload='{"id":1,"body":"**bold**"}',
@@ -872,7 +740,7 @@ class TestTopLevelFormatControlsTheDraft:
         mock_create.return_value = dict(self.RESULT)
         result = await use_mail(
             MailAction(
-                action="draft",
+                action="create",
                 format="plain",
                 payload='{"to":"r@example.com","subject":"T","body":"the word format is harmless"}',
             )
@@ -883,6 +751,6 @@ class TestTopLevelFormatControlsTheDraft:
     @patch("actions.create_draft")
     async def test_a_payload_that_is_not_an_object_does_not_trip_the_key_check(self, mock_create):
         """payload='"format"' decodes to a string: there is no key to forbid."""
-        result = await use_mail(MailAction(action="draft", format="plain", payload='"format"'))
+        result = await use_mail(MailAction(action="create", format="plain", payload='"format"'))
         assert "no longer goes inside the payload" not in result
         mock_create.assert_not_called()

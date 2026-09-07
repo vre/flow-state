@@ -39,15 +39,26 @@ class TestArgumentsBecomeAnAction:
         args = imapctl.build_parser().parse_args(["read", "INBOX", "1253:full"])
         assert imapctl.to_action(args).payload == "1253:full"
 
-    def test_draft_requires_and_carries_format(self):
-        args = imapctl.build_parser().parse_args(["draft", "--format", "plain", "--payload", '{"to":"a","subject":"b","body":"c"}'])
+    def test_create_requires_and_carries_format(self):
+        args = imapctl.build_parser().parse_args(["create", "--format", "plain", "--payload", '{"to":"a","subject":"b","body":"c"}'])
         action = imapctl.to_action(args)
         assert action.format == "plain"
-        assert action.action == "draft"
+        assert action.action == "create"
 
-    def test_draft_without_format_is_a_usage_error(self):
+    def test_replace_carries_the_folder_holding_the_draft(self):
+        args = imapctl.build_parser().parse_args(["replace", "Drafts", "--format", "markdown", "--payload", '{"id":1,"body":"x"}'])
+        action = imapctl.to_action(args)
+        assert action.action == "replace"
+        assert action.folder == "Drafts"
+
+    def test_edit_is_gone(self):
+        """IMAP messages are immutable; what was called editing was always a replace."""
+        with pytest.raises(SystemExit):
+            imapctl.build_parser().parse_args(["edit", "Drafts", "--payload", "{}"])
+
+    def test_create_without_format_is_a_usage_error(self):
         with pytest.raises(SystemExit) as exc:
-            imapctl.build_parser().parse_args(["draft", "--payload", "{}"])
+            imapctl.build_parser().parse_args(["create", "--payload", "{}"])
         assert exc.value.code == imapctl.EXIT_USAGE
 
     def test_account_reaches_the_action(self):
@@ -138,8 +149,15 @@ class TestSkillDocument:
         assert "no daemon" in self.SKILL.lower()
 
     def test_it_states_the_draft_contract(self):
-        assert "--format` is **required**" in self.SKILL or "`--format` is **required**" in self.SKILL
-        assert "keep the markdown source" in self.SKILL.lower()
+        assert "`--format` is **required**" in self.SKILL
+        assert "keep the source" in self.SKILL.lower()
+
+    def test_it_says_there_is_no_edit(self):
+        """The action names describe IMAP: create appends, replace supersedes."""
+        assert "There is no edit" in self.SKILL
+        assert "imap-slim-cli create" in self.SKILL
+        assert "imap-slim-cli replace" in self.SKILL
+        assert "new id" in self.SKILL.lower()
 
     def test_it_warns_that_mail_is_untrusted(self):
         assert "EXTERNAL_EMAIL" in self.SKILL

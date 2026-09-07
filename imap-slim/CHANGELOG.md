@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0] - 2026-09-07
+
+**Breaking: the action names now describe what IMAP actually does.** There is no edit — messages
+are immutable — so what was called editing was always a replace.
+
+### Changed
+- `draft` without an id is now **`create`** (an `APPEND`)
+- `draft` with an id is now **`replace`** (an `APPEND`, then an expunge of the draft it supersedes)
+- `replace` reports "Draft Replaced" and, as before, gives the draft a **new id** — the old one is
+  stale the moment a replace succeeds
+
+### Removed
+- **`edit`.** It fetched a draft, substituted text, and performed the same replace, which made its
+  name a promise the protocol cannot keep: in-place mutation with a stable identity. It was already
+  refused for any draft with an HTML body, and for a plain draft it did nothing the caller could not
+  do by sending the body again
+
+### Notes
+- The expunge inside `replace` is the only deletion this client performs, and it is not exposed as
+  an action. `flag ... +Deleted` marks a message and nothing more; your mail client does the
+  deleting. `cleanup` removes downloaded attachment temp files locally and never touches the server
+
 ## [1.1.1] - 2026-09-07
 
 ### Fixed

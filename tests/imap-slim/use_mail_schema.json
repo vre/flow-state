@@ -17,7 +17,7 @@
           "title": "Account"
         },
         "action": {
-          "description": "Action: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help",
+          "description": "Action: list|read|search|create|replace|flag|attachment|cleanup|folders|accounts|help",
           "title": "Action",
           "type": "string"
         },
@@ -76,7 +76,7 @@
             }
           ],
           "default": null,
-          "description": "Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+          "description": "Action data: read=msg_id[:N|:full] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
           "title": "Payload"
         },
         "preview": {

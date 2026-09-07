@@ -19,7 +19,6 @@ from imap_client import (
     cleanup_attachments,
     create_draft,
     download_attachment,
-    edit_draft,
     get_default_account,
     list_accounts,
     list_folders,
@@ -103,11 +102,11 @@ class MailAction(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    action: str = Field(..., description="Action: list|read|search|draft|edit|flag|attachment|cleanup|folders|accounts|help")
+    action: str = Field(..., description="Action: list|read|search|create|replace|flag|attachment|cleanup|folders|accounts|help")
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id[:N|:full] | search=query | draft=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | edit=JSON{id,replacements:[{old,new}]} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:N|:full] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
@@ -124,7 +123,7 @@ class MailAction(BaseModel):
     @field_validator("action")
     @classmethod
     def validate_action(cls, v: str) -> str:
-        valid = {"list", "read", "search", "draft", "edit", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
+        valid = {"list", "read", "search", "create", "replace", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
         v_lower = v.lower()
         if v_lower not in valid:
             raise ValueError(f"Invalid action '{v}'. Valid: {', '.join(sorted(valid))}")
@@ -138,7 +137,7 @@ class MailAction(BaseModel):
 
     @model_validator(mode="after")
     def validate_format_required(self) -> "MailAction":
-        if self.action == "draft" and self.format is None:
+        if self.action in {"create", "replace"} and self.format is None:
             raise ValueError(
                 "format parameter required for draft: 'markdown' (rendered to HTML plus a plain "
                 "alternative; newline = line break) or 'plain' (sent exactly as written, no HTML)"
@@ -156,8 +155,8 @@ HELP_TOPICS = {
 - **list** - List messages in a folder (`[att:N]` and snippet preview shown)
 - **read** - Read a specific message
 - **search** - Search messages (`[att:N]` and snippet preview shown)
-- **draft** - Create draft reply (saved to Drafts folder)
-- **edit** - Edit specific text in a draft (old→new replacement)
+- **create** - Write a new draft to the Drafts folder
+- **replace** - Supersede an existing draft with new content
 - **flag** - Add or remove flags/labels on messages
 - **attachment** - Download email attachment to temp file
 - **cleanup** - Remove downloaded attachment temp files
@@ -171,8 +170,8 @@ List inbox: {action: "list", folder: "INBOX", preview: false}
 List with snippets: {action: "list", folder: "INBOX", preview: true}
 Read message: {action: "read", folder: "INBOX", payload: "123"}
 Search: {action: "search", folder: "INBOX", payload: "from:boss@example.com", preview: true}
-Create draft: {action: "draft", folder: "INBOX", format: "markdown", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
-Edit draft: {action: "edit", folder: "Drafts", payload: '{"id":1253,"replacements":[{"old":"foo","new":"bar"}]}'}
+Create draft: {action: "create", format: "markdown", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"..."}'}
+Replace draft: {action: "replace", folder: "Drafts", format: "markdown", payload: '{"id":1253,"body":"..."}'}
 Flag message: {action: "flag", folder: "INBOX", payload: "123:+Flagged,-Seen"}
 """,
     "list": """
@@ -238,74 +237,59 @@ Output includes `[att:N]` when a message has attachments. Set `preview: true` to
 {action: "search", folder: "INBOX", payload: "flagged"}
 {action: "search", folder: "INBOX", payload: "is:unread"}
 """,
-    "draft": """
-# draft - Create or Modify Draft
+    "create": """
+# create - Write a New Draft
 
-Creates a new draft or modifies an existing one.
+Appends a new message to the Drafts folder. Nothing is sent.
 
-## Create New Draft
-- format: "markdown" or "plain" - REQUIRED, top-level parameter, not inside the payload
+## Parameters
+- format: "markdown" or "plain" - REQUIRED, top-level, not inside the payload
 - payload: JSON with to, subject, body (required), in_reply_to, cc, attachments (optional)
 
-{action: "draft", format: "markdown", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
+{action: "create", format: "markdown", payload: '{"to":"x@y.com","subject":"Hi","body":"**bold** text"}'}
 
 ## Attachments
-- attachments: list of absolute file paths
-- Max 25 MB per file. MIME type auto-detected.
-- Works with both create and modify
+- attachments: list of absolute file paths, max 25 MB each, MIME type auto-detected
 
-{action: "draft", format: "markdown", payload: '{"to":"x@y.com","subject":"Report","body":"See attached","attachments":["/path/to/file.pdf"]}'}
+{action: "create", format: "markdown", payload: '{"to":"x@y.com","subject":"Report","body":"See attached","attachments":["/path/to/file.pdf"]}'}
 
-## Format (required, top-level)
-- "markdown": renders an HTML part plus a plain-text alternative. Supports **bold**, *italic*,
-  ~~strike~~, ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes.
-  A newline inside a paragraph becomes a line break; a blank line starts a new paragraph.
-  Markdown block syntax still wins: "Title" followed by a line of "=" is a heading, not a rule.
-  Fenced code blocks (```) and pipe tables are supported. Fence content is sent exactly as
-  written, in both the HTML and the plain part. Fences must start at the left margin.
+## Format (required)
+- "markdown": renders an HTML part plus a plain-text alternative. **bold**, *italic*, ~~strike~~,
+  ==highlight==, :emoji:, `- [ ]` checkboxes, lists, headings, links, blockquotes, fenced code
+  blocks and pipe tables. Code block content is sent exactly as written, in both parts.
+  A newline inside a paragraph is a line break, a blank line starts a
+  paragraph, and markdown block syntax still wins - a line of "=" under text is a heading.
+  Fences must start at the left margin.
 - "plain": the body is sent exactly as written, plain text only, no HTML part. Nothing is
   interpreted, so ASCII art and rule lines survive untouched.
 - There is no default. Omitting it is an error.
 
-## Modify Existing Draft
-- format: required here too
-- payload: JSON with id (required), body (required), subject/to/cc/attachments (optional)
-- Preserves In-Reply-To, References, and existing attachments
-
-{action: "draft", folder: "Drafts", format: "markdown", payload: '{"id":1253,"body":"Updated..."}'}
-
-## Forward Attachment Workflow
-1. Use 'read' to see attachments
-2. Use 'attachment' to download: {action: "attachment", payload: "msg_id:index"}
-3. Use 'draft' with attachments and a format: the downloaded file path
-
 ## Reply Workflow
-1. Use 'read' to get message (note message_id for replies)
-2. Use 'draft' with in_reply_to - quote relevant parts with >
-3. Open email client → Drafts → review and send
+1. Use 'read' to get the message and note its message_id
+2. Use 'create' with in_reply_to - quote relevant parts with >
+3. Open your mail client, review, send
 """,
-    "edit": """
-# edit - Edit Draft (surgical replacement)
+    "replace": """
+# replace - Supersede an Existing Draft
 
-Edit specific text in an existing draft without rewriting the entire body.
+There is no way to edit a message: IMAP messages are immutable. Replace appends the new version
+and expunges the draft it replaced. That expunge is the only deletion this client performs.
 
 ## Parameters
-- folder: Folder containing draft (e.g., 'Drafts')
-- payload: JSON with id and replacements
+- folder: the folder holding the draft, e.g. 'Drafts'
+- format: "markdown" or "plain" - REQUIRED, same meaning as for create
+- payload: JSON with id and body (required), subject/to/cc/attachments (optional)
 
-## Payload
-- id: Draft message ID (from list/read results)
-- replacements: list of {old, new} pairs
+{action: "replace", folder: "Drafts", format: "markdown", payload: '{"id":1253,"body":"Updated..."}'}
 
-## Example
-{action: "edit", folder: "Drafts", payload: '{"id": 1444, "replacements": [{"old": "11 ducks", "new": "12 ducks"}]}'}
+## What is preserved, and what is not
+- In-Reply-To, References and existing attachments are carried over
+- **The draft gets a new message id.** Any id you were holding is stale afterwards; use the one
+  the response reports
+- Safety: the message must carry the \\Draft flag, or the replace is refused
 
-## Notes
-- Each 'old' string must match exactly once in the draft body
-- Multiple replacements applied in order
-- Threading headers and attachments are preserved
-- Use 'read' first to see current draft content
-- For full rewrites, use 'draft' with id instead
+## Keep your own source
+Nothing stores the markdown you wrote. To change a draft, send the whole body again.
 """,
     "folders": """
 # folders - List Folders
@@ -681,54 +665,12 @@ uv run --directory {plugin_dir} python setup.py
             return body
 
         # Edit existing draft with surgical replacements
-        if action == "edit":
-            if not folder:
-                return "Error: folder required (e.g., 'Drafts')"
+        # create = APPEND. replace = APPEND then expunge the draft it replaced.
+        # There is no edit: IMAP messages are immutable, so what used to be
+        # called editing was always a replace.
+        if action in {"create", "replace"}:
             if not params.payload:
-                return "Error: payload required. Use 'help edit' for details."
-
-            try:
-                edit_data = json.loads(params.payload)
-            except json.JSONDecodeError as e:
-                return f"Error: Invalid JSON in payload: {e}"
-
-            if "id" not in edit_data:
-                return "Error: 'id' required (draft message ID). Use 'help edit' for details."
-            try:
-                draft_id = int(edit_data["id"])
-            except (ValueError, TypeError):
-                return f"Error: 'id' must be a numeric message ID, got '{edit_data['id']}'"
-            if draft_id <= 0:
-                return f"Error: 'id' must be a positive integer, got {draft_id}"
-
-            if "replacements" not in edit_data:
-                return "Error: 'replacements' required. Use 'help edit' for details."
-            replacements = edit_data["replacements"]
-            if not isinstance(replacements, list) or len(replacements) == 0:
-                return "Error: 'replacements' must be a non-empty list of {old, new} pairs"
-
-            result = edit_draft(
-                folder=folder,
-                message_id=draft_id,
-                replacements=replacements,
-                account=params.account,
-            )
-
-            changes = result.get("changes", [])
-            change_lines = [f'  {idx}. "{item["old"]}" → "{item["new"]}"' for idx, item in enumerate(changes, start=1)]
-            changes_text = "\n".join(change_lines) if change_lines else "  (no changes)"
-
-            return f"""# Draft Edited
-
-**Changes:** {len(changes)} replacements applied
-{changes_text}
-
-**Draft:** {result["subject"]} ({result["folder"]})"""
-
-        # Draft (create or modify)
-        if action == "draft":
-            if not params.payload:
-                return "Error: payload required. Use 'help draft' for details."
+                return f"Error: payload required. Use 'help {action}' for details."
 
             try:
                 draft_data = json.loads(params.payload)
@@ -740,15 +682,20 @@ uv run --directory {plugin_dir} python setup.py
             if isinstance(draft_data, dict) and "format" in draft_data:
                 return (
                     "Error: 'format' no longer goes inside the payload. Pass it as a top-level "
-                    'parameter instead: {action:"draft", format:"markdown"|"plain", payload:\'{...}\'}'
+                    'parameter instead: {action:"create"|"replace", format:"markdown"|"plain", payload:\'{...}\'}'
                 )
 
-            # Modify existing draft if 'id' provided
-            if "id" in draft_data:
+            has_id = isinstance(draft_data, dict) and "id" in draft_data
+            if action == "replace" and not has_id:
+                return "Error: 'id' required for replace - the draft being replaced. Use 'create' for a new draft."
+            if action == "create" and has_id:
+                return "Error: 'id' is not valid for create. Use 'replace' to supersede an existing draft."
+
+            if action == "replace":
                 if not folder:
-                    return "Error: folder required for modify (e.g., 'Drafts')"
+                    return "Error: folder required for replace (e.g., 'Drafts')"
                 if "body" not in draft_data:
-                    return "Error: 'body' required for modify"
+                    return "Error: 'body' required for replace"
 
                 body = draft_data["body"]
                 format_type = params.format
@@ -775,7 +722,7 @@ uv run --directory {plugin_dir} python setup.py
 
                 reply_info = " (reply threading preserved)" if result["preserved_reply_to"] else ""
                 att_info = format_attachment_line(result.get("attachments", []))
-                return f"""# Draft Modified{reply_info}
+                return f"""# Draft Replaced{reply_info}
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}

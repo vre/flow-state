@@ -1270,7 +1270,7 @@ def modify_draft(
         attachments: List of absolute file paths to attach.
         account: Account name. None uses default.
         prefetched_draft: Optional (envelope, parsed_message) tuple from earlier fetch.
-            Used by edit_draft to avoid a second fetch.
+            Lets a caller that already fetched the draft avoid a second fetch.
 
     Returns:
         Info about the modified draft
@@ -1466,112 +1466,6 @@ def _extract_draft_bodies(msg: email.message.Message) -> tuple[str, str | None]:
             plain_body = decoded
 
     return plain_body, html_body
-
-
-def _find_match_contexts(text: str, needle: str, context_chars: int = 20, max_matches: int = 3) -> list[str]:
-    """Collect short context snippets around needle matches."""
-    snippets = []
-    search_from = 0
-    while len(snippets) < max_matches:
-        idx = text.find(needle, search_from)
-        if idx == -1:
-            break
-        left = max(0, idx - context_chars)
-        right = min(len(text), idx + len(needle) + context_chars)
-        snippet = text[left:right].replace("\n", " ")
-        snippets.append(snippet)
-        search_from = idx + len(needle)
-    return snippets
-
-
-def edit_draft(folder: str, message_id: int, replacements: list[dict], account: str = None) -> dict:
-    """Edit specific text in an existing draft.
-
-    Args:
-        folder: Folder containing draft
-        message_id: Draft message ID
-        replacements: List of {"old": str, "new": str} replacements
-        account: Account name. None uses default.
-
-    Returns:
-        Modified draft response with applied changes
-    """
-    if not replacements:
-        raise IMAPError("No replacements provided. Use at least one {old, new} pair.")
-
-    from session import get_session
-
-    session = get_session(account)
-    with session.connection_ctx() as client:
-        try:
-            client.select_folder(folder, readonly=True)
-        except Exception as e:
-            if is_transport_failure(e, stage="command"):
-                raise
-            raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
-
-        messages = client.fetch([message_id], ["RFC822", "ENVELOPE", "FLAGS"])
-        if message_id not in messages:
-            raise IMAPError(f"Message {message_id} not found in '{folder}'")
-
-        data = messages[message_id]
-        envelope = data[b"ENVELOPE"]
-        raw_email = data[b"RFC822"]
-        original_msg = email.message_from_bytes(raw_email)
-
-        # Safety: verify message has \Draft flag before allowing edit (which deletes+replaces)
-        msg_flags = [to_str(f).lower() for f in data.get(b"FLAGS", [])]
-        if "\\draft" not in msg_flags:
-            raise IMAPError(f"Message {message_id} does not have \\Draft flag — refusing to edit. Only draft messages can be edited.")
-
-        plain_body, html_body = _extract_draft_bodies(original_msg)
-
-    # Surgical replacement runs on the plain part, and the HTML part would have
-    # to be regenerated from it. The plain part is the lossy projection, so a
-    # single edit turns <strong> into <em> and drops <del> and <mark> entirely.
-    # Nothing stores the source, so this cannot be done correctly - refuse.
-    # Not a test of "was this markdown": a rich-text draft from any mail client
-    # has an HTML body too, and it is just as unpreservable.
-    if html_body is not None:
-        raise IMAPError(
-            f"Message {message_id} has an HTML body, which a text replacement cannot preserve - "
-            "bold would become italic and strikethrough and highlight would be dropped. "
-            'Send the whole body instead: {action:"draft", format:..., payload:\'{"id":'
-            f'{message_id},"body":"..."}}\'}}'
-        )
-
-    for idx, repl in enumerate(replacements):
-        if not isinstance(repl, dict) or "old" not in repl or "new" not in repl:
-            raise IMAPError(f"Replacement [{idx}] must be an object with 'old' and 'new' fields")
-        old = repl["old"]
-        new = repl["new"]
-        if not isinstance(old, str) or not old:
-            raise IMAPError(f"Replacement [{idx}] 'old' must be a non-empty string")
-        if not isinstance(new, str):
-            raise IMAPError(f"Replacement [{idx}] 'new' must be a string")
-
-        match_count = plain_body.count(old)
-        if match_count == 0:
-            raise IMAPError(f"Text not found: '{old}'. Use 'read' to verify current draft content.")
-        if match_count > 1:
-            contexts = _find_match_contexts(plain_body, old)
-            context_info = " | ".join(f"...{c}..." for c in contexts) if contexts else "(no context available)"
-            raise IMAPError(
-                f"Text '{old}' appears multiple times ({match_count}). Provide a more specific old string. Matches: {context_info}"
-            )
-
-        plain_body = plain_body.replace(old, new, 1)
-
-    result = modify_draft(
-        folder=folder,
-        message_id=message_id,
-        body=plain_body,
-        html=None,
-        account=account,
-        prefetched_draft=(envelope, original_msg),
-    )
-    result["changes"] = [{"old": r["old"], "new": r["new"]} for r in replacements]
-    return result
 
 
 def modify_flags(folder: str, message_ids: list[int], add_flags: list[str], remove_flags: list[str], account: str = None) -> dict:

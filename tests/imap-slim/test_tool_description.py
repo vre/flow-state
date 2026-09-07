@@ -12,7 +12,7 @@ from imap_stream_mcp import HELP_TOPICS, MailAction, use_mail
 
 # Measured 2026-08-26 before this cut: docstring 1357 + field descriptions 562.
 BASELINE = 1919
-BUDGET = 330
+BUDGET = 360  # +30 for the create/replace rename: two action names where there was one
 
 
 def _description_text() -> str:
@@ -79,11 +79,12 @@ class TestExamplesAreValidCalls:
     """AC10: an example that would be rejected teaches the wrong thing."""
 
     def _draft_examples(self) -> list[str]:
+        """Every example that writes a draft, under either writing action."""
         sources = [use_mail.__doc__ or ""] + list(HELP_TOPICS.values())
         examples = []
         for source in sources:
             for line in source.split("\n"):
-                if 'action: "draft"' in line or 'action:"draft"' in line:
+                if any(m in line for m in ('action: "create"', 'action:"create"', 'action: "replace"', 'action:"replace"')):
                     examples.append(line)
         return examples
 
@@ -100,14 +101,14 @@ class TestExamplesAreValidCalls:
             assert '"format"' not in payload, f"format inside payload: {line}"
 
     def test_nothing_calls_markdown_the_default(self):
-        haystack = (use_mail.__doc__ or "") + HELP_TOPICS["draft"]
+        haystack = (use_mail.__doc__ or "") + HELP_TOPICS["create"] + HELP_TOPICS["replace"]
         assert "markdown" in haystack
         assert "(default" not in haystack.lower()
 
 
 class TestDraftHelpMatchesBehaviour:
     def test_format_section_covers_both_modes_and_precedence(self):
-        draft_help = HELP_TOPICS["draft"].lower()
+        draft_help = HELP_TOPICS["create"].lower()
         assert "markdown" in draft_help and "plain" in draft_help
         assert "line break" in draft_help
         assert "block syntax" in draft_help
@@ -118,12 +119,12 @@ class TestHelpNamesCodeAndTables:
     """AC8: the help said these were unsupported; they are now supported."""
 
     def test_help_does_not_claim_they_are_unsupported(self):
-        draft_help = HELP_TOPICS["draft"]
+        draft_help = HELP_TOPICS["create"]
         assert "NOT supported" not in draft_help
         assert "not supported yet" not in draft_help.lower()
 
     def test_help_names_them(self):
-        draft_help = HELP_TOPICS["draft"].lower()
+        draft_help = HELP_TOPICS["create"].lower()
         assert "code block" in draft_help
         assert "table" in draft_help
         assert "left margin" in draft_help, "the column-zero requirement must be stated"
@@ -183,3 +184,43 @@ class TestTheSurfaceIsDefinedOnce:
         assert params[0].annotation is MailAction
         assert inspect.signature(use_mail).return_annotation is str
         assert "EXTERNAL_EMAIL" in (use_mail.__doc__ or ""), "the untrusted-content notice must stay on the wrapper"
+
+
+class TestDocumentationMatchesTheCode:
+    """Docs go stale silently. These catch the claims that would mislead.
+
+    Not a general freshness check - only the statements that were actually
+    wrong once: an action that no longer exists, and a security claim that
+    outlived the behaviour it described.
+    """
+
+    from pathlib import Path as _P
+
+    REPO = _P(__file__).resolve().parent.parent.parent
+    DOCS = {
+        "plugin README": REPO / "imap-slim" / "README.md",
+        "repo README": REPO / "README.md",
+        "SKILL.md": REPO / "imap-slim" / "SKILL.md",
+    }
+
+    def test_no_document_advertises_the_removed_edit_action(self):
+        for name, path in self.DOCS.items():
+            text = path.read_text()
+            assert 'action: "edit"' not in text and 'action:"edit"' not in text, f"{name} still shows the edit action"
+            assert "imap-slim-cli edit" not in text, f"{name} still shows an edit subcommand"
+
+    def test_no_document_claims_there_is_no_expunge(self):
+        """`replace` expunges the draft it supersedes; saying otherwise is a false
+        security claim, and both READMEs made it."""
+        for name, path in self.DOCS.items():
+            text = path.read_text().lower()
+            assert "no expunge" not in text, f"{name} claims there is no expunge"
+            assert "no destructive operations" not in text, f"{name} claims no destructive operations"
+
+    def test_the_documented_actions_are_the_real_ones(self):
+        import actions
+
+        valid = {"list", "read", "search", "create", "replace", "folders", "help", "attachment", "cleanup", "accounts", "flag"}
+        assert set(actions.HELP_TOPICS) - {"overview"} <= valid, "a help topic names an action that does not exist"
+        for name in ("create", "replace"):
+            assert name in actions.HELP_TOPICS, f"no help topic for {name}"

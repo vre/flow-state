@@ -91,7 +91,7 @@ class TestAccountPassthrough:
         from imap_stream_mcp import use_mail
 
         payload = json.dumps({"to": "a@b.com", "subject": "test", "body": "hi"})
-        params = MailAction(action="draft", format="markdown", folder="INBOX", payload=payload, account=self.ACCOUNT)
+        params = MailAction(action="create", format="markdown", payload=payload, account=self.ACCOUNT)
         asyncio.run(use_mail(params))
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
@@ -111,25 +111,7 @@ class TestAccountPassthrough:
         from imap_stream_mcp import use_mail
 
         payload = json.dumps({"id": 1, "body": "updated"})
-        params = MailAction(action="draft", format="markdown", folder="Drafts", payload=payload, account=self.ACCOUNT)
-        asyncio.run(use_mail(params))
-        mock_fn.assert_called_once()
-        assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT
-
-    @patch("actions.edit_draft")
-    def test_edit_draft_passes_account(self, mock_fn, _patch_accounts):
-        mock_fn.return_value = {
-            "subject": "test",
-            "folder": "Drafts",
-            "changes": [{"old": "foo", "new": "bar"}],
-        }
-        import asyncio
-        import json
-
-        from imap_stream_mcp import use_mail
-
-        payload = json.dumps({"id": 1, "replacements": [{"old": "foo", "new": "bar"}]})
-        params = MailAction(action="edit", folder="Drafts", payload=payload, account=self.ACCOUNT)
+        params = MailAction(action="replace", format="markdown", folder="Drafts", payload=payload, account=self.ACCOUNT)
         asyncio.run(use_mail(params))
         mock_fn.assert_called_once()
         assert mock_fn.call_args.kwargs.get("account") == self.ACCOUNT

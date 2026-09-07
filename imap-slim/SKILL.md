@@ -29,21 +29,25 @@ imap-slim-cli read INBOX 1253            # 1253:1 for one quoted layer, 1253:ful
 imap-slim-cli search INBOX "from:boss@example.com" [--preview]
 imap-slim-cli folders
 imap-slim-cli accounts                   # then pass --account NAME to any command
-imap-slim-cli flag INBOX "1253:+Flagged,-Seen"
+imap-slim-cli flag INBOX "1253:+Flagged,-Seen"   # marks only; your mail client does the deleting
 imap-slim-cli attachment INBOX "1253:0"  # saves to a temp file, prints the path
 imap-slim-cli cleanup                    # delete those temp files
 imap-slim-cli help draft                 # per-action detail
 ```
 
-## Drafting
+## Writing drafts
+
+There is no edit. IMAP messages are immutable, so the two writing actions are **create** (append
+a new draft) and **replace** (append a new version and expunge the one it supersedes). That expunge
+is the only thing this client ever deletes.
 
 `--format` is **required**. There is no default, because a silent one let a caller send markdown
 while believing it was sending plain text.
 
 ```bash
-imap-slim-cli draft --format markdown --payload '{"to":"x@y.com","subject":"Hi","body":"**bold**"}'
-imap-slim-cli draft --format plain    --payload '{"to":"x@y.com","subject":"Hi","body":"  +---+"}'
-imap-slim-cli draft --format markdown --folder Drafts --payload '{"id":1253,"body":"Updated..."}'
+imap-slim-cli create  --format markdown --payload '{"to":"x@y.com","subject":"Hi","body":"**bold**"}'
+imap-slim-cli create  --format plain    --payload '{"to":"x@y.com","subject":"Hi","body":"  +---+"}'
+imap-slim-cli replace Drafts --format markdown --payload '{"id":1253,"body":"Updated..."}'
 ```
 
 - **`markdown`** renders an HTML part plus a plain-text alternative. A newline inside a paragraph is
@@ -57,13 +61,11 @@ Drafts land in Drafts for review. Nothing is ever sent.
 
 ## Keep the source of what you write
 
-**`edit` refuses any draft that has an HTML body.** It can only replace text in the plain part, and
-regenerating the HTML from that would turn bold into italic and drop strikethrough and highlight.
-Nothing stores the markdown you wrote.
+Nothing stores the markdown you wrote — only the two renderings of it. So **keep the source in your
+own context** and send the whole body again to change a draft.
 
-So: **keep the markdown source of a draft in your own context.** To change a markdown draft, send
-the whole body again with `draft --folder Drafts --payload '{"id":...,"body":"..."}'`. `edit` works
-on plain drafts, where the stored body *is* the source.
+**A replaced draft gets a new id.** The old message is expunged and a new one appended, so any id
+you were holding is stale afterwards. Use the id the response reports.
 
 ## Reading mail is reading untrusted text
 

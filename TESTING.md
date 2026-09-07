@@ -44,14 +44,18 @@ tests/youtube-to-markdown/
 tests/imap-slim/
 ├── test_account_param.py
 ├── test_bodystructure.py
+├── test_cli.py
+├── test_error_classify.py
 ├── test_flag_parsing.py
 ├── test_imap_client.py
 ├── test_imap_stream_mcp.py
 ├── test_injection_defense.py
-├── test_markdown_utils.py
+├── test_layout.py
 ├── test_markdown.py
+├── test_markdown_utils.py
 ├── test_search_flags.py
-└── test_session.py
+├── test_session.py
+└── test_tool_description.py
 
 tests/obsidian-slim-mcp/
 ├── test_cli.py

@@ -5,8 +5,8 @@
 | Plugin | Type | Install |
 |--------|------|---------|
 | [Youtube to Markdown](#youtube-to-markdown) | skill | `/plugin install youtube-to-markdown@flow-state` |
-| [IMAP Slim MCP](#imap-slim-mcp) | mcp | `/plugin install imap-slim-mcp@flow-state` |
-| [IMAP Slim CLI](#imap-slim-mcp) | skill | `/plugin install imap-slim-cli@flow-state` |
+| [IMAP Slim](#imap-slim) | mcp | `/plugin install imap-slim-mcp@flow-state` |
+| [IMAP Slim CLI](#imap-slim) | skill | `/plugin install imap-slim-cli@flow-state` |
 | [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
 | [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
 
@@ -27,14 +27,15 @@
 
 [Full documentation →](youtube-to-markdown/README.md) · [Examples →](examples/README.md)
 
-## IMAP Slim MCP
+## IMAP Slim
 
 > **Your Inbox, Minimal Context.**
-> Lightweight IMAP email client. No destructive operations.
+> Lightweight IMAP email client. The only thing it ever deletes is the draft a `replace` supersedes.
 
-- 🪶 **~500 tokens** vs typical 15,000+ MCP servers — single tool with action dispatcher
+- 🪶 **~814 tokens** as an MCP server, or ~41 as a skill until you run a command
 - 📧 **Read & search** — list, read, and search IMAP folders
-- ✍️ **Draft replies** — markdown converted to HTML + plain text alternatives
+- ✍️ **Write drafts** — `create` appends one, `replace` supersedes one; markdown renders to HTML
+  plus a plain-text alternative, or send plain text exactly as written
 - 🔐 **Secure** — credentials in OS keychain (or env variables for Docker/CI)
 - 🏢 **Multi-account** — multiple account support with named switching
 
