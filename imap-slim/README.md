@@ -79,6 +79,10 @@ claude mcp add imap-slim -- uv --directory $(pwd) run imap-slim
 
 ### OS Keychain (Recommended)
 
+`python setup.py` with no arguments offers add, update, remove and set-default. Updating shows each
+current value in brackets — Enter keeps it, typing replaces it — including the account name, so
+renaming moves the stored keys with it. An empty password keeps the stored one.
+
 ```bash
 uv run python setup.py                 # Interactive setup
 uv run python setup.py --add work      # Add named account

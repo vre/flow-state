@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.2.2] - 2026-09-07
+
+### Fixed
+- **The default account is now marked wherever accounts are listed.** Only `--list` showed it, so
+  every interactive prompt that offered a choice between accounts hid the consequence of picking
+  none of them. A name pasted back with its ` (default)` marker still resolves.
+
+## [2.2.1] - 2026-09-07
+
+### Fixed
+- **`setup.py` prompts show the current value again.** 2.2.0 put existing values in the readline
+  edit buffer instead of in brackets; the buffer never rendered, so `  Account name: ` appeared
+  empty and there was no way to see what pressing Enter would keep. All prompts now use the
+  bracket form, and readline is gone.
+
+## [2.2.0] - 2026-09-07
+
+### Added
+- **`setup.py` can remove an account and set the default from its interactive menu.** Both existed
+  only as command-line flags, which meant they existed only for someone who thought to run
+  `--help`.
+- **Updating an account pre-fills every field, editable in place.** Correcting one character in a
+  server name meant retyping the server, the port, the username and the password. The account name
+  is editable too, so an account can be renamed and its keys move with it.
+- Every current or suggested value is shown in brackets: `Port [993]: `, `Account name [foo]: `.
+  Enter keeps it, typing replaces it. Readline pre-filling the edit buffer was tried and removed
+  in 2.2.1 - it never rendered, so the prompt showed nothing after the colon and there was no way
+  to see what an empty answer would keep.
+- **An empty password keeps the stored one.** It cannot be pre-filled - it is never read back - so
+  the prompt says what an empty answer does.
+
+### Notes
+- Renaming onto an existing account name is refused, and the source account is left untouched.
+- Removal from the menu asks for confirmation first.
+- `setup.py` had no tests at all; it has eleven now.
+
 ## [2.1.0] - 2026-09-07
 
 ### Added
