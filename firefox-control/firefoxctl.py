@@ -38,6 +38,7 @@ import subprocess
 import sys
 import time
 from typing import Any
+from urllib.parse import urlsplit
 
 import aiohttp
 from injection_defense import sanitize_result
@@ -138,15 +139,21 @@ class BiDiConnection:
 
     async def send(self, method: str, params: dict[str, Any] | None = None) -> Any:
         self._id += 1
-        msg: dict[str, Any] = {"id": self._id, "method": method}
+        msg_id = self._id
+        msg: dict[str, Any] = {"id": msg_id, "method": method}
         if params is not None:
             msg["params"] = params
         loop = asyncio.get_running_loop()
         fut = loop.create_future()
-        self._pending[self._id] = fut
+        self._pending[msg_id] = fut
         assert self._ws is not None
-        await self._ws.send_json(msg)
-        resp = await fut
+        try:
+            await self._ws.send_json(msg)
+            resp = await fut
+        finally:
+            # A cancelled caller (asyncio.wait_for) would otherwise leave its reply
+            # slot behind for the life of the connection.
+            self._pending.pop(msg_id, None)
         if resp.get("type") == "error":
             err = resp.get("error", "unknown")
             err_msg = resp.get("message", "")
@@ -168,7 +175,13 @@ async def cmd_list(conn: BiDiConnection) -> list[dict]:
     contexts = result.get("contexts", [])
     tabs = []
     for ctx in contexts:
-        tabs.append({"context": ctx.get("context", ""), "url": ctx.get("url", "")})
+        tabs.append(
+            {
+                "context": ctx.get("context", ""),
+                "url": ctx.get("url", ""),
+                "clientWindow": ctx.get("clientWindow"),
+            }
+        )
     return tabs
 
 
@@ -206,16 +219,165 @@ async def cmd_screenshot(conn: BiDiConnection, context: str) -> bytes:
     return base64.b64decode(data)
 
 
-async def cmd_navigate(conn: BiDiConnection, context: str, url: str) -> dict:
-    result = await conn.send(
-        "browsingContext.navigate",
-        {
-            "context": context,
-            "url": url,
-            "wait": "complete",
-        },
+def _same_target(candidate: str, target: str) -> bool:
+    """True if two URLs address the same resource.
+
+    Deliberately strict: a container swap re-issues the same request, so the
+    replacement carries the requested address verbatim. Anything looser widens what
+    can be adopted without a measurement saying it must be. The one tolerance is
+    Firefox's own normalisation of an empty path to "/".
+    """
+    a, b = urlsplit(candidate), urlsplit(target)
+    return (
+        a.scheme == b.scheme
+        and a.netloc == b.netloc
+        and (a.path or "/") == (b.path or "/")
+        and a.query == b.query
+        and a.fragment == b.fragment
     )
+
+
+async def cmd_navigate(
+    conn: BiDiConnection,
+    context: str,
+    url: str,
+    swap_timeout: float = 15.0,
+) -> dict:
+    """Navigate a context, surviving a browsing-context swap.
+
+    Firefox may answer a navigation by REPLACING the browsing context instead of
+    reusing it: the requested id is destroyed and a new one appears at the target
+    URL. BiDi reports that as
+
+        browsingContext.navigate: unknown error — Error: Browsing context got discarded
+
+    which reads like a failure and is not one — the navigation succeeded, only the
+    handle changed. A caller that treats it as an error loses a page that loaded
+    fine, and may fall back to grabbing a tab the user is reading.
+
+    The cause is a userContext (container) switch: an extension such as Multi-Account
+    Containers assigns the target to a container, and a context cannot change
+    container in place. Measured on www.reddit.com 2026-09-22 — the replacement
+    lands at the requested URL, in the same window, in the assigned container. Only
+    the first navigation into a container swaps; the context is stable afterwards.
+    Recovery costs nothing when no swap happens.
+
+    Args:
+        conn: Open BiDi connection.
+        context: Context to navigate.
+        url: Target URL.
+        swap_timeout: Seconds to wait for a replacement before giving up.
+
+    Returns:
+        The BiDi result plus `context` — the id to keep using. After a swap it also
+        carries `context_swapped: True`.
+
+    Raises:
+        BiDiError: the navigation failed, or a replacement could not be identified
+            unambiguously. A target that redirects falls here: the address no longer
+            matches, so the swap is not recognised.
+    """
+    try:
+        # An enhancement, not a precondition: an unresponsive getTree must not turn a
+        # navigation that would have worked into a failure.
+        tabs_before = await asyncio.wait_for(cmd_list(conn), timeout=swap_timeout)
+    except (TimeoutError, asyncio.TimeoutError):
+        tabs_before = None
+    before = {t["context"] for t in tabs_before} if tabs_before is not None else set()
+    window = next(
+        (t.get("clientWindow") for t in tabs_before or [] if t["context"] == context),
+        None,
+    )
+    try:
+        result = await conn.send(
+            "browsingContext.navigate",
+            {"context": context, "url": url, "wait": "complete"},
+        )
+    except BiDiError as e:
+        # Substring matching is the weak discriminator here; BiDi reports this as a
+        # bare "unknown error". A reworded message stops recovery and the original
+        # error propagates — no worse than before the recovery existed.
+        if "discarded" not in str(e) or tabs_before is None or window is None:
+            raise
+        replacement = await _await_swapped_context(conn, before, url, window, swap_timeout)
+        if not replacement:
+            raise
+        return {
+            "navigation": None,
+            "url": replacement.get("url", ""),
+            "context": replacement["context"],
+            "context_swapped": True,
+        }
+    result = dict(result)
+    result.setdefault("context", context)
     return result
+
+
+async def _await_swapped_context(
+    conn: BiDiConnection,
+    before: set[str],
+    target: str,
+    window: str | None,
+    timeout: float,
+    poll: float = 0.5,
+) -> dict | None:
+    """Find the context that replaced the one we navigated, or give up.
+
+    A new context id proves nothing on its own — a tab the user opens while we wait
+    is also "new", and adopting it is the failure this recovery exists to prevent.
+    So a candidate must also be at the **requested address** and in the **same
+    window**, and if more than one is, this returns nothing rather than choosing.
+
+    Both checks follow from the cause (a container switch, see `cmd_navigate`): the
+    replacement re-issues the same request, so its URL is the target rather than a
+    redirect of it, and it stays in the window the original was in. `window` is never
+    None here: a Firefox that does not report `clientWindow` leaves nothing to compare
+    — two absent values assert no fact about window identity — so `cmd_navigate`
+    declines recovery outright rather than adopting on the address alone.
+
+    BiDi exposes no "replaced context X" relation, so this remains a heuristic. What
+    is left of it: the user would have to open the exact target URL, in that window,
+    between the snapshot and the end of the wait. "New" means new since that snapshot,
+    taken immediately before the navigation is sent — not since Firefox acted on it.
+    Closing that needs a window nothing else can open tabs in.
+
+    Blank contexts are skipped: the replacement has not finished loading, and an
+    empty new tab is more likely to be the user's.
+    """
+    if poll <= 0:
+        raise ValueError("poll must be positive")
+    if not timeout > 0:
+        raise ValueError("timeout must be positive")
+
+    deadline = time.monotonic() + timeout
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        try:
+            # Bounded: an unresponsive getTree must not extend the wait past the
+            # deadline the caller asked for.
+            tabs = await asyncio.wait_for(cmd_list(conn), timeout=remaining)
+        except (TimeoutError, asyncio.TimeoutError):
+            return None
+
+        candidates = [
+            t
+            for t in tabs
+            if t["context"] not in before
+            and t.get("url", "") not in ("", "about:blank", "about:newtab")
+            and _same_target(t.get("url", ""), target)
+            and t.get("clientWindow") == window
+        ]
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(candidates) > 1:
+            return None
+
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        await asyncio.sleep(min(poll, remaining))
 
 
 async def cmd_open(conn: BiDiConnection, url: str) -> dict:

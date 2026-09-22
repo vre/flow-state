@@ -46,6 +46,30 @@ uv run firefoxctl.py CONTEXT console-tail --for 30
 uv run firefoxctl.py CONTEXT navigate https://example.com
 ```
 
+**`navigate` may hand you a different context back.** Firefox sometimes answers a
+navigation by replacing the browsing context rather than reusing it — the id you
+asked for is destroyed and a new one appears at the target URL. `navigate` follows
+the swap when it can identify the replacement:
+
+```bash
+uv run firefoxctl.py --json navigate "$ctx" https://example.com/feed.json
+# {"navigation": "...", "url": "...", "context": "<same id>"}
+# {"navigation": null,  "url": "...", "context": "<NEW id>", "context_swapped": true}
+```
+
+**Read `context` back from the result — do not reuse the id you passed in.**
+
+It adopts a new context only when that context is **new, at the address you
+requested, and in the window the original was in**, and refuses when two qualify.
+A Firefox that does not report `clientWindow` gets no recovery at all — the discard
+propagates, as it did before this existed.
+The address comparison is exact — query and fragment included, and only an empty
+path is treated as `/`. A target that **redirects** therefore raises: the
+replacement is at the redirected address, which no longer matches. Navigate to the
+final URL, or handle the error.
+
+Navigation failures propagate unchanged.
+
 ## DOM helpers
 
 Shorthands for common eval patterns. Selectors are CSS.
@@ -81,6 +105,36 @@ uv run firefoxctl.py bidi browsingContext.getTree --params '{}'
 ```
 
 ## Gotchas
+
+### A container assignment replaces the context mid-navigation
+
+`browsingContext.navigate` can return `Error: Browsing context got discarded` when
+the navigation **succeeded** — the page is loaded under a new id.
+
+The cause is a `userContext` (container) switch. An extension such as Multi-Account
+Containers assigns a site to a container, and a context cannot change container in
+place, so Firefox builds a new one and discards the old. Measured on
+www.reddit.com 2026-09-22: the replacement carries the requested URL, the same
+`clientWindow`, and the assigned `userContext`. It is **host-specific** — only sites
+with an assignment rule swap — and **first-navigation only**: once a context is in
+the container, it navigates normally.
+
+Consequences:
+
+- A profile with no container rules never sees this, so it will not reproduce on a
+  clean test profile.
+- Creating the tab directly in the assigned container (`browsingContext.create` with
+  `userContext`) avoids the swap. The container's BiDi id is generated per session —
+  read it from `browser.getUserContexts`, never hardcode it.
+- **BiDi exposes no "replaced context X" relation**, so `navigate`'s recovery is a
+  heuristic. What is left of it after the URL and window checks: the user would have
+  to open that exact URL, in that window, between the snapshot `navigate` takes and
+  the end of the wait. Accepted, not eliminated — "new" is new since that snapshot,
+  not since Firefox acted on the navigation.
+
+If you need certainty rather than a narrow risk: validate what you get back (the
+document's origin, or a marker you set before navigating), or drive a window nothing
+else can create contexts in.
 
 ### `list` URLs lie on error pages — validate before trusting a tab
 
