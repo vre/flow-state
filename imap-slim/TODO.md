@@ -15,8 +15,9 @@
 - [x] Snippet preview (`preview: true/false`) in list/search (v0.7.0) — `docs/imap-slim/plans/2026-02-24-list-search-snippet.md`
 - [x] Thread-aware read: truncate quoted replies to reduce token count (v0.6.1) — `docs/imap-slim/plans/2026-02-25-thread-aware-read.md`
 - [x] Depth-aware quote truncation: `:N` modifiers for progressive disclosure of reply chains (v0.7.1) — `docs/imap-slim/plans/2026-03-09-depth-aware-quote-truncation.md`
-- [x] `multipart/related` carried when quoting an HTML reply (v2.2.0). In `replace` such a draft is
-      still refused rather than written without it
+- [x] `multipart/related` carried when quoting an HTML reply (v2.1.0)
+- [ ] `replace` loses inline images: a nameless one is dropped silently, a named one becomes a
+      detached attachment. The note here since 2.0.1 said such drafts were refused; they are not
 - [x] Draft body format made explicit and required (v2.0.0) - `format` is a top-level parameter
 - [x] Fenced code blocks and pipe tables (v2.0.0)
 - [x] Connection recovery: discard rather than interrogate a dead socket (v2.0.0)
@@ -33,3 +34,6 @@
       `user@MISSING_DOMAIN`. Judged not worth fixing - the sending client composes the real header
 - [ ] Interleaved replies have not been used in anger; the order check may prove too strict when
       a quoted line repeats in the original
+- [x] Replies quote the original: plain, HTML with inline images, and point-by-point (v2.1.0).
+      All three verified in Thunderbird against real mail (2026-09-22)
+- [x] From address per account; the IMAP login is not always an address (v2.1.0)

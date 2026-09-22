@@ -1,83 +1,45 @@
 # Changelog
 
-## [2.3.0] - 2026-09-22
-
-### Added
-
-- **Answering point by point**, plain text only. `read FOLDER UID:quote` returns the message as a
-  quote block with its attribution; a `create` body that already contains `>` lines is taken as
-  interleaved, so nothing is appended. Every quoted line is then checked against the original:
-  lines may be dropped, but what remains must be verbatim and in the order it was written, or the
-  draft is refused rather than corrected. Interleaving an HTML reply is refused - splicing into
-  someone else's markup is not something this client does, and no mail client does it either.
-
-## [2.2.0] - 2026-09-22
-
-### Added
-
-- **Replying to an HTML message quotes its own markup**, verbatim, inside
-  `<blockquote type="cite" cite="mid:…">` under a `div.moz-cite-prefix` attribution - the shape
-  Thunderbird produces, measured from real replies rather than described from memory. The inline
-  images the quote refers to are carried into a `multipart/related` wrapping the HTML alternative
-  (RFC 2387), under fresh Content-IDs in the sender's domain, marked inline. Attachments on the
-  original are not carried, which is also what Thunderbird does.
-- `setup.py` asks for a **From address** per account.
-
-### Fixed
-
-- **Drafts carried `From: <imap login>`.** On a server whose login is a bare name the header read
-  `From: vre`, which is not a mailbox anything can send from. It now comes from the account's
-  stored address, falling back only to something that already looks like one.
-
 ## [2.1.0] - 2026-09-22
 
+Relative to 2.0.0.
+
 ### Added
 
-- **The client quotes.** `create` takes `quote: "FOLDER:UID"`, fetches that message and builds
-  the reply around it: the quoted text, Thunderbird's attribution line, the `Re:` subject, the
-  recipient (`Reply-To`, else `From`) and the `In-Reply-To`/`References` headers. The caller
-  writes only the new text. The quoted original is never passed through the markdown renderer
-  and never rewrapped, because an altered quote is a misquote.
-- A draft over 500 kB is reported in the response. Nothing is truncated.
+- **Replies: the client quotes.** `create` takes `quote: "FOLDER:UID"` and builds the reply around
+  that message - the quote, Thunderbird's attribution line, the `Re:` subject, the recipient
+  (`Reply-To`, else `From`) and `In-Reply-To`/`References`. The caller writes only the new text.
+  The quoted original is never passed through the markdown renderer and never rewrapped.
+- **HTML replies quote the original's own markup**, verbatim, in
+  `<blockquote type="cite" cite="mid:…">` under a `div.moz-cite-prefix` attribution - the shape
+  Thunderbird produces, measured from real replies. Inline images the quote refers to are carried
+  into a `multipart/related` around the HTML alternative (RFC 2387), under fresh Content-IDs,
+  marked inline. Attachments on the original are not carried.
+- **Point-by-point replies**, plain text only. `read FOLDER UID:quote` returns a quote block; a
+  body that already contains `>` lines is written as it stands, and every quoted line is checked
+  against the original - dropped lines are fine, changed or reordered ones refuse the draft.
+- `setup.py` asks for a From address per account.
+- `create` and `replace` report the new draft's id; a draft over 500 kB is noted, never truncated.
 
 ### Fixed
 
-- **A long Message-ID was RFC 2047-encoded into a `References` chain**, which matches nothing, so
-  threading broke silently for any thread containing one - Outlook's ids run about 80 characters
-  and hit this every time. Headers are now built with a 998-column policy, the limit RFC 5322
-  actually sets.
-- `list` printed raw encoded words for non-ASCII subjects while both search paths decoded them.
-
-## [2.0.1] - 2026-09-14
-
-A cross-model review of 2.0.0 found these. The suite passed throughout; every one came from
-running the code.
-
-### Fixed
-
-- **`replace` silently dropped an attached email.** `message/rfc822` has no decoded payload, so the
-  part was skipped and the original draft then expunged. Attached messages are now carried over,
-  and any part that cannot be copied aborts the replace before anything is written.
-- **`debug_imap.py --debug` printed the password.** Tracing was enabled before `LOGIN`, which
-  `imaplib` echoes in full. It starts after authentication.
-- **An empty `to`, `cc` or `subject` could not clear a field.** Truthiness could not tell "not
-  supplied" from "explicitly empty", so `cc: ""` kept the previous recipients.
-- **`since:` and `before:` sent an unusable date.** `2024-01-01` went to the server verbatim; IMAP
-  wants `1-Jan-2024` (RFC 3501 §9).
-- **A non-ASCII search failed before reaching the server.** No charset was named, so the term was
-  encoded as ASCII and raised locally. `UTF-8` is declared when the criteria need it.
-- **A failed `flag` operation exited 0.** The CLI decided from the first characters of the rendered
-  text; the dispatcher now marks a failed response and the exit code follows it.
-- **Cached message lists ignored the request.** A list cached for `limit=10` answered `limit=50`,
-  and previews were returned or withheld regardless of what was asked. Flags, which move without
-  touching UIDVALIDITY/UIDNEXT/EXISTS, are now refetched after 30 s.
-- **Renaming an account could split it across two names.** Each key was deleted right after being
-  copied. All keys are copied and verified before any original is removed.
-- `list` and `search` put subjects, senders and snippets inside the same `[EXTERNAL_EMAIL_…]`
-  boundary `read` uses. Sanitizing strips markers but leaves ordinary prose, which arrived
-  unmarked.
-- `create` and `replace` report the new draft's id, which `SKILL.md` already told callers to use.
-- `help draft` appeared in `SKILL.md` and the README; the topics are `create` and `replace`.
+- **`replace` silently dropped an attached email** and then expunged the original. Attached
+  messages are carried over; any part that cannot be copied aborts before anything is written.
+- **`debug_imap.py --debug` printed the password** - tracing started before `LOGIN`.
+- **Drafts carried `From: <imap login>`**, which reads `From: vre` on a server whose login is a
+  bare name. Thunderbird rewrites it on send, which is why it never showed.
+- **A long Message-ID was RFC 2047-encoded into `References`**, which matches nothing and breaks
+  threading for every Outlook-length id. Headers are built at 998 columns, RFC 5322's limit.
+- **Renaming an account could split it across two names.** Keys are now copied and verified
+  before any original is removed.
+- `since:`/`before:` sent `2024-01-01` where IMAP wants `1-Jan-2024`; non-ASCII searches failed
+  before reaching the server.
+- An empty `to`, `cc` or `subject` could not clear a field.
+- Cached message lists ignored `limit` and `preview`, and never noticed flags changing.
+- A failed `flag` exited 0.
+- `list` and `search` put sender-written text outside the `[EXTERNAL_EMAIL_…]` boundary.
+- `list` showed raw encoded words for non-ASCII subjects.
+- `help draft` in the docs, where the topics are `create` and `replace`.
 
 ## [2.0.0] - 2026-09-07
 

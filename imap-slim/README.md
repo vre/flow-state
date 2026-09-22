@@ -20,7 +20,8 @@ Inspired by [Jesse Vincent's MCP design philosophy](https://blog.fsck.com/2025/1
 - **list** - List messages in any folder (`[att:N]` attachment count, `preview` for body snippet)
 - **read** - Read message content with attachments
 - **search** - Search by sender, subject, date, or text (`[att:N]` attachment count, `preview` for body snippet)
-- **create** - Write a new draft (an IMAP `APPEND`), with file attachments
+- **create** - Write a new draft (an IMAP `APPEND`), with file attachments. With `quote` it is a
+  reply: the client quotes the original, HTML included, and sets the threading
 - **replace** - Supersede an existing draft. IMAP messages are immutable, so this appends the new
   version and expunges the one it replaces; **the draft gets a new id**
 - **flag** - Add/remove flags and labels (Seen, Flagged, Deleted, $label1, etc.)
@@ -81,7 +82,8 @@ claude mcp add imap-slim -- uv --directory $(pwd) run imap-slim
 
 `python setup.py` with no arguments offers add, update, remove and set-default. Updating shows each
 current value in brackets — Enter keeps it, typing replaces it — including the account name, so
-renaming moves the stored keys with it. An empty password keeps the stored one.
+renaming moves the stored keys with it. An empty password keeps the stored one. Each account also
+has a From address, since an IMAP login is not always one.
 
 ```bash
 uv run python setup.py                 # Interactive setup
@@ -107,17 +109,22 @@ Add to your MCP config:
 
 ## Workflow: Reply to Email
 
-1. **List todays messages from INBOX** to find the email one you want
-2. **Read the message from XXX** to load the content into context
-3. **I would like to answer...** create reply with Claude's help
-4. **Send via email client** → Drafts → Review and send
+1. **List today's messages from INBOX** to find the one you want
+2. **Read it** to load the content into context
+3. **Answer it** — Claude writes only the new text; `create` with `quote` fetches the original and
+   builds the quote, attribution, `Re:` subject, recipient and threading headers
+4. **Review and send** from your mail client's Drafts
+
+An HTML message is quoted by its own markup, with its inline images, in the shape Thunderbird uses
+— write above it. To answer point by point, plain text only: `read` with `:quote` gives a block to
+write between, and every quoted line is checked against the original before the draft is written.
 
 ## Limitations
 
-- **Draft operations are for user-composed content.** Replacing a draft originally created in a
-  rich email client (Outlook, Gmail) may lose inline images and complex formatting: `create` and
-  `replace` build the MIME structure from text and HTML, so embedded `cid:` image references are
-  not preserved.
+- **`replace` does not keep inline images.** One without a filename is dropped; one with a filename
+  becomes an ordinary attachment, detached from the markup. Quoting in `create` does carry them.
+- **Point-by-point replies are plain text only.** Splicing between the lines of someone else's HTML
+  is not something this client does.
 - **There is no edit.** IMAP messages are immutable. Nothing stores the markdown you wrote — only
   its two renderings — so keep your source and send the whole body again to change a draft.
 - **A replaced draft gets a new id.** Any id held across a `replace` is stale.
@@ -171,6 +178,7 @@ mcp-server.json      # MCP config, named explicitly by the marketplace entry.
 # Read message
 {action: "read", folder: "INBOX", payload: "12345"}
 {action: "read", folder: "INBOX", payload: "12345:full"}  # include full quoted tail
+{action: "read", folder: "INBOX", payload: "12345:quote"} # quote block for a point-by-point reply
 
 # Search (preview: true for body snippets)
 {action: "search", folder: "INBOX", payload: "from:boss@company.com", preview: true}
@@ -178,9 +186,12 @@ mcp-server.json      # MCP config, named explicitly by the marketplace entry.
 {action: "search", folder: "INBOX", payload: "since:2024-01-01", preview: true}
 
 # Create draft
-{action: "create", format: "markdown", payload: '{"to":"x@y.com","subject":"Re: Hi","body":"Thanks!","in_reply_to":"<msgid>"}'}
+{action: "create", format: "markdown", payload: '{"to":"x@y.com","subject":"Hi","body":"**Hello**"}'}
 
-# Edit draft (surgical replacement)
+# Reply: only the body; the client quotes INBOX:12345 and sets recipient, subject and threading
+{action: "create", format: "markdown", quote: "INBOX:12345", payload: '{"body":"Thanks!"}'}
+
+# Replace a draft (appends a new version, expunges the old; the id changes)
 {action: "replace", folder: "Drafts", format: "markdown", payload: '{"id": 1444, "body": "12 ducks"}'}
 
 # Flag messages
@@ -218,6 +229,10 @@ mcp-server.json      # MCP config, named explicitly by the marketplace entry.
 
 ## Release Highlights
 
+- **v2.1.0** — Replies: the client quotes the original, HTML and inline images included, with
+  point-by-point replies for plain text.
+- **v2.0.0** — Skill-backed CLI alongside the MCP; `create`/`replace` named after IMAP; draft
+  format required; connection recovery in ~0.2 s.
 - **v1.0.0** — Multi-account fix, injection defense module with NFKC normalization and randomized nonce delimiters.
 
 ## License
