@@ -46,7 +46,7 @@ uv run firefoxctl.py CONTEXT console-tail --for 30
 uv run firefoxctl.py CONTEXT navigate https://example.com
 ```
 
-**`navigate` may hand you a different context back.** Firefox sometimes answers a
+**`navigate` and `open` may hand you a different context back.** Firefox sometimes answers a
 navigation by replacing the browsing context rather than reusing it — the id you
 asked for is destroyed and a new one appears at the target URL. `navigate` follows
 the swap when it can identify the replacement:
@@ -57,7 +57,10 @@ uv run firefoxctl.py --json navigate "$ctx" https://example.com/feed.json
 # {"navigation": null,  "url": "...", "context": "<NEW id>", "context_swapped": true}
 ```
 
-**Read `context` back from the result — do not reuse the id you passed in.**
+**Read `context` back from the result — do not reuse the id you passed in, and for
+`open`, not the tab you think it created.** `open` navigates through the same path:
+its navigation is always a context's first, which is exactly the one a container
+assignment replaces.
 
 It adopts a new context only when that context is **new, at the address you
 requested, and in the window the original was in**, and refuses when two qualify.

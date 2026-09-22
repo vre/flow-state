@@ -381,15 +381,34 @@ async def _await_swapped_context(
 
 
 async def cmd_open(conn: BiDiConnection, url: str) -> dict:
-    """Open a new tab, optionally navigating to url."""
+    """Open a new tab, optionally navigating to url.
+
+    Goes through `cmd_navigate` rather than navigating directly, because this
+    navigation is always a context's *first* — the one a container assignment
+    replaces (see `cmd_navigate`). Navigating raw here would hand back a context id
+    that the browser had already discarded.
+
+    Args:
+        conn: Open BiDi connection.
+        url: Target URL, or empty/`about:blank` to leave the tab blank.
+
+    Returns:
+        `context` — the id to keep using, which is not necessarily the tab created —
+        and `url`. `context_swapped: True` is present when the context was replaced.
+
+    Raises:
+        BiDiError: the navigation failed, or was swapped and the replacement could
+            not be identified.
+    """
     result = await conn.send("browsingContext.create", {"type": "tab"})
     context = result.get("context", "")
-    if url and url != "about:blank":
-        await conn.send(
-            "browsingContext.navigate",
-            {"context": context, "url": url, "wait": "complete"},
-        )
-    return {"context": context, "url": url}
+    if not url or url == "about:blank":
+        return {"context": context, "url": url}
+    navigated = await cmd_navigate(conn, context, url)
+    opened = {"context": navigated.get("context", context), "url": url}
+    if navigated.get("context_swapped"):
+        opened["context_swapped"] = True
+    return opened
 
 
 def _js(s: str) -> str:

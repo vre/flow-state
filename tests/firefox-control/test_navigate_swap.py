@@ -325,3 +325,62 @@ def test_a_send_cancelled_while_writing_does_not_leak_its_future():
         return conn._pending
 
     assert asyncio.run(go()) == {}
+
+
+# --- open ---
+#
+# `open` creates a tab and navigates it, so its navigation is always a *first*
+# navigation — exactly the one a container assignment replaces. It must follow the
+# swap for the same reason `navigate` does, and hand back a context that is alive.
+
+
+class OpenConn:
+    """Scripted BiDi: create returns a fixed id, navigate replies or raises."""
+
+    def __init__(self, navigate_error=None):
+        self._navigate_error = navigate_error
+        self.navigated = []
+
+    async def send(self, method, params=None):
+        if method == "browsingContext.create":
+            return {"context": "old"}
+        if method == "browsingContext.navigate":
+            self.navigated.append(params)
+            if self._navigate_error is not None:
+                raise self._navigate_error
+            return {"navigation": "nav-1", "url": params["url"]}
+        raise AssertionError(f"unexpected method {method}")
+
+
+def test_open_follows_a_swap_and_returns_the_live_context(monkeypatch):
+    _patch_list(monkeypatch, [[BLANK], [BLANK, _tab("new", TARGET)]])
+    conn = OpenConn(navigate_error=firefoxctl.BiDiError(DISCARDED))
+    result = asyncio.run(firefoxctl.cmd_open(conn, TARGET))
+    assert result["context"] == "new"
+    assert result["context_swapped"] is True
+
+
+def test_open_without_a_swap_returns_the_tab_it_created(monkeypatch):
+    _patch_list(monkeypatch, [[BLANK]])
+    conn = OpenConn()
+    result = asyncio.run(firefoxctl.cmd_open(conn, TARGET))
+    assert result["context"] == "old"
+    assert result["url"] == TARGET
+    assert "context_swapped" not in result
+    # Pin what was actually asked of the browser, not just the shape of the reply.
+    assert conn.navigated == [{"context": "old", "url": TARGET, "wait": "complete"}]
+
+
+def test_open_still_raises_on_a_genuine_navigation_failure(monkeypatch):
+    _patch_list(monkeypatch, [[BLANK]])
+    conn = OpenConn(navigate_error=firefoxctl.BiDiError("browsingContext.navigate: unknown error — Error: NS_ERROR_UNKNOWN_HOST"))
+    with pytest.raises(firefoxctl.BiDiError, match="NS_ERROR_UNKNOWN_HOST"):
+        asyncio.run(firefoxctl.cmd_open(conn, TARGET))
+
+
+def test_open_with_no_url_does_not_navigate(monkeypatch):
+    _patch_list(monkeypatch, [[BLANK]])
+    conn = OpenConn()
+    result = asyncio.run(firefoxctl.cmd_open(conn, ""))
+    assert result["context"] == "old"
+    assert conn.navigated == []
