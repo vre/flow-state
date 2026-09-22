@@ -308,6 +308,31 @@ def get_credentials(account: str | None = None) -> tuple[str, str, str, str]:
     return server, port or "993", username, password
 
 
+def get_from_address(account: str | None = None) -> str:
+    """The address to put in From.
+
+    The IMAP login is not an address - on this mailbox it is "vre" - and a draft
+    built from it carries `From: vre`, which is not a mailbox any client can
+    send from. An explicit per-account address is stored by setup.py; the
+    fallbacks only ever use something that already looks like an address.
+    """
+    if account is None:
+        account = get_default_account()
+
+    stored = _keyring_get(f"{account}:from_address") if account else None
+    if stored:
+        return stored
+
+    username = _keyring_get(f"{account}:imap_username") if account else None
+    if username and "@" in username:
+        return username
+    if account and "@" in account:
+        # Accounts are named by their address here, which is the last thing
+        # that is certainly the user's own.
+        return account
+    return username or account or ""
+
+
 def list_accounts() -> list[str]:
     """Return list of configured account names.
 
@@ -1220,6 +1245,7 @@ def create_draft(
     references: str | None = None,
     cc: str | None = None,
     html: str | None = None,
+    related: list[dict] | None = None,
     attachments: list[str] | None = None,
     account: str = None,
 ) -> dict:
@@ -1234,6 +1260,9 @@ def create_draft(
         references: Full References chain for threading. Falls back to in_reply_to.
         cc: CC addresses (comma-separated)
         html: HTML body (if provided, creates multipart/alternative)
+        related: Inline parts the HTML refers to by cid, as dicts with cid,
+            maintype, subtype, filename and data. They hang off the HTML
+            alternative as multipart/related, not off the message.
         attachments: List of absolute file paths to attach.
         account: Account name. None uses default.
 
@@ -1247,8 +1276,8 @@ def create_draft(
         # Build email message
         msg = email.message.EmailMessage(policy=DRAFT_POLICY)
 
-        _, _, username, _ = get_credentials(account)
-        msg["From"] = username
+        get_credentials(account)  # fails early, and with the setup guide, if unconfigured
+        msg["From"] = get_from_address(account)
         msg["To"] = to
         msg["Subject"] = subject
         msg["Date"] = email.utils.formatdate(localtime=True)
@@ -1270,6 +1299,20 @@ def create_draft(
         msg.set_content(body)
         if html:
             msg.add_alternative(html, subtype="html")
+            if related:
+                # multipart/related wraps the HTML alternative alone (RFC 2387),
+                # so a plain-text reader still sees only the text part and the
+                # images travel with the markup that references them.
+                html_part = msg.get_payload()[-1]
+                for part in related:
+                    html_part.add_related(
+                        part["data"],
+                        maintype=part.get("maintype", "application"),
+                        subtype=part.get("subtype", "octet-stream"),
+                        cid=f"<{part['cid']}>",
+                        filename=part.get("filename") or None,
+                        disposition="inline",
+                    )
 
         # Attach files (validates all paths before modifying message)
         att_info = []
@@ -1379,6 +1422,25 @@ def fetch_quotable(folder: str, uid: int, account: str = None) -> dict:
         except (TypeError, ValueError):
             date = None
 
+    inline_parts = []
+    for part in msg.walk():
+        cid = (part.get("Content-ID") or "").strip().strip("<>")
+        if not cid or part.get_content_maintype() == "multipart":
+            continue
+        data = part.get_payload(decode=True)
+        if data is None:
+            continue
+        maintype, _, subtype = part.get_content_type().partition("/")
+        inline_parts.append(
+            {
+                "cid": cid,
+                "maintype": maintype,
+                "subtype": subtype or "octet-stream",
+                "filename": part.get_filename(),
+                "data": data,
+            }
+        )
+
     plain, html_body = _extract_draft_bodies(msg)
     if not plain and html_body:
         converter = html2text.HTML2Text()
@@ -1398,6 +1460,7 @@ def fetch_quotable(folder: str, uid: int, account: str = None) -> dict:
         "date": date,
         "plain": plain or "",
         "html": html_body,
+        "inline_parts": inline_parts,
     }
 
 
@@ -1560,8 +1623,8 @@ def modify_draft(
         # Build new message
         new_msg = email.message.EmailMessage(policy=DRAFT_POLICY)
 
-        _, _, username, _ = get_credentials(account)
-        new_msg["From"] = username
+        get_credentials(account)
+        new_msg["From"] = get_from_address(account)
         # None means "not supplied, keep the original"; an empty string is an
         # explicit instruction to clear the field. Truthiness cannot tell those
         # apart, which made cc="" silently keep the previous recipients.

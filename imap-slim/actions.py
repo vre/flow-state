@@ -21,6 +21,7 @@ from imap_client import (
     download_attachment,
     fetch_quotable,
     get_default_account,
+    get_from_address,
     list_accounts,
     list_folders,
     list_messages,
@@ -319,6 +320,8 @@ recipient (Reply-To, else From) and the In-Reply-To/References headers.
 - Only "body" is required with quote. An explicit to or subject overrides what the original says.
 - The quoted text is never re-interpreted: markdown in someone else's mail stays literal, and
   nothing is rewrapped. Do not write the quote yourself - you would be paraphrasing it.
+- An HTML original is quoted by its own markup, with its inline images carried along. Write above
+  the quote; writing between its lines is not possible and no mail client does it either.
 - quote is create only. A draft being replaced already holds its quote.
 """,
     "replace": """
@@ -817,8 +820,15 @@ Open Thunderbird → Drafts to review and send."""
             format_type = params.format
             html_body, plain_body = convert_body(body, format_type)
 
+            related_parts = None
             if quoted is not None:
-                plain_body, html_body = assemble_reply(plain_body, html_body, quoted)
+                # Carried images get Content-IDs in the sender's domain, as
+                # Thunderbird does. Without one they would fall back to the
+                # machine's hostname, which has no business leaving the laptop.
+                sender = get_from_address(params.account)
+                plain_body, html_body, related_parts = assemble_reply(
+                    plain_body, html_body, quoted, domain=sender.rpartition("@")[2] or None
+                )
 
             # Parse and validate attachments
             att_paths = draft_data.get("attachments")
@@ -836,6 +846,7 @@ Open Thunderbird → Drafts to review and send."""
                 references=defaults.get("references"),
                 cc=draft_data.get("cc"),
                 html=html_body,
+                related=related_parts,
                 attachments=att_paths,
                 account=params.account,
             )

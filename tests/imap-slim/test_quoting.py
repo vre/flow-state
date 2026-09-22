@@ -128,7 +128,7 @@ class TestReplyHeaders:
 
 class TestAssembly:
     def test_new_text_comes_first_then_attribution_then_quote(self):
-        plain, _html = assemble_reply("Kiitos!", None, ORIGINAL)
+        plain, _html, _related = assemble_reply("Kiitos!", None, ORIGINAL)
         lines = plain.splitlines()
         assert lines[0] == "Kiitos!"
         assert lines[1] == ""
@@ -136,26 +136,26 @@ class TestAssembly:
         assert lines[4].startswith("> Hei,")
 
     def test_the_original_survives_intact(self):
-        plain, _html = assemble_reply("Kiitos!", None, ORIGINAL)
+        plain, _html, _related = assemble_reply("Kiitos!", None, ORIGINAL)
         stripped = "\n".join(line[2:] if line.startswith("> ") else "" for line in plain.splitlines()[4:])
         assert stripped.strip("\n") == ORIGINAL["plain"]
 
     def test_plain_only_builds_no_html_half(self):
-        _plain, html = assemble_reply("Kiitos!", None, ORIGINAL)
+        _plain, html, _related = assemble_reply("Kiitos!", None, ORIGINAL)
         assert html is None
 
     def test_html_half_cites_the_original_message_id(self):
-        _plain, html = assemble_reply("Kiitos!", "<p>Kiitos!</p>", ORIGINAL)
+        _plain, html, _related = assemble_reply("Kiitos!", "<p>Kiitos!</p>", ORIGINAL)
         assert '<blockquote type="cite" cite="mid:abc123@example.com">' in html
         assert '<div class="moz-cite-prefix">On 19.8.2026 15.18, Maija Meikäläinen wrote:<br></div>' in html
 
     def test_html_half_puts_the_new_text_above_the_quote(self):
         """An unbalanced tag in the quote can then only break the quote."""
-        _plain, html = assemble_reply("Kiitos!", "<p>Kiitos!</p>", ORIGINAL)
+        _plain, html, _related = assemble_reply("Kiitos!", "<p>Kiitos!</p>", ORIGINAL)
         assert html.index("<p>Kiitos!</p>") < html.index("<blockquote")
 
     def test_a_message_without_an_id_still_quotes(self):
-        _plain, html = assemble_reply("K", "<p>K</p>", {**ORIGINAL, "message_id": ""})
+        _plain, html, _related = assemble_reply("K", "<p>K</p>", {**ORIGINAL, "message_id": ""})
         assert '<blockquote type="cite">' in html
 
 

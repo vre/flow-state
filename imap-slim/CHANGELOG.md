@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.2.0] - 2026-09-22
+
+### Added
+
+- **Replying to an HTML message quotes its own markup**, verbatim, inside
+  `<blockquote type="cite" cite="mid:…">` under a `div.moz-cite-prefix` attribution - the shape
+  Thunderbird produces, measured from real replies rather than described from memory. The inline
+  images the quote refers to are carried into a `multipart/related` wrapping the HTML alternative
+  (RFC 2387), under fresh Content-IDs in the sender's domain, marked inline. Attachments on the
+  original are not carried, which is also what Thunderbird does.
+- `setup.py` asks for a **From address** per account.
+
+### Fixed
+
+- **Drafts carried `From: <imap login>`.** On a server whose login is a bare name the header read
+  `From: vre`, which is not a mailbox anything can send from. It now comes from the account's
+  stored address, falling back only to something that already looks like one.
+
 ## [2.1.0] - 2026-09-22
 
 ### Added

@@ -92,7 +92,7 @@ def set_default_account(name: str):
     print(f"Default account set to: {name}")
 
 
-def collect_account_settings(name: str, existing: bool = False) -> tuple[str, str, str, str | None]:
+def collect_account_settings(name: str, existing: bool = False) -> tuple[str, str, str, str | None, str]:
     """Interactively collect IMAP settings for an account.
 
     When the account exists, every field is pre-filled with its current value and
@@ -122,6 +122,15 @@ def collect_account_settings(name: str, existing: bool = False) -> tuple[str, st
         print("Error: Username is required.")
         sys.exit(1)
 
+    # The login is not always an address - some servers take a bare name - and a
+    # draft built from one carries "From: vre", which no client can send.
+    current_from = _keyring_get(f"{name}:from_address") if existing else None
+    suggested = current_from or (username if "@" in username else (name if "@" in name else ""))
+    from_address = ask("  From address", suggested)
+    if not from_address or "@" not in from_address:
+        print("Error: From address must be an email address.")
+        sys.exit(1)
+
     print()
     if existing:
         password = getpass.getpass("  Password (hidden, Enter keeps the current one): ") or None
@@ -131,10 +140,10 @@ def collect_account_settings(name: str, existing: bool = False) -> tuple[str, st
             print("Error: Password is required.")
             sys.exit(1)
 
-    return server, port, username, password
+    return server, port, username, password, from_address
 
 
-def save_account_credentials(name: str, server: str, port: str, username: str, password: str):
+def save_account_credentials(name: str, server: str, port: str, username: str, password: str, from_address: str | None = None):
     """Save account credentials to keychain."""
     accounts = get_accounts()
 
@@ -142,6 +151,8 @@ def save_account_credentials(name: str, server: str, port: str, username: str, p
     keyring.set_password(SERVICE_NAME, f"{name}:imap_port", port)
     keyring.set_password(SERVICE_NAME, f"{name}:imap_username", username)
     keyring.set_password(SERVICE_NAME, f"{name}:imap_password", password)
+    if from_address:
+        keyring.set_password(SERVICE_NAME, f"{name}:from_address", from_address)
 
     if name not in accounts:
         accounts.append(name)
@@ -156,7 +167,7 @@ def rename_account(old: str, new: str):
     two names if any write in the middle fails, and the half under the old name
     is no longer reachable once the accounts list has moved on.
     """
-    suffixes = ["imap_server", "imap_port", "imap_username", "imap_password"]
+    suffixes = ["imap_server", "imap_port", "imap_username", "imap_password", "from_address"]
 
     copied = []
     for suffix in suffixes:
@@ -204,7 +215,7 @@ def add_account(name: str):
     else:
         print(f"Adding new account: {name}")
 
-    server, port, username, password = collect_account_settings(name, existing=existing)
+    server, port, username, password, from_address = collect_account_settings(name, existing=existing)
 
     if password is None:
         password = _keyring_get(f"{name}:imap_password")
@@ -214,7 +225,7 @@ def add_account(name: str):
         print("Keeping the stored password.")
 
     print("\nStoring credentials in keychain...")
-    save_account_credentials(name, server, port, username, password)
+    save_account_credentials(name, server, port, username, password, from_address)
 
     if len(get_accounts()) == 1:
         keyring.set_password(SERVICE_NAME, "default_account", name)
@@ -239,7 +250,7 @@ def remove_account(name: str):
         print(f"Error: Account '{name}' not found.")
         sys.exit(1)
 
-    for key in ["imap_server", "imap_port", "imap_username", "imap_password"]:
+    for key in ["imap_server", "imap_port", "imap_username", "imap_password", "from_address"]:
         try:
             keyring.delete_password(SERVICE_NAME, f"{name}:{key}")
         except keyring.errors.PasswordDeleteError:
@@ -281,7 +292,7 @@ def clear_all():
     print("Removing all stored credentials...")
 
     for acc in accounts:
-        for key in ["imap_server", "imap_port", "imap_username", "imap_password"]:
+        for key in ["imap_server", "imap_port", "imap_username", "imap_password", "from_address"]:
             try:
                 keyring.delete_password(SERVICE_NAME, f"{acc}:{key}")
             except keyring.errors.PasswordDeleteError:

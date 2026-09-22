@@ -91,7 +91,7 @@ class TestUpdatingKeepsWhatYouDoNotRetype:
         seed(fake_keyring)
 
         with (
-            patch.object(setup_mod, "ask", side_effect=["work", "mail.example.com", "993", "u@example.com"]),
+            patch.object(setup_mod, "ask", side_effect=["work", "mail.example.com", "993", "u@example.com", "u@example.com"]),
             patch("getpass.getpass", return_value=""),
         ):
             setup_mod.add_account("work")
@@ -102,7 +102,7 @@ class TestUpdatingKeepsWhatYouDoNotRetype:
         seed(fake_keyring)
 
         with (
-            patch.object(setup_mod, "ask", side_effect=["work", "mail.example.com", "993", "u@example.com"]),
+            patch.object(setup_mod, "ask", side_effect=["work", "mail.example.com", "993", "u@example.com", "u@example.com"]),
             patch("getpass.getpass", return_value="fresh"),
         ):
             setup_mod.add_account("work")
@@ -111,7 +111,7 @@ class TestUpdatingKeepsWhatYouDoNotRetype:
 
     def test_a_new_account_still_requires_a_password(self, setup_mod, fake_keyring):
         with (
-            patch.object(setup_mod, "ask", side_effect=["mail.example.com", "993", "u@example.com"]),
+            patch.object(setup_mod, "ask", side_effect=["mail.example.com", "993", "u@example.com", "u@example.com"]),
             patch("getpass.getpass", return_value=""),
             pytest.raises(SystemExit),
         ):
@@ -174,7 +174,7 @@ class TestRenaming:
         seed(fake_keyring, name="work")
 
         with (
-            patch.object(setup_mod, "ask", side_effect=["office", "mail.example.com", "993", "u@example.com"]),
+            patch.object(setup_mod, "ask", side_effect=["office", "mail.example.com", "993", "u@example.com", "u@example.com"]),
             patch("getpass.getpass", return_value=""),
         ):
             setup_mod.add_account("work")

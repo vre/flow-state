@@ -68,6 +68,10 @@ truncates quoted chains by default, so you may not even have seen all of it. The
 message; the client quotes it. The quoted text is never re-interpreted - markdown in their mail
 stays literal - and nothing is rewrapped.
 
+Replying to an HTML message quotes its own markup verbatim, with the inline images it refers to
+carried along, so the sender sees their mail as they wrote it. Write above the quote; there is no
+way to write between its lines, which is also true of every mail client.
+
 - **`markdown`** renders an HTML part plus a plain-text alternative. A newline inside a paragraph is
   a line break; a blank line starts a paragraph. Fenced code blocks and pipe tables work, and fences
   must start at the left margin. Markdown block syntax still wins: a line of `=` under text is a

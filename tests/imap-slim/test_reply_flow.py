@@ -41,6 +41,7 @@ def _reply(payload='{"body": "Kiitos!"}', fmt="plain", quote="INBOX:1253"):
     with (
         patch("actions.fetch_quotable", return_value=ORIGINAL) as fetch,
         patch("actions.create_draft", return_value=CREATED) as create,
+        patch("actions.get_from_address", return_value="me@example.com"),
     ):
         result = run_action(MailAction(action="create", format=fmt, payload=payload, quote=quote))
     return result, fetch, create
@@ -147,6 +148,7 @@ class TestSizeWarning:
         with (
             patch("actions.fetch_quotable", return_value=ORIGINAL),
             patch("actions.create_draft", return_value={**CREATED, "size": 900 * 1024}),
+            patch("actions.get_from_address", return_value="me@example.com"),
         ):
             result = run_action(MailAction(action="create", format="plain", payload='{"body": "K"}', quote="INBOX:1253"))
         assert "900 kB" in result
