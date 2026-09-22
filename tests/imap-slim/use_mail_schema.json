@@ -76,7 +76,7 @@
             }
           ],
           "default": null,
-          "description": "Action data: read=msg_id[:N|:full] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
+          "description": "Action data: read=msg_id[:N|:full|:quote] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
           "title": "Payload"
         },
         "preview": {

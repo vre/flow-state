@@ -34,7 +34,7 @@ from imap_client import (
 from injection_defense import sanitize_external_text, wrap_untrusted
 from markdown_utils import convert_body
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from quoting import assemble_reply, reply_headers
+from quoting import assemble_reply, quote_block, reply_headers, validate_quoted_lines
 from render import (
     POTENTIAL_INJECTION_WARNING,
     classify_connection_error,
@@ -111,7 +111,7 @@ class MailAction(BaseModel):
     folder: str | None = Field(default=None, description="IMAP folder path or URL (e.g., 'INBOX' or 'imap://x@y/INBOX/Sub')")
     payload: str | None = Field(
         default=None,
-        description="Action data: read=msg_id[:N|:full] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
+        description="Action data: read=msg_id[:N|:full|:quote] | search=query | create=JSON{to,subject,body,in_reply_to?,cc?,attachments?:[paths]} | replace=JSON{id,body,subject?,to?,cc?,attachments?} | flag=MSG_ID:+FLAG,-FLAG",
     )
     limit: int | None = Field(default=20, description="Max results for list/search", ge=1, le=100)
     preview: bool | None = Field(
@@ -243,7 +243,8 @@ Fetches message content by ID.
 
 ## Parameters
 - folder: Folder containing message
-- payload: Message ID (from list/search results), optionally with :N (depth) or :full
+- payload: Message ID (from list/search results), optionally with :N (depth), :full, or
+  :quote (the message as a quote block, to write between for a point-by-point reply)
 
 ## Returns
 Full message with: subject, from, to, cc, date, body_text, body_html, message_id, in_reply_to
@@ -321,7 +322,10 @@ recipient (Reply-To, else From) and the In-Reply-To/References headers.
 - The quoted text is never re-interpreted: markdown in someone else's mail stays literal, and
   nothing is rewrapped. Do not write the quote yourself - you would be paraphrasing it.
 - An HTML original is quoted by its own markup, with its inline images carried along. Write above
-  the quote; writing between its lines is not possible and no mail client does it either.
+  the quote.
+- Point by point, plain text only: read FOLDER UID:quote gives a block to write between, and a
+  body that already contains ">" lines is taken as interleaved - nothing is appended and every
+  quoted line is checked against the original. Dropping lines is fine; changing them is refused.
 - quote is create only. A draft being replaced already holds its quote.
 """,
     "replace": """
@@ -565,6 +569,18 @@ uv run --directory {plugin_dir} python setup.py
 
             if ":" in params.payload:
                 id_str, modifier = params.payload.split(":", 1)
+                if not id_str.isdigit():
+                    return Failure(f"Error: payload must be numeric message ID, got '{id_str}'")
+                if modifier == "quote":
+                    quotable = fetch_quotable(folder, int(id_str), account=params.account)
+                    safe_block, block_flag = sanitize_external_text(quote_block(quotable))
+                    notice = POTENTIAL_INJECTION_WARNING + "\n\n" if block_flag else ""
+                    return (
+                        f"{notice}# Quote block for {folder}:{id_str}\n\n"
+                        "Write your own lines between these, leaving the `>` lines as they are, and send the\n"
+                        "whole thing as the body with quote set. Quoted lines are checked against the original.\n\n"
+                        + wrap_untrusted(safe_block)
+                    )
                 if modifier == "full":
                     full = True
                     depth = 0
@@ -573,7 +589,8 @@ uv run --directory {plugin_dir} python setup.py
                     depth = int(modifier)
                 else:
                     return Failure(
-                        f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:1' (include previous message), or '{id_str}:full'"
+                        f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:1' (include previous "
+                        f"message), '{id_str}:full', or '{id_str}:quote' (a quote block to write between)"
                     )
             else:
                 id_str = params.payload
@@ -820,8 +837,27 @@ Open Thunderbird → Drafts to review and send."""
             format_type = params.format
             html_body, plain_body = convert_body(body, format_type)
 
+            # A body that already carries quoted lines was assembled by the
+            # caller around a quote block, to answer point by point. Then the
+            # client checks the quote instead of appending one.
+            interleaved = quoted is not None and any(line.startswith(">") for line in body.split("\n"))
+            if interleaved:
+                if format_type != "plain":
+                    return Failure(
+                        "Error: an interleaved reply must use format 'plain'. Splicing text between the lines "
+                        "of someone else's HTML is not something this client does - reply above the quote with "
+                        "'markdown' instead."
+                    )
+                offending = validate_quoted_lines(body, quoted)
+                if offending is not None:
+                    return Failure(
+                        f"Error: this quoted line is not in {params.quote}, or is out of order: {offending!r}. "
+                        "Quote what was written, in the order it was written. Use "
+                        f"'read {quote_folder} {quote_uid}:quote' to get the block again."
+                    )
+
             related_parts = None
-            if quoted is not None:
+            if quoted is not None and not interleaved:
                 # Carried images get Content-IDs in the sender's domain, as
                 # Thunderbird does. Without one they would fall back to the
                 # machine's hostname, which has no business leaving the laptop.

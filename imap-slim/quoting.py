@@ -194,3 +194,47 @@ def rewrite_cids(fragment: str, mapping: dict[str, str]) -> str:
         return f"{match.group('attr')}={match.group('q')}cid:{replacement}{match.group('q')}"
 
     return _CID_REF.sub(_swap, fragment)
+
+
+def quote_block(original: dict) -> str:
+    """The attribution and the quoted original, ready to be written into.
+
+    Handed to a caller that wants to answer point by point: it splices its own
+    lines between these, and what comes back is checked against the original
+    rather than trusted.
+    """
+    attribution = attribution_line(original.get("date"), original.get("from_display") or original.get("from_addr") or "")
+    quoted = quote_plain(original.get("plain") or "")
+    return f"{attribution}\n{quoted}" if attribution else quoted
+
+
+def _unquote(line: str) -> str:
+    """Strip exactly one level of quoting from a line."""
+    if line.startswith("> "):
+        return line[2:]
+    if line == ">":
+        return ""
+    return line[1:] if line.startswith(">") else line
+
+
+def validate_quoted_lines(body: str, original: dict) -> str | None:
+    """Check that every quoted line in `body` is really in the original.
+
+    Interleaving means the caller hands back a body it assembled, so the quote
+    is only trustworthy if it is checked. Lines may be dropped - quoting
+    selectively is normal - but what remains must appear verbatim and in the
+    original's order. Returns None when the body is sound, or the first line
+    that is not.
+    """
+    source = (original.get("plain") or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    position = 0
+
+    for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if not line.startswith(">"):
+            continue
+        wanted = _unquote(line)
+        try:
+            position = source.index(wanted, position) + 1
+        except ValueError:
+            return line
+    return None

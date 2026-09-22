@@ -12,7 +12,7 @@ from imap_stream_mcp import HELP_TOPICS, MailAction, use_mail
 
 # Measured 2026-08-26 before this cut: docstring 1357 + field descriptions 562.
 BASELINE = 1919
-BUDGET = 510  # +30 create/replace rename; +150 the quote parameter, which is the whole
+BUDGET = 525  # +30 create/replace rename; +150 the quote parameter, which is the whole
 #               reply feature's surface - the alternative is a caller that cannot discover it
 
 

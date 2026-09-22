@@ -15,8 +15,8 @@
 - [x] Snippet preview (`preview: true/false`) in list/search (v0.7.0) — `docs/imap-slim/plans/2026-02-24-list-search-snippet.md`
 - [x] Thread-aware read: truncate quoted replies to reduce token count (v0.6.1) — `docs/imap-slim/plans/2026-02-25-thread-aware-read.md`
 - [x] Depth-aware quote truncation: `:N` modifiers for progressive disclosure of reply chains (v0.7.1) — `docs/imap-slim/plans/2026-03-09-depth-aware-quote-truncation.md`
-- [ ] Preserve `multipart/related` MIME structure in `replace` (inline images lose `cid:` linkage).
-      Since 2.0.1 such a draft is refused rather than written without it
+- [x] `multipart/related` carried when quoting an HTML reply (v2.2.0). In `replace` such a draft is
+      still refused rather than written without it
 - [x] Draft body format made explicit and required (v2.0.0) - `format` is a top-level parameter
 - [x] Fenced code blocks and pipe tables (v2.0.0)
 - [x] Connection recovery: discard rather than interrogate a dead socket (v2.0.0)
@@ -31,3 +31,5 @@
 - [ ] Retry has never been proven against a connection that dies mid-command on a real server
 - [ ] `replace` rebuilds the To header from the envelope; a malformed address becomes
       `user@MISSING_DOMAIN`. Judged not worth fixing - the sending client composes the real header
+- [ ] Interleaved replies have not been used in anger; the order check may prove too strict when
+      a quoted line repeats in the original

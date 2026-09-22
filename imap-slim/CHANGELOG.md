@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.3.0] - 2026-09-22
+
+### Added
+
+- **Answering point by point**, plain text only. `read FOLDER UID:quote` returns the message as a
+  quote block with its attribution; a `create` body that already contains `>` lines is taken as
+  interleaved, so nothing is appended. Every quoted line is then checked against the original:
+  lines may be dropped, but what remains must be verbatim and in the order it was written, or the
+  draft is refused rather than corrected. Interleaving an HTML reply is refused - splicing into
+  someone else's markup is not something this client does, and no mail client does it either.
+
 ## [2.2.0] - 2026-09-22
 
 ### Added

@@ -69,8 +69,19 @@ message; the client quotes it. The quoted text is never re-interpreted - markdow
 stays literal - and nothing is rewrapped.
 
 Replying to an HTML message quotes its own markup verbatim, with the inline images it refers to
-carried along, so the sender sees their mail as they wrote it. Write above the quote; there is no
-way to write between its lines, which is also true of every mail client.
+carried along, so the sender sees their mail as they wrote it. Write above the quote.
+
+**Answering point by point** works in plain text only. Ask for the quote block, write your lines
+between the `>` lines, and send the whole thing back:
+
+```bash
+imap-slim-cli read INBOX 1253:quote      # the block, attribution and all
+imap-slim-cli create --format plain --quote INBOX:1253 --payload '{"body":"<the edited block>"}'
+```
+
+A body that already contains `>` lines is taken as interleaved: nothing is appended, and every
+quoted line is checked against the original. Lines may be dropped, but what stays must be
+verbatim and in order - otherwise the draft is refused, not corrected.
 
 - **`markdown`** renders an HTML part plus a plain-text alternative. A newline inside a paragraph is
   a line break; a blank line starts a paragraph. Fenced code blocks and pipe tables work, and fences
