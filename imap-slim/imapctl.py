@@ -61,7 +61,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("create", help="write a new draft to Drafts")
     p.add_argument("--format", required=True, choices=["markdown", "plain"], help="required; there is no default")
-    p.add_argument("--payload", required=True, help='JSON: {"to","subject","body"}')
+    p.add_argument("--payload", required=True, help='JSON: {"to","subject","body"} - with --quote only {"body"}')
+    p.add_argument("--quote", help="reply to FOLDER:UID, e.g. INBOX:1253; the client quotes it and sets the threading")
     _add_account(p)
 
     p = sub.add_parser("replace", help="supersede an existing draft; it gets a new id")
@@ -116,6 +117,7 @@ def to_action(args: argparse.Namespace) -> MailAction:
     elif args.command == "create":
         fields["format"] = args.format
         fields["payload"] = args.payload
+        fields["quote"] = args.quote
     elif args.command == "replace":
         fields["format"] = args.format
         fields["payload"] = args.payload

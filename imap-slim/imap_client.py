@@ -9,6 +9,7 @@ import datetime
 import email
 import email.header
 import email.message
+import email.policy
 import email.utils
 import errno
 import json
@@ -25,6 +26,13 @@ import keyring
 from bodystructure import count_attachments, extract_snippet, find_html_part, find_text_part, get_body_peek
 from imapclient import IMAPClient
 from imapclient.exceptions import IMAPClientAbortError
+
+# Python's default policy folds headers at 78 columns and RFC 2047-encodes any
+# token it cannot fit there - a Message-ID included. An encoded id matches
+# nothing, so a References chain containing one long id (Outlook's run ~80
+# characters) silently breaks threading for every client that groups by it.
+# 998 is the line limit RFC 5322 actually sets.
+DRAFT_POLICY = email.policy.default.clone(max_line_length=998)
 
 SERVICE_NAME = "imap-slim"
 _LEGACY_SERVICE_NAME = "imap-stream"
@@ -1209,6 +1217,7 @@ def create_draft(
     subject: str,
     body: str,
     in_reply_to: str | None = None,
+    references: str | None = None,
     cc: str | None = None,
     html: str | None = None,
     attachments: list[str] | None = None,
@@ -1222,6 +1231,7 @@ def create_draft(
         subject: Message subject
         body: Message body (plain text)
         in_reply_to: Message-ID to reply to
+        references: Full References chain for threading. Falls back to in_reply_to.
         cc: CC addresses (comma-separated)
         html: HTML body (if provided, creates multipart/alternative)
         attachments: List of absolute file paths to attach.
@@ -1235,7 +1245,7 @@ def create_draft(
     session = get_session(account)
     with session.connection_ctx() as client:
         # Build email message
-        msg = email.message.EmailMessage()
+        msg = email.message.EmailMessage(policy=DRAFT_POLICY)
 
         _, _, username, _ = get_credentials(account)
         msg["From"] = username
@@ -1249,7 +1259,12 @@ def create_draft(
 
         if in_reply_to:
             msg["In-Reply-To"] = in_reply_to
-            msg["References"] = in_reply_to
+            # References chains the whole thread. Falling back to In-Reply-To
+            # alone keeps a two-message thread together but loses everything
+            # before it.
+            msg["References"] = references or in_reply_to
+        elif references:
+            msg["References"] = references
 
         # Set body - plain text, optionally with HTML alternative
         msg.set_content(body)
@@ -1285,7 +1300,8 @@ def create_draft(
             raise IMAPError("Cannot find Drafts folder. Available folders: " + ", ".join(f[2] for f in folders))
 
         # Append to Drafts with \Draft flag
-        append_response = client.append(drafts_folder, msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
+        raw = msg.as_bytes()
+        append_response = client.append(drafts_folder, raw, flags=[b"\\Draft", b"\\Seen"])
 
         # Invalidate cache for drafts folder
         from session import invalidate_message_cache
@@ -1299,6 +1315,7 @@ def create_draft(
             "subject": subject,
             "message_id": msg["Message-ID"],
             "uid": appended_uid(append_response),
+            "size": len(raw),
         }
         if att_info:
             response["attachments"] = att_info
@@ -1317,6 +1334,71 @@ def appended_uid(append_response) -> int | None:
     text = to_str(append_response)
     match = re.search(r"APPENDUID\s+\d+\s+(\d+)", text, re.IGNORECASE)
     return int(match.group(1)) if match else None
+
+
+def fetch_quotable(folder: str, uid: int, account: str = None) -> dict:
+    """Fetch the message a reply will quote.
+
+    The whole message, not the truncated read view: `read` drops quoted tails to
+    save tokens, and quoting a truncated original would misquote it.
+
+    Returns the fields a reply is built from - who wrote it, when, what it said,
+    and the threading identifiers that keep the thread together.
+    """
+    from session import get_session
+
+    session = get_session(account)
+
+    def _operation(client):
+        try:
+            client.select_folder(folder, readonly=True)
+        except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
+            raise IMAPError(f"Cannot open folder '{folder}': {e}") from e
+
+        data = client.fetch([uid], ["RFC822"])
+        if uid not in data or not data[uid].get(b"RFC822"):
+            raise IMAPError(f"Message {uid} not found in '{folder}' - nothing to quote")
+        return email.message_from_bytes(data[uid][b"RFC822"])
+
+    msg = session.run_op(_operation, retry=True)
+
+    from_name, from_addr = email.utils.parseaddr(msg.get("From", ""))
+    reply_to = email.utils.parseaddr(msg.get("Reply-To", ""))[1] or None
+
+    date = None
+    raw_date = msg.get("Date")
+    if raw_date:
+        try:
+            date = email.utils.parsedate_to_datetime(raw_date)
+            if date.tzinfo is not None:
+                # The attribution shows the time as the reader's clock had it,
+                # which is what every mail client displays.
+                date = date.astimezone()
+        except (TypeError, ValueError):
+            date = None
+
+    plain, html_body = _extract_draft_bodies(msg)
+    if not plain and html_body:
+        converter = html2text.HTML2Text()
+        converter.ignore_links = False
+        converter.body_width = 0
+        plain = converter.handle(html_body)
+
+    return {
+        "uid": uid,
+        "folder": folder,
+        "subject": decode_header_value(msg.get("Subject", "")),
+        "message_id": (msg.get("Message-ID") or "").strip(),
+        "references": (decode_header_value(msg.get("References", "")) or "").replace("\n", " ").replace("\r", " ").strip(),
+        "from_display": decode_header_value(from_name) if from_name else "",
+        "from_addr": from_addr,
+        "reply_to": reply_to,
+        "date": date,
+        "plain": plain or "",
+        "html": html_body,
+    }
 
 
 def _iter_attachment_parts(msg: email.message.Message):
@@ -1476,7 +1558,7 @@ def modify_draft(
             references = decode_header_value(references).replace("\n", "").replace("\r", "").strip()
 
         # Build new message
-        new_msg = email.message.EmailMessage()
+        new_msg = email.message.EmailMessage(policy=DRAFT_POLICY)
 
         _, _, username, _ = get_credentials(account)
         new_msg["From"] = username
@@ -1532,7 +1614,8 @@ def modify_draft(
             drafts_folder = folder  # Use current folder as fallback
 
         # Append-before-delete: append new draft first, then delete old
-        append_response = client.append(drafts_folder, new_msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
+        raw_new = new_msg.as_bytes()
+        append_response = client.append(drafts_folder, raw_new, flags=[b"\\Draft", b"\\Seen"])
 
         client.delete_messages([message_id])
         # A bare EXPUNGE removes EVERY \\Deleted message in the mailbox, not the
@@ -1559,6 +1642,7 @@ def modify_draft(
             "subject": new_msg["Subject"],
             "message_id": new_msg["Message-ID"],
             "uid": appended_uid(append_response),
+            "size": len(raw_new),
             "preserved_reply_to": bool(in_reply_to),
             "superseded_expunged": expunged,
         }

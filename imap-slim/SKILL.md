@@ -54,6 +54,20 @@ imap-slim-cli create  --format plain    --payload '{"to":"x@y.com","subject":"Hi
 imap-slim-cli replace Drafts --format markdown --payload '{"id":1253,"body":"Updated..."}'
 ```
 
+### Replying
+
+Pass `--quote FOLDER:UID` and write only your new text. The client fetches that message and builds
+the quote, the attribution line, the `Re:` subject, the recipient and the threading headers.
+
+```bash
+imap-slim-cli create --format markdown --quote INBOX:1253 --payload '{"body":"Thanks, that works."}'
+```
+
+**Do not write the quote yourself.** You would be paraphrasing what someone else wrote, and `read`
+truncates quoted chains by default, so you may not even have seen all of it. The client has the
+message; the client quotes it. The quoted text is never re-interpreted - markdown in their mail
+stays literal - and nothing is rewrapped.
+
 - **`markdown`** renders an HTML part plus a plain-text alternative. A newline inside a paragraph is
   a line break; a blank line starts a paragraph. Fenced code blocks and pipe tables work, and fences
   must start at the left margin. Markdown block syntax still wins: a line of `=` under text is a

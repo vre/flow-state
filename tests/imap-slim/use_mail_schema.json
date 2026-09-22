@@ -91,6 +91,19 @@
           "default": null,
           "description": "Include body snippet (~100 chars) in list/search results. Required for list and search actions.",
           "title": "Preview"
+        },
+        "quote": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reply to this message, quoting it: 'FOLDER:UID' (e.g. 'INBOX:1253'). The client builds the quote and threading headers; write only your new text. create only.",
+          "title": "Quote"
         }
       },
       "required": [

@@ -19,6 +19,7 @@ from imap_client import (
     cleanup_attachments,
     create_draft,
     download_attachment,
+    fetch_quotable,
     get_default_account,
     list_accounts,
     list_folders,
@@ -32,12 +33,15 @@ from imap_client import (
 from injection_defense import sanitize_external_text, wrap_untrusted
 from markdown_utils import convert_body
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from quoting import assemble_reply, reply_headers
 from render import (
     POTENTIAL_INJECTION_WARNING,
     classify_connection_error,
     format_attachment_line,
     format_description,
     format_flags,
+    format_quote_line,
+    format_size_warning,
 )
 
 
@@ -119,6 +123,10 @@ class MailAction(BaseModel):
         default=None,
         description="Body format, required for draft. 'markdown': rendered to HTML plus a plain alternative; a newline is a line break, a blank line a paragraph. 'plain': sent exactly as written, no HTML.",
     )
+    quote: str | None = Field(
+        default=None,
+        description="Reply to this message, quoting it: 'FOLDER:UID' (e.g. 'INBOX:1253'). The client builds the quote and threading headers; write only your new text. create only.",
+    )
 
     @field_validator("action")
     @classmethod
@@ -133,6 +141,18 @@ class MailAction(BaseModel):
     def validate_preview_required(self) -> "MailAction":
         if self.action in {"list", "search"} and self.preview is None:
             raise ValueError("preview parameter required for list/search (true=include body snippets, false=headers only)")
+        return self
+
+    @model_validator(mode="after")
+    def validate_quote_target(self) -> "MailAction":
+        if self.quote is None:
+            return self
+        if self.action != "create":
+            # A draft already carries its quote; quoting again on replace would
+            # append a second copy of it.
+            raise ValueError("quote is only valid for create - a draft being replaced already holds its quote")
+        if ":" not in self.quote or not self.quote.rsplit(":", 1)[1].isdigit():
+            raise ValueError(f"quote must be 'FOLDER:UID' (e.g. 'INBOX:1253'), got '{self.quote}'")
         return self
 
     @model_validator(mode="after")
@@ -289,10 +309,17 @@ Appends a new message to the Drafts folder. Nothing is sent.
   interpreted, so ASCII art and rule lines survive untouched.
 - There is no default. Omitting it is an error.
 
-## Reply Workflow
-1. Use 'read' to get the message and note its message_id
-2. Use 'create' with in_reply_to - quote relevant parts with >
-3. Open your mail client, review, send
+## Replying
+Pass quote: "FOLDER:UID" and write only your new text in the body. The client fetches that
+message and builds the rest: the quote itself, the attribution line, the Re: subject, the
+recipient (Reply-To, else From) and the In-Reply-To/References headers.
+
+{action: "create", format: "markdown", quote: "INBOX:1253", payload: '{"body":"Thanks, that works."}'}
+
+- Only "body" is required with quote. An explicit to or subject overrides what the original says.
+- The quoted text is never re-interpreted: markdown in someone else's mail stays literal, and
+  nothing is rewrapped. Do not write the quote yourself - you would be paraphrasing it.
+- quote is create only. A draft being replaced already holds its quote.
 """,
     "replace": """
 # replace - Supersede an Existing Draft
@@ -764,12 +791,24 @@ uv run --directory {plugin_dir} python setup.py
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
 **Format:** {format_description(format_type)}
-**Saved to:** {result["folder"]}{format_draft_id_line(result)}{leftover}
+**Saved to:** {result["folder"]}{format_draft_id_line(result)}{format_size_warning(result.get("size", 0))}{leftover}
 
 Open Thunderbird → Drafts to review and send."""
 
-            # Create new draft
-            required = ["to", "subject", "body"]
+            # Create new draft. With `quote`, the client fetches the message
+            # being replied to and builds the quote, so the caller supplies only
+            # the new text - and only `body` is required, because recipient and
+            # subject come from the original.
+            quoted = None
+            if params.quote:
+                quote_folder, quote_uid = params.quote.rsplit(":", 1)
+                quoted = fetch_quotable(quote_folder, int(quote_uid), account=params.account)
+                defaults = reply_headers(quoted)
+                required = ["body"]
+            else:
+                defaults = {}
+                required = ["to", "subject", "body"]
+
             missing = [f for f in required if f not in draft_data]
             if missing:
                 return Failure(f"Error: Missing required fields: {', '.join(missing)}")
@@ -777,6 +816,9 @@ Open Thunderbird → Drafts to review and send."""
             body = draft_data["body"]
             format_type = params.format
             html_body, plain_body = convert_body(body, format_type)
+
+            if quoted is not None:
+                plain_body, html_body = assemble_reply(plain_body, html_body, quoted)
 
             # Parse and validate attachments
             att_paths = draft_data.get("attachments")
@@ -787,10 +829,11 @@ Open Thunderbird → Drafts to review and send."""
 
             result = create_draft(
                 folder=folder or "INBOX",
-                to=draft_data["to"],
-                subject=draft_data["subject"],
+                to=draft_data.get("to") or defaults.get("to", ""),
+                subject=draft_data.get("subject") if draft_data.get("subject") is not None else defaults.get("subject", ""),
                 body=plain_body,
-                in_reply_to=draft_data.get("in_reply_to"),
+                in_reply_to=draft_data.get("in_reply_to") or defaults.get("in_reply_to"),
+                references=defaults.get("references"),
                 cc=draft_data.get("cc"),
                 html=html_body,
                 attachments=att_paths,
@@ -802,8 +845,8 @@ Open Thunderbird → Drafts to review and send."""
 
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
-**Format:** {format_description(format_type)}
-**Saved to:** {result["folder"]}{format_draft_id_line(result)}
+**Format:** {format_description(format_type)}{format_quote_line(quoted)}
+**Saved to:** {result["folder"]}{format_draft_id_line(result)}{format_size_warning(result.get("size", 0))}
 
 Open Thunderbird → Drafts to review and send."""
 

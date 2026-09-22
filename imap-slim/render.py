@@ -115,3 +115,23 @@ def format_flags(flags: list[str]) -> str:
 
 # Context poisoning protection - see injection_defense module
 POTENTIAL_INJECTION_WARNING = "**SECURITY NOTICE:** Potential prompt injection patterns detected; suspicious content removed or escaped."
+
+# Above this the draft is large enough to be worth mentioning: inline images in
+# a quoted thread dominate the number. It is a warning, never a truncation - a
+# truncated quote is a misquote.
+LARGE_DRAFT_BYTES = 500 * 1024
+
+
+def format_quote_line(quoted: dict | None) -> str:
+    """The line naming what a reply quotes, or nothing when it quotes nothing."""
+    if not quoted:
+        return ""
+    who = quoted.get("from_display") or quoted.get("from_addr") or "unknown sender"
+    return f"\n**Quoting:** {quoted['folder']}:{quoted['uid']} from {who}"
+
+
+def format_size_warning(size: int) -> str:
+    """A note when the appended message is large, with no change to what was written."""
+    if not size or size <= LARGE_DRAFT_BYTES:
+        return ""
+    return f"\n\n**Note:** this draft is {size / 1024:.0f} kB. Quoted inline images make up most of that; nothing was truncated."

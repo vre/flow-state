@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.1.0] - 2026-09-22
+
+### Added
+
+- **The client quotes.** `create` takes `quote: "FOLDER:UID"`, fetches that message and builds
+  the reply around it: the quoted text, Thunderbird's attribution line, the `Re:` subject, the
+  recipient (`Reply-To`, else `From`) and the `In-Reply-To`/`References` headers. The caller
+  writes only the new text. The quoted original is never passed through the markdown renderer
+  and never rewrapped, because an altered quote is a misquote.
+- A draft over 500 kB is reported in the response. Nothing is truncated.
+
+### Fixed
+
+- **A long Message-ID was RFC 2047-encoded into a `References` chain**, which matches nothing, so
+  threading broke silently for any thread containing one - Outlook's ids run about 80 characters
+  and hit this every time. Headers are now built with a 998-column policy, the limit RFC 5322
+  actually sets.
+- `list` printed raw encoded words for non-ASCII subjects while both search paths decoded them.
+
 ## [2.0.1] - 2026-09-14
 
 A cross-model review of 2.0.0 found these. The suite passed throughout; every one came from

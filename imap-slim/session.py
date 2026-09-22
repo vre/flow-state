@@ -326,7 +326,7 @@ class AccountSession:
 
     def _fetch_messages(self, conn: IMAPClient, folder: str, limit: int, preview: bool) -> list[dict]:
         """Cache-validate and fetch. Caller must hold the lease."""
-        from imap_client import IMAPError, is_transport_failure
+        from imap_client import IMAPError, decode_header_value, is_transport_failure
 
         # Use select_folder to get atomic state for validation
         try:
@@ -445,7 +445,10 @@ class AccountSession:
             messages.append(
                 {
                     "id": msg_id,
-                    "subject": _to_str(envelope.subject) if envelope.subject else "(no subject)",
+                    # decode_header_value, not _to_str: a subject arrives RFC 2047
+                    # encoded, and both search paths already decode it. Listing a folder
+                    # showed "=?UTF-8?Q?Re=3A_Raportti..." for every non-ASCII subject.
+                    "subject": decode_header_value(envelope.subject) if envelope.subject else "(no subject)",
                     "from": from_addr,
                     "date": date_str,
                     "size": msg_data.get(b"RFC822.SIZE", 0),

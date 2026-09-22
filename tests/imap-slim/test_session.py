@@ -246,6 +246,31 @@ class TestMessageListCaching:
         assert messages[0]["subject"] == "Cached"
         mock_client.search.assert_not_called()
 
+    def test_subjects_are_decoded_in_a_listing(self):
+        """A listing showed raw RFC 2047 words while both search paths decoded
+        them, so every non-ASCII subject was unreadable in `list`."""
+        session = AccountSession("test")
+        mock_client = Mock(spec=IMAPClient)
+        mock_client.select_folder.return_value = {b"UIDVALIDITY": 1, b"UIDNEXT": 2, b"EXISTS": 1}
+        mock_client.search.return_value = [1]
+        mock_client.fetch.return_value = {
+            1: {
+                b"ENVELOPE": Mock(
+                    subject=b"=?UTF-8?Q?Re=3A_Tarjouspyynt=C3=B6?=",
+                    from_=[Mock(name=None, mailbox=b"a", host=b"b.com")],
+                    date=None,
+                ),
+                b"FLAGS": [],
+                b"BODYSTRUCTURE": None,
+            }
+        }
+        session.connection = mock_client
+        session.last_activity = time.time()
+
+        messages = session.get_messages("INBOX", limit=10)
+
+        assert messages[0]["subject"] == "Re: Tarjouspyyntö"
+
     def test_get_messages_refetches_on_uidnext_change(self):
         """Refetches if UIDNEXT changed (new message)."""
         session = AccountSession("test")
