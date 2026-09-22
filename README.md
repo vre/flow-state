@@ -4,11 +4,10 @@
 
 | Plugin | Type | Install |
 |--------|------|---------|
-| [Youtube to Markdown](#youtube-to-markdown) | skill | `/plugin install youtube-to-markdown@flow-state` |
-| [IMAP Slim](#imap-slim) | mcp | `/plugin install imap-slim-mcp@flow-state` |
-| [IMAP Slim CLI](#imap-slim) | skill | `/plugin install imap-slim-cli@flow-state` |
-| [Chrome Control](#chrome-control) | skill | `/plugin install chrome-control@flow-state` |
-| [Firefox Control](#firefox-control) | skill | `/plugin install firefox-control@flow-state` |
+| [Youtube to Markdown](#youtube-to-markdown) | Skill | `/plugin install youtube-to-markdown@flow-state` |
+| [IMAP Slim](#imap-slim) | Skill+CLI / MCP | `/plugin install imap-slim-cli@flow-state` or `imap-slim-mcp@flow-state` |
+| [Chrome Control](#chrome-control) | Skill+CLI | `/plugin install chrome-control@flow-state` |
+| [Firefox Control](#firefox-control) | Skill+CLI | `/plugin install firefox-control@flow-state` |
 
 **Other Agents**: tell the llm to install from `https://github.com/vre/flow-state/<plugin-name>`
 
@@ -29,13 +28,15 @@
 
 ## IMAP Slim
 
-> **Your Inbox, Minimal Context.**
-> Lightweight IMAP email client. The only thing it ever deletes is the draft a `replace` supersedes.
+> **Secure and lightweight IMAP email CLI/MCP.**
+> Reply as Drafts and send with your client. Delete restricted.
 
 - 🪶 **~814 tokens** as an MCP server, or ~41 as a skill until you run a command
 - 📧 **Read & search** — list, read, and search IMAP folders
 - ✍️ **Write drafts** — `create` appends one, `replace` supersedes one; markdown renders to HTML
   plus a plain-text alternative, or send plain text exactly as written
+- ↩️ **Replies** — the client quotes the original, HTML and inline images included, the way
+  Thunderbird does; the model writes only the new text. Point-by-point for plain text
 - 🔐 **Secure** — credentials in OS keychain (or env variables for Docker/CI)
 - 🏢 **Multi-account** — multiple account support with named switching
 
@@ -46,8 +47,8 @@ session until a command runs. Install either, or both.
 
 ## Chrome Control
 
-> **Your Browser, Your Agent's Eyes and Hands.**
-> One CLI, your existing Chrome session, your cookies and logins.
+> **Minimal Chrome control CLI to be your agent's eyes and fingers.**
+> Use your cookies and logins.
 
 - 🔗 **Auto-connect** — connects to your running Chrome session (M144+), all tabs, cookies, logins
 - 🔌 **Daemon mode** — single persistent WebSocket, Unix socket interface, no repeated permission dialogs
@@ -59,8 +60,8 @@ session until a command runs. Install either, or both.
 
 ## Firefox Control
 
-> **Firefox, handicapped Eyes and Hands for an LLM.**
-> Control Firefox while it announces to the whole world that it is a bot.
+> **Minimal Firefox control CLI to be your agent's eyes and fingers.**
+> Use your cookies and logins. Handicapped.
 
 - ⚠️ **Test tool** — `navigator.webdriver=true` on all remote debugging sessions, every anti-bot system detects it
 - 🔌 **Direct BiDi** — native Firefox WebSocket, no geckodriver, no Selenium
@@ -73,7 +74,12 @@ session until a command runs. Install either, or both.
 
 ## Release Highlights
 
-- **NEW** `firefox-control v0.1.0` — WebDriver BiDi CLI for Firefox (test tool)
+- **UPDATE** `imap-slim v2.1.0` — Replies: the client quotes the original, HTML and inline images
+  included, with point-by-point replies for plain text. Available as a skill-backed CLI
+  (`imap-slim-cli`) as well as the MCP server; `create`/`replace` named after what IMAP does.
+
+- **UPDATE** `firefox-control v0.2.0` — WebDriver BiDi CLI for Firefox (test tool)
+  - `navigate` and `open` survive Firefox replacing the browsing context mid-load
   - Direct BiDi WebSocket, daemon mode, DOM helpers
   - Proves that BiDi works and was quite easy actually to set up
 
@@ -84,8 +90,6 @@ session until a command runs. Install either, or both.
   - Forked base from [pengelbrecht/chrome-debug-skill](https://github.com/pengelbrecht/chrome-debug-skill)
 
 - **UPDATE** `youtube-to-markdown v3.0.0` — Summary format overhaul: claim-bullets as default, themed-claims for long interviews, step-list for tutorials. Prompt injection defense hardened to three layers.
-
-- **UPDATE** `imap-slim-mcp v1.0.0` — Multi-account fix, injection defense module with NFKC normalization and randomized nonce delimiters.
 
 ## The Backstory
 

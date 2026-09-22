@@ -1,6 +1,6 @@
 # 0001 — One dispatcher, two front-ends
 
-Status: accepted (v1.1.0)
+Status: accepted (v2.0.0)
 
 ## Context
 

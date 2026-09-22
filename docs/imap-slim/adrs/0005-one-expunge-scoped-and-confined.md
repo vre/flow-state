@@ -1,6 +1,6 @@
 # 0005 — Exactly one expunge, scoped to one message, only in Drafts
 
-Status: accepted (v2.0.1)
+Status: accepted (v2.0.0)
 
 ## Context
 

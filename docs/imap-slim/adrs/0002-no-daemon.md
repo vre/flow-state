@@ -1,6 +1,6 @@
 # 0002 — No daemon; the CLI is stateless
 
-Status: accepted (v1.1.0)
+Status: accepted (v2.0.0)
 
 ## Context
 

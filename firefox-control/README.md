@@ -256,6 +256,7 @@ The tool proves BiDi works. For production agent workflows, use Chrome CDP tooli
 
 ## Release Highlights
 
+- **v0.2.0** — `navigate` and `open` survive Firefox replacing the browsing context mid-load
 - **v0.1.0** — WebDriver BiDi CLI for Firefox (test tool)
   - Direct BiDi WebSocket, daemon mode, DOM helpers
   - Proves that BiDi works and was quite easy actually to set up

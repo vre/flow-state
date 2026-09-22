@@ -161,6 +161,8 @@ imap_client.py       # IMAP operations (list, read, search, create, replace)
 bodystructure.py     # BODYSTRUCTURE parsing (attachments, snippets)
 session.py           # connection lease, caching, message fetch
 markdown_utils.py    # markdown → HTML + plain alternative
+quoting.py           # reply assembly: quote, attribution, threading, cid rewriting
+injection_defense.py # sanitising and wrapping of untrusted mail content
 setup.py             # credential configuration utility
 debug_imap.py        # connection troubleshooting utility
 mcp-server.json      # MCP config, named explicitly by the marketplace entry.

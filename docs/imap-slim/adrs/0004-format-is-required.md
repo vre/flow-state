@@ -1,6 +1,6 @@
 # 0004 — The draft body format is required and top-level
 
-Status: accepted (v1.1.0). Breaking.
+Status: accepted (v2.0.0). Breaking.
 
 ## Context
 
