@@ -16,6 +16,12 @@ from imapclient import IMAPClient
 # socket timeout while discarding costs nothing.
 CONNECTION_MAX_IDLE = 60
 
+# A cached list is served for this long before the flags on it are refetched.
+# Nothing in the SELECT response changes when another client marks a message
+# read, so an age bound is the only thing that keeps that drift from lasting
+# the life of the process.
+MESSAGE_CACHE_TTL = 30
+
 _sessions: dict[str, "AccountSession"] = {}
 _sessions_lock = threading.Lock()
 
@@ -135,12 +141,23 @@ class FolderCache:
 
 @dataclass
 class MessageListCache:
-    """Cached message list with validation metadata."""
+    """Cached message list with validation metadata.
+
+    UIDVALIDITY/UIDNEXT/EXISTS answer "did the mailbox change". They do not
+    answer "does this entry match what the caller asked for" - a list cached
+    for limit=10 cannot serve limit=50, and one cached without previews has no
+    snippets to return - so the request shape is part of the key. Flags change
+    without moving any of the counters, which nothing but a refetch can see;
+    the age bound is what keeps that drift short.
+    """
 
     messages: list[dict]
     uidvalidity: int
     uidnext: int
     exists: int
+    limit: int
+    preview: bool
+    fetched_at: float
 
 
 @dataclass
@@ -327,7 +344,15 @@ class AccountSession:
 
         with self.lock:
             cached = self.message_cache.get(folder)
-            if cached and cached.uidvalidity == uidvalidity and cached.uidnext == uidnext and cached.exists == exists:
+            if (
+                cached
+                and cached.uidvalidity == uidvalidity
+                and cached.uidnext == uidnext
+                and cached.exists == exists
+                and cached.limit >= limit
+                and cached.preview == preview
+                and time.time() - cached.fetched_at <= MESSAGE_CACHE_TTL
+            ):
                 return cached.messages[:limit]
 
         # Cache miss - fetch fresh
@@ -336,7 +361,15 @@ class AccountSession:
 
         if not message_ids:
             with self.lock:
-                self.message_cache[folder] = MessageListCache(messages=[], uidvalidity=uidvalidity, uidnext=uidnext, exists=exists)
+                self.message_cache[folder] = MessageListCache(
+                    messages=[],
+                    uidvalidity=uidvalidity,
+                    uidnext=uidnext,
+                    exists=exists,
+                    limit=limit,
+                    preview=preview,
+                    fetched_at=time.time(),
+                )
             return []
 
         # Get newest messages
@@ -423,7 +456,15 @@ class AccountSession:
             )
 
         with self.lock:
-            self.message_cache[folder] = MessageListCache(messages=messages, uidvalidity=uidvalidity, uidnext=uidnext, exists=exists)
+            self.message_cache[folder] = MessageListCache(
+                messages=messages,
+                uidvalidity=uidvalidity,
+                uidnext=uidnext,
+                exists=exists,
+                limit=limit,
+                preview=preview,
+                fetched_at=time.time(),
+            )
         return messages
 
 

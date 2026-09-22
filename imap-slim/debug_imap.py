@@ -165,14 +165,21 @@ def test_with_imaplib_debug():
     print("=" * 50)
     print()
 
-    # Enable debug
-    imaplib.Debug = 4
-
     try:
+        # Tracing starts AFTER login: imaplib.Debug echoes every command it
+        # sends, and LOGIN carries the password in clear text.
         imap = imaplib.IMAP4_SSL(server, int(port))
         imap.login(username, password)
-        print("\n✓ Success!")
-        imap.logout()
+        print("✓ Login OK - tracing the commands that follow")
+        print()
+        imaplib.Debug = 4
+        try:
+            imap.select("INBOX", readonly=True)
+            imap.noop()
+            print("\n✓ Success!")
+            imap.logout()
+        finally:
+            imaplib.Debug = 0
     except Exception as e:
         print(f"\n✗ Failed: {e}")
 

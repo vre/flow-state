@@ -145,6 +145,31 @@ class MailAction(BaseModel):
         return self
 
 
+def format_draft_id_line(result: dict) -> str:
+    """The id line for a draft response.
+
+    The UID comes from the APPEND response and needs UIDPLUS; without it the
+    server names no id, and the draft has to be found by its Message-ID.
+    """
+    uid = result.get("uid")
+    if uid is not None:
+        return f"\n**Id:** {uid} (use with read/replace in {result['folder']})"
+    return f"\n**Id:** not reported by the server - find it with `list {result['folder']}`, Message-ID {result['message_id']}"
+
+
+class Failure(str):
+    """A rendered response that reports a failure.
+
+    It is a str, so the MCP tool keeps returning plain text and nothing about
+    that surface changes. A caller that needs an exit code asks
+    `isinstance(result, Failure)` rather than guessing from the first
+    characters: prefix matching missed every failure whose response did not
+    happen to begin with "Error:".
+    """
+
+    __slots__ = ()
+
+
 # Help documentation - loaded only when needed
 HELP_TOPICS = {
     "overview": """
@@ -394,7 +419,7 @@ def run_action(params: MailAction) -> str:
             topic = (params.payload or "overview").lower()
             if topic in HELP_TOPICS:
                 return HELP_TOPICS[topic]
-            return f"Unknown topic '{topic}'. Available: {', '.join(HELP_TOPICS.keys())}"
+            return Failure(f"Unknown topic '{topic}'. Available: {', '.join(HELP_TOPICS.keys())}")
 
         # Folders
         if action == "folders":
@@ -458,7 +483,7 @@ uv run --directory {plugin_dir} python setup.py
         # List
         if action == "list":
             if not folder:
-                return "Error: folder required. Example: {action:'list', folder:'INBOX'}"
+                return Failure("Error: folder required. Example: {action:'list', folder:'INBOX'}")
 
             messages = list_messages(folder, limit=params.limit, account=params.account, preview=params.preview or False)
 
@@ -471,7 +496,10 @@ uv run --directory {plugin_dir} python setup.py
                     return POTENTIAL_INJECTION_WARNING + "\n\n" + body
                 return body
 
-            lines = [f"# Messages in {safe_folder}", f"Showing {len(messages)} messages", ""]
+            # Subjects, senders and snippets are written by whoever sent the
+            # mail. Sanitizing strips markers but leaves ordinary prose, so the
+            # rows go inside the same boundary `read` puts a body in.
+            lines = []
             for msg in messages:
                 flag_str = format_flags(msg["flags"])
                 attachment_count = msg.get("attachment_count", 0)
@@ -492,7 +520,8 @@ uv run --directory {plugin_dir} python setup.py
                     lines.append(f"  > {safe_snippet}")
                 lines.append("")
 
-            body = "\n".join(lines)
+            header = f"# Messages in {safe_folder}\nShowing {len(messages)} messages\n\n"
+            body = header + wrap_untrusted("\n".join(lines))
             if suspicious_patterns_found:
                 return POTENTIAL_INJECTION_WARNING + "\n\n" + body
             return body
@@ -500,9 +529,9 @@ uv run --directory {plugin_dir} python setup.py
         # Read
         if action == "read":
             if not folder:
-                return "Error: folder required."
+                return Failure("Error: folder required.")
             if not params.payload:
-                return "Error: payload (message ID) required. Example: {action:'read', folder:'INBOX', payload:'123'}"
+                return Failure("Error: payload (message ID) required. Example: {action:'read', folder:'INBOX', payload:'123'}")
 
             if ":" in params.payload:
                 id_str, modifier = params.payload.split(":", 1)
@@ -513,7 +542,7 @@ uv run --directory {plugin_dir} python setup.py
                     full = False
                     depth = int(modifier)
                 else:
-                    return (
+                    return Failure(
                         f"Error: unknown modifier '{modifier}'. Use '{id_str}', '{id_str}:1' (include previous message), or '{id_str}:full'"
                     )
             else:
@@ -524,7 +553,7 @@ uv run --directory {plugin_dir} python setup.py
             try:
                 msg_id = int(id_str)
             except ValueError:
-                return f"Error: payload must be numeric message ID, got '{id_str}'"
+                return Failure(f"Error: payload must be numeric message ID, got '{id_str}'")
 
             msg = read_message(folder, msg_id, account=params.account, full=full, depth=depth)
 
@@ -623,9 +652,9 @@ uv run --directory {plugin_dir} python setup.py
         # Search
         if action == "search":
             if not folder:
-                return "Error: folder required."
+                return Failure("Error: folder required.")
             if not params.payload:
-                return "Error: payload (search query) required. Use 'help search' for syntax."
+                return Failure("Error: payload (search query) required. Use 'help search' for syntax.")
 
             messages = search_messages(folder, params.payload, limit=params.limit, account=params.account, preview=params.preview or False)
 
@@ -638,7 +667,7 @@ uv run --directory {plugin_dir} python setup.py
                     return POTENTIAL_INJECTION_WARNING + "\n\n" + body
                 return body
 
-            lines = [f"# Search Results: {params.payload}", f"Found {len(messages)} in {safe_folder}", ""]
+            lines = []
             for msg in messages:
                 flag_str = format_flags(msg.get("flags", []))
                 attachment_count = msg.get("attachment_count", 0)
@@ -659,7 +688,8 @@ uv run --directory {plugin_dir} python setup.py
                     lines.append(f"  > {safe_snippet}")
                 lines.append("")
 
-            body = "\n".join(lines)
+            header = f"# Search Results: {params.payload}\nFound {len(messages)} in {safe_folder}\n\n"
+            body = header + wrap_untrusted("\n".join(lines))
             if suspicious_patterns_found:
                 return POTENTIAL_INJECTION_WARNING + "\n\n" + body
             return body
@@ -670,32 +700,32 @@ uv run --directory {plugin_dir} python setup.py
         # called editing was always a replace.
         if action in {"create", "replace"}:
             if not params.payload:
-                return f"Error: payload required. Use 'help {action}' for details."
+                return Failure(f"Error: payload required. Use 'help {action}' for details.")
 
             try:
                 draft_data = json.loads(params.payload)
             except json.JSONDecodeError as e:
-                return f"Error: Invalid JSON in payload: {e}"
+                return Failure(f"Error: Invalid JSON in payload: {e}")
 
             # Only a key of a decoded object: payload='"format"' decodes to a
             # string, where there is no key to forbid.
             if isinstance(draft_data, dict) and "format" in draft_data:
-                return (
+                return Failure(
                     "Error: 'format' no longer goes inside the payload. Pass it as a top-level "
                     'parameter instead: {action:"create"|"replace", format:"markdown"|"plain", payload:\'{...}\'}'
                 )
 
             has_id = isinstance(draft_data, dict) and "id" in draft_data
             if action == "replace" and not has_id:
-                return "Error: 'id' required for replace - the draft being replaced. Use 'create' for a new draft."
+                return Failure("Error: 'id' required for replace - the draft being replaced. Use 'create' for a new draft.")
             if action == "create" and has_id:
-                return "Error: 'id' is not valid for create. Use 'replace' to supersede an existing draft."
+                return Failure("Error: 'id' is not valid for create. Use 'replace' to supersede an existing draft.")
 
             if action == "replace":
                 if not folder:
-                    return "Error: folder required for replace (e.g., 'Drafts')"
+                    return Failure("Error: folder required for replace (e.g., 'Drafts')")
                 if "body" not in draft_data:
-                    return "Error: 'body' required for replace"
+                    return Failure("Error: 'body' required for replace")
 
                 body = draft_data["body"]
                 format_type = params.format
@@ -704,9 +734,9 @@ uv run --directory {plugin_dir} python setup.py
                 # Parse and validate attachments
                 att_paths = draft_data.get("attachments")
                 if att_paths is not None and not isinstance(att_paths, list):
-                    return "Error: 'attachments' must be a list of file paths"
+                    return Failure("Error: 'attachments' must be a list of file paths")
                 if att_paths and not all(isinstance(p, str) for p in att_paths):
-                    return "Error: each attachment must be a file path string"
+                    return Failure("Error: each attachment must be a file path string")
 
                 result = modify_draft(
                     folder=folder,
@@ -734,7 +764,7 @@ uv run --directory {plugin_dir} python setup.py
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
 **Format:** {format_description(format_type)}
-**Saved to:** {result["folder"]}{leftover}
+**Saved to:** {result["folder"]}{format_draft_id_line(result)}{leftover}
 
 Open Thunderbird → Drafts to review and send."""
 
@@ -742,7 +772,7 @@ Open Thunderbird → Drafts to review and send."""
             required = ["to", "subject", "body"]
             missing = [f for f in required if f not in draft_data]
             if missing:
-                return f"Error: Missing required fields: {', '.join(missing)}"
+                return Failure(f"Error: Missing required fields: {', '.join(missing)}")
 
             body = draft_data["body"]
             format_type = params.format
@@ -751,9 +781,9 @@ Open Thunderbird → Drafts to review and send."""
             # Parse and validate attachments
             att_paths = draft_data.get("attachments")
             if att_paths is not None and not isinstance(att_paths, list):
-                return "Error: 'attachments' must be a list of file paths"
+                return Failure("Error: 'attachments' must be a list of file paths")
             if att_paths and not all(isinstance(p, str) for p in att_paths):
-                return "Error: each attachment must be a file path string"
+                return Failure("Error: each attachment must be a file path string")
 
             result = create_draft(
                 folder=folder or "INBOX",
@@ -773,16 +803,16 @@ Open Thunderbird → Drafts to review and send."""
 **To:** {result["to"]}
 **Subject:** {result["subject"]}{att_info}
 **Format:** {format_description(format_type)}
-**Saved to:** {result["folder"]}
+**Saved to:** {result["folder"]}{format_draft_id_line(result)}
 
 Open Thunderbird → Drafts to review and send."""
 
         # Attachment
         if action == "attachment":
             if not folder:
-                return "Error: folder required."
+                return Failure("Error: folder required.")
             if not params.payload:
-                return "Error: payload required. Format: 'msg_id:index' (e.g., '1253:0')"
+                return Failure("Error: payload required. Format: 'msg_id:index' (e.g., '1253:0')")
 
             try:
                 parts = params.payload.split(":")
@@ -791,7 +821,7 @@ Open Thunderbird → Drafts to review and send."""
                 msg_id = int(parts[0])
                 att_index = int(parts[1])
             except ValueError:
-                return f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')"
+                return Failure(f"Error: Invalid payload '{params.payload}'. Use 'msg_id:index' format (e.g., '1253:0')")
 
             result = download_attachment(folder, msg_id, att_index, account=params.account)
 
@@ -814,14 +844,14 @@ Use Read tool for images, pdf/docx skills for documents."""
         # Flag
         if action == "flag":
             if not folder:
-                return "Error: folder required. Example: {action:'flag', folder:'INBOX', payload:'123:+Flagged'}"
+                return Failure("Error: folder required. Example: {action:'flag', folder:'INBOX', payload:'123:+Flagged'}")
             if not params.payload:
-                return "Error: payload required. Use 'help flag' for details."
+                return Failure("Error: payload required. Use 'help flag' for details.")
 
             try:
                 msg_ids, add_flags, remove_flags = parse_flag_payload(params.payload)
             except ValueError as e:
-                return f"Error: {e}"
+                return Failure(f"Error: {e}")
 
             result = modify_flags(folder, msg_ids, add_flags, remove_flags, account=params.account)
 
@@ -844,7 +874,10 @@ Use Read tool for images, pdf/docx skills for documents."""
                     else:
                         lines.append(f"  - Message {fail['id']}: {fail['error']}")
 
-            return "\n".join(lines)
+            text = "\n".join(lines)
+            # Any message that could not be flagged makes the whole call a
+            # failure for a script: it asked for N and did not get N.
+            return Failure(text) if result["failed"] else text
 
         # Cleanup
         if action == "cleanup":
@@ -852,19 +885,19 @@ Use Read tool for images, pdf/docx skills for documents."""
             freed_kb = result["freed_bytes"] / 1024
             return f"Cleaned up {result['deleted']} file(s), freed {freed_kb:.1f} KB"
 
-        return f"Unknown action '{action}'. Use 'help' for available actions."
+        return Failure(f"Unknown action '{action}'. Use 'help' for available actions.")
 
     except ValueError as e:
-        return f"Error: {e}"
+        return Failure(f"Error: {e}")
     except IMAPError as e:
         classified = classify_connection_error(e)
         if classified:
-            return classified
+            return Failure(classified)
         error_msg = str(e)
         # Provide friendly setup guide for unconfigured credentials
         if "not configured" in error_msg.lower():
             plugin_dir = Path(__file__).parent.resolve()
-            return f"""# IMAP Stream - Setup Required
+            return Failure(f"""# IMAP Stream - Setup Required
 
 Your IMAP credentials are not configured yet.
 
@@ -889,10 +922,10 @@ export IMAP_SLIM_PASSWORD="app-password"
 ```
 
 After setup, try: `{{action: "folders"}}` to verify connection.
-"""
-        return f"Error: {e}"
+""")
+        return Failure(f"Error: {e}")
     except Exception as e:
         classified = classify_connection_error(e)
         if classified:
-            return classified
-        return f"Error: {type(e).__name__}: {e}"
+            return Failure(classified)
+        return Failure(f"Error: {type(e).__name__}: {e}")

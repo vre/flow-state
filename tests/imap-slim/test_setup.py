@@ -130,6 +130,46 @@ class TestRenaming:
         assert setup_mod.get_accounts() == ["office"]
         assert fake_keyring.get_password("imap-slim", "default_account") == "office"
 
+    def test_a_failed_copy_leaves_the_old_account_whole(self, setup_mod, fake_keyring):
+        """Deleting each key right after copying it split the account across two
+        names when a write in the middle failed, and the half left under the old
+        name was unreachable once the accounts list had moved on."""
+        seed(fake_keyring, name="work")
+        real_set = fake_keyring.set_password
+        calls = {"n": 0}
+
+        def failing_set(service, key, value):
+            calls["n"] += 1
+            if calls["n"] == 3:
+                raise RuntimeError("keychain write failed")
+            real_set(service, key, value)
+
+        with patch.object(fake_keyring, "set_password", side_effect=failing_set), pytest.raises(RuntimeError):
+            setup_mod.rename_account("work", "office")
+
+        assert setup_mod.get_accounts() == ["work"]
+        for suffix in ("imap_server", "imap_port", "imap_username", "imap_password"):
+            assert fake_keyring.get_password("imap-slim", f"work:{suffix}") is not None, f"work:{suffix} was destroyed"
+
+    def test_an_unverifiable_copy_stops_before_deleting(self, setup_mod, fake_keyring):
+        """The copy is read back; a store that accepted the write but did not
+        keep it must not cost the original."""
+        seed(fake_keyring, name="work")
+
+        def lying_set(service, key, value):
+            if key.startswith("office:"):
+                return  # silently drops it
+            fake_keyring.store[(service, key)] = value
+
+        with (
+            patch.object(fake_keyring, "set_password", side_effect=lying_set),
+            pytest.raises(SystemExit),
+        ):
+            setup_mod.rename_account("work", "office")
+
+        assert fake_keyring.get_password("imap-slim", "work:imap_password") == "secret"
+        assert setup_mod.get_accounts() == ["work"]
+
     def test_updating_can_rename(self, setup_mod, fake_keyring):
         seed(fake_keyring, name="work")
 

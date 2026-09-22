@@ -149,11 +149,32 @@ def save_account_credentials(name: str, server: str, port: str, username: str, p
 
 
 def rename_account(old: str, new: str):
-    """Move an account's keys to a new name, keeping default and ordering."""
-    for suffix in ["imap_server", "imap_port", "imap_username", "imap_password"]:
+    """Move an account's keys to a new name, keeping default and ordering.
+
+    Copy everything, verify everything, and only then delete the originals. A
+    delete that follows each individual copy leaves the account split across
+    two names if any write in the middle fails, and the half under the old name
+    is no longer reachable once the accounts list has moved on.
+    """
+    suffixes = ["imap_server", "imap_port", "imap_username", "imap_password"]
+
+    copied = []
+    for suffix in suffixes:
         value = _keyring_get(f"{old}:{suffix}")
-        if value is not None:
-            keyring.set_password(SERVICE_NAME, f"{new}:{suffix}", value)
+        if value is None:
+            continue
+        keyring.set_password(SERVICE_NAME, f"{new}:{suffix}", value)
+        copied.append((suffix, value))
+
+    for suffix, value in copied:
+        if _keyring_get(f"{new}:{suffix}") != value:
+            print(
+                f"Error: '{new}:{suffix}' could not be verified after copying. Account '{old}' is left untouched.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    for suffix, _value in copied:
         try:
             keyring.delete_password(SERVICE_NAME, f"{old}:{suffix}")
         except keyring.errors.PasswordDeleteError:

@@ -109,7 +109,7 @@ class MockIMAPClient:
             b"EXISTS": len(messages),
         }
 
-    def search(self, criteria: list) -> list[int]:
+    def search(self, criteria: list, charset: str | None = None) -> list[int]:
         """Return message IDs matching criteria."""
         if self.selected_folder is None:
             return []

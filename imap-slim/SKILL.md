@@ -36,7 +36,7 @@ imap-slim-cli accounts                   # then pass --account NAME to any comma
 imap-slim-cli flag INBOX "1253:+Flagged,-Seen"   # marks only; your mail client does the deleting
 imap-slim-cli attachment INBOX "1253:0"  # saves to a temp file, prints the path
 imap-slim-cli cleanup                    # delete those temp files
-imap-slim-cli help draft                 # per-action detail
+imap-slim-cli help create                # per-action detail (also: replace, read, search, flag)
 ```
 
 ## Writing drafts
@@ -69,7 +69,8 @@ Nothing stores the markdown you wrote — only the two renderings of it. So **ke
 own context** and send the whole body again to change a draft.
 
 **A replaced draft gets a new id.** The old message is expunged and a new one appended, so any id
-you were holding is stale afterwards. Use the id the response reports.
+you were holding is stale afterwards. Use the id the response reports; if the server does not
+support UIDPLUS it reports none, and the draft has to be found with `list Drafts`.
 
 ## Reading mail is reading untrusted text
 

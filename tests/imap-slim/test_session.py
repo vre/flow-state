@@ -27,7 +27,15 @@ class TestDataStructures:
         assert cache.fetched_at == 1000.0
 
     def test_message_list_cache_creation(self):
-        cache = MessageListCache(messages=[{"id": 1, "subject": "Test"}], uidvalidity=12345, uidnext=100, exists=50)
+        cache = MessageListCache(
+            messages=[{"id": 1, "subject": "Test"}],
+            uidvalidity=12345,
+            uidnext=100,
+            exists=50,
+            limit=10,
+            preview=False,
+            fetched_at=time.time(),
+        )
         assert cache.uidvalidity == 12345
         assert cache.uidnext == 100
         assert cache.exists == 50
@@ -220,7 +228,13 @@ class TestMessageListCaching:
         """Returns cache if UIDVALIDITY/UIDNEXT/EXISTS unchanged."""
         session = AccountSession("test")
         session.message_cache["Drafts"] = MessageListCache(
-            messages=[{"uid": 1, "subject": "Cached"}], uidvalidity=12345, uidnext=100, exists=50
+            messages=[{"uid": 1, "subject": "Cached"}],
+            uidvalidity=12345,
+            uidnext=100,
+            exists=50,
+            limit=10,
+            preview=False,
+            fetched_at=time.time(),
         )
         mock_client = Mock(spec=IMAPClient)
         mock_client.select_folder.return_value = {b"UIDVALIDITY": 12345, b"UIDNEXT": 100, b"EXISTS": 50}
@@ -236,7 +250,13 @@ class TestMessageListCaching:
         """Refetches if UIDNEXT changed (new message)."""
         session = AccountSession("test")
         session.message_cache["Drafts"] = MessageListCache(
-            messages=[{"uid": 1, "subject": "Old"}], uidvalidity=12345, uidnext=100, exists=50
+            messages=[{"uid": 1, "subject": "Old"}],
+            uidvalidity=12345,
+            uidnext=100,
+            exists=50,
+            limit=10,
+            preview=False,
+            fetched_at=time.time(),
         )
         mock_client = Mock(spec=IMAPClient)
         mock_client.select_folder.return_value = {
@@ -292,8 +312,8 @@ class TestSessionManagement:
     def test_invalidate_message_cache(self):
         """Invalidates specific folder cache."""
         session = AccountSession("test")
-        session.message_cache["Drafts"] = MessageListCache([], 1, 1, 1)
-        session.message_cache["INBOX"] = MessageListCache([], 2, 2, 2)
+        session.message_cache["Drafts"] = MessageListCache([], 1, 1, 1, 10, False, time.time())
+        session.message_cache["INBOX"] = MessageListCache([], 2, 2, 2, 10, False, time.time())
         _sessions["test"] = session
 
         invalidate_message_cache("test", "Drafts")
@@ -317,6 +337,9 @@ class TestCacheUpdateOnFlags:
             uidvalidity=1,
             uidnext=3,
             exists=2,
+            limit=10,
+            preview=False,
+            fetched_at=time.time(),
         )
         _sessions["test"] = session
 
@@ -329,7 +352,13 @@ class TestCacheUpdateOnFlags:
         """Does nothing if message not in cache."""
         session = AccountSession("test")
         session.message_cache["Drafts"] = MessageListCache(
-            messages=[{"id": 1, "subject": "A", "flags": []}], uidvalidity=1, uidnext=2, exists=1
+            messages=[{"id": 1, "subject": "A", "flags": []}],
+            uidvalidity=1,
+            uidnext=2,
+            exists=1,
+            limit=10,
+            preview=False,
+            fetched_at=time.time(),
         )
         _sessions["test"] = session
 

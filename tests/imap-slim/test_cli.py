@@ -8,6 +8,7 @@ receives, and that failure is distinguishable from success by exit code.
 from pathlib import Path
 from unittest.mock import patch
 
+import actions
 import imapctl
 import pytest
 from actions import MailAction
@@ -93,7 +94,7 @@ class TestExitCodes:
         ],
     )
     def test_a_failed_action_exits_one_and_writes_to_stderr(self, text, capsys):
-        with patch("actions.run_action", return_value=text):
+        with patch("actions.run_action", return_value=actions.Failure(text)):
             code = imapctl.main(["folders"])
         assert code == imapctl.EXIT_ERROR
         out = capsys.readouterr()
@@ -101,7 +102,7 @@ class TestExitCodes:
         assert text.split("\n")[0] in out.err
 
     def test_quiet_prints_nothing_but_keeps_the_code(self, capsys):
-        with patch("actions.run_action", return_value="Error: nope"):
+        with patch("actions.run_action", return_value=actions.Failure("Error: nope")):
             code = imapctl.main(["-q", "folders"])
         assert code == imapctl.EXIT_ERROR
         out = capsys.readouterr()

@@ -5,6 +5,7 @@ Handles all IMAP operations with lazy connection management.
 Credentials are fetched from macOS Keychain at connection time.
 """
 
+import datetime
 import email
 import email.header
 import email.message
@@ -917,6 +918,19 @@ def cleanup_attachments() -> dict:
     return {"deleted": deleted, "freed_bytes": freed_bytes}
 
 
+def _parse_search_date(value: str, keyword: str) -> datetime.date:
+    """Turn a YYYY-MM-DD search term into a date.
+
+    IMAP dates are `1-Jan-2024` (RFC 3501 §9); a bare string is passed through
+    verbatim and the server rejects it. IMAPClient serialises a date object
+    into the wire form itself.
+    """
+    try:
+        return datetime.datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise IMAPError(f"'{keyword}:' needs a date as YYYY-MM-DD, got '{value}'") from None
+
+
 def search_messages(folder: str, query: str, limit: int = 20, account: str = None, preview: bool = False) -> list[dict]:
     """Search messages in a folder.
 
@@ -961,15 +975,29 @@ def search_messages(folder: str, query: str, limit: int = 20, account: str = Non
         elif query_lower.startswith("subject:"):
             criteria = ["SUBJECT", query[8:].strip()]
         elif query_lower.startswith("since:"):
-            criteria = ["SINCE", query[6:].strip()]
+            criteria = ["SINCE", _parse_search_date(query[6:].strip(), "since")]
         elif query_lower.startswith("before:"):
-            criteria = ["BEFORE", query[7:].strip()]
+            criteria = ["BEFORE", _parse_search_date(query[7:].strip(), "before")]
         else:
             # General text search - search subject OR body
             criteria = ["OR", "SUBJECT", query, "BODY", query]
 
+        # A search term outside ASCII has to name its charset; without one the
+        # client encodes as ASCII and raises before anything reaches the server.
+        charset = "UTF-8" if any(isinstance(c, str) and not c.isascii() for c in criteria) else None
+
         # Execute search
-        message_ids = client.search(criteria)
+        try:
+            message_ids = client.search(criteria, charset=charset)
+        except Exception as e:
+            if is_transport_failure(e, stage="command"):
+                raise
+            if charset:
+                raise IMAPError(
+                    f"Search for non-ASCII text failed: {e}. The server may not accept UTF-8 "
+                    "search terms; try an ASCII substring of the same word."
+                ) from e
+            raise IMAPError(f"Search failed: {e}") from e
 
         if not message_ids:
             return []
@@ -1257,17 +1285,95 @@ def create_draft(
             raise IMAPError("Cannot find Drafts folder. Available folders: " + ", ".join(f[2] for f in folders))
 
         # Append to Drafts with \Draft flag
-        client.append(drafts_folder, msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
+        append_response = client.append(drafts_folder, msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
 
         # Invalidate cache for drafts folder
         from session import invalidate_message_cache
 
         invalidate_message_cache(session.account, drafts_folder)
 
-        response = {"status": "created", "folder": drafts_folder, "to": to, "subject": subject, "message_id": msg["Message-ID"]}
+        response = {
+            "status": "created",
+            "folder": drafts_folder,
+            "to": to,
+            "subject": subject,
+            "message_id": msg["Message-ID"],
+            "uid": appended_uid(append_response),
+        }
         if att_info:
             response["attachments"] = att_info
         return response
+
+
+def appended_uid(append_response) -> int | None:
+    """Parse the new UID out of an APPEND response.
+
+    A server advertising UIDPLUS answers with [APPENDUID <uidvalidity> <uid>]
+    (RFC 4315). Without it there is no UID to report and the caller must find
+    the draft by its Message-ID.
+    """
+    if append_response is None:
+        return None
+    text = to_str(append_response)
+    match = re.search(r"APPENDUID\s+\d+\s+(\d+)", text, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def _iter_attachment_parts(msg: email.message.Message):
+    """Yield the attachment parts of a message, outermost first.
+
+    Does not descend into a part that is itself an attachment: an attached
+    email carries its own parts, and walk() would hand them back as separate
+    attachments of the carrier.
+    """
+    if msg.get_content_maintype() != "multipart":
+        return
+    for part in msg.get_payload():
+        if not isinstance(part, email.message.Message):
+            continue
+        filename = part.get_filename()
+        disposition = part.get_content_disposition()
+        if disposition == "attachment" or (disposition == "inline" and filename):
+            yield part
+            continue
+        yield from _iter_attachment_parts(part)
+
+
+def _preserve_attachments(original_msg: email.message.Message, new_msg: email.message.EmailMessage) -> tuple[list[dict], list[str]]:
+    """Copy the original's attachments onto the new message.
+
+    Returns (info, unpreservable). A message/rfc822 attachment has no decoded
+    payload - get_payload(decode=True) returns None for it - so it is carried
+    over as the sub-message it contains. Anything else without a payload is
+    reported rather than skipped, so the caller can refuse to write.
+    """
+    info: list[dict] = []
+    unpreservable: list[str] = []
+
+    for part in _iter_attachment_parts(original_msg):
+        filename = part.get_filename() or "unnamed"
+        content_type = part.get_content_type()
+
+        if content_type == "message/rfc822":
+            payload = part.get_payload()
+            sub = payload[0] if isinstance(payload, list) and payload else None
+            if not isinstance(sub, email.message.Message):
+                unpreservable.append(filename)
+                continue
+            new_msg.add_attachment(sub, filename=filename)
+            info.append({"name": filename, "size": len(sub.as_bytes())})
+            continue
+
+        payload = part.get_payload(decode=True)
+        if payload is None:
+            unpreservable.append(filename)
+            continue
+
+        maintype, subtype = content_type.split("/", 1)
+        new_msg.add_attachment(payload, maintype=maintype, subtype=subtype, filename=filename)
+        info.append({"name": filename, "size": len(payload)})
+
+    return info, unpreservable
 
 
 def modify_draft(
@@ -1359,6 +1465,7 @@ def modify_draft(
                 mailbox = to_str(a.mailbox)
                 host = to_str(a.host)
                 original_cc.append(f"{mailbox}@{host}")
+        original_to_header = ", ".join(original_to)
 
         # Preserve threading fields (decode and clean up)
         in_reply_to = original_msg.get("In-Reply-To", "")
@@ -1373,15 +1480,17 @@ def modify_draft(
 
         _, _, username, _ = get_credentials(account)
         new_msg["From"] = username
-        new_msg["To"] = to if to else ", ".join(original_to)
-        new_msg["Subject"] = subject if subject else original_subject
+        # None means "not supplied, keep the original"; an empty string is an
+        # explicit instruction to clear the field. Truthiness cannot tell those
+        # apart, which made cc="" silently keep the previous recipients.
+        new_msg["To"] = original_to_header if to is None else to
+        new_msg["Subject"] = original_subject if subject is None else subject
         new_msg["Date"] = email.utils.formatdate(localtime=True)
         new_msg["Message-ID"] = email.utils.make_msgid()
 
-        if cc:
-            new_msg["Cc"] = cc
-        elif original_cc:
-            new_msg["Cc"] = ", ".join(original_cc)
+        new_cc = ", ".join(original_cc) if cc is None else cc
+        if new_cc:
+            new_msg["Cc"] = new_cc
 
         # Preserve threading
         if in_reply_to:
@@ -1394,28 +1503,17 @@ def modify_draft(
         if html:
             new_msg.add_alternative(html, subtype="html")
 
-        # Preserve existing attachments from original draft
-        preserved_att_info = []
-        for part in original_msg.walk():
-            disposition = part.get_content_disposition()
-            filename = part.get_filename()
-            if disposition == "attachment" or (disposition == "inline" and filename):
-                payload = part.get_payload(decode=True)
-                if payload is not None:
-                    content_type = part.get_content_type()
-                    maintype, subtype = content_type.split("/", 1)
-                    new_msg.add_attachment(
-                        payload,
-                        maintype=maintype,
-                        subtype=subtype,
-                        filename=filename or "unnamed",
-                    )
-                    preserved_att_info.append(
-                        {
-                            "name": filename or "unnamed",
-                            "size": len(payload),
-                        }
-                    )
+        # Preserve existing attachments from the original draft. Anything that
+        # cannot be carried over aborts the replace here, before the append and
+        # the delete: dropping an attachment silently loses data the user has
+        # no other copy of.
+        preserved_att_info, unpreservable = _preserve_attachments(original_msg, new_msg)
+        if unpreservable:
+            raise IMAPError(
+                "Refusing to replace: these attachments cannot be carried into the new draft - "
+                f"{', '.join(unpreservable)}. Edit this draft in a mail client, or create a new "
+                "draft and attach the files again."
+            )
 
         # Attach new files
         att_info = []
@@ -1434,7 +1532,7 @@ def modify_draft(
             drafts_folder = folder  # Use current folder as fallback
 
         # Append-before-delete: append new draft first, then delete old
-        client.append(drafts_folder, new_msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
+        append_response = client.append(drafts_folder, new_msg.as_bytes(), flags=[b"\\Draft", b"\\Seen"])
 
         client.delete_messages([message_id])
         # A bare EXPUNGE removes EVERY \\Deleted message in the mailbox, not the
@@ -1460,6 +1558,7 @@ def modify_draft(
             "to": new_msg["To"],
             "subject": new_msg["Subject"],
             "message_id": new_msg["Message-ID"],
+            "uid": appended_uid(append_response),
             "preserved_reply_to": bool(in_reply_to),
             "superseded_expunged": expunged,
         }

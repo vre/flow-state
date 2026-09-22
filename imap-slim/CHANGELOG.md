@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.0.1] - 2026-09-14
+
+A cross-model review of 2.0.0 found these. The suite passed throughout; every one came from
+running the code.
+
+### Fixed
+
+- **`replace` silently dropped an attached email.** `message/rfc822` has no decoded payload, so the
+  part was skipped and the original draft then expunged. Attached messages are now carried over,
+  and any part that cannot be copied aborts the replace before anything is written.
+- **`debug_imap.py --debug` printed the password.** Tracing was enabled before `LOGIN`, which
+  `imaplib` echoes in full. It starts after authentication.
+- **An empty `to`, `cc` or `subject` could not clear a field.** Truthiness could not tell "not
+  supplied" from "explicitly empty", so `cc: ""` kept the previous recipients.
+- **`since:` and `before:` sent an unusable date.** `2024-01-01` went to the server verbatim; IMAP
+  wants `1-Jan-2024` (RFC 3501 §9).
+- **A non-ASCII search failed before reaching the server.** No charset was named, so the term was
+  encoded as ASCII and raised locally. `UTF-8` is declared when the criteria need it.
+- **A failed `flag` operation exited 0.** The CLI decided from the first characters of the rendered
+  text; the dispatcher now marks a failed response and the exit code follows it.
+- **Cached message lists ignored the request.** A list cached for `limit=10` answered `limit=50`,
+  and previews were returned or withheld regardless of what was asked. Flags, which move without
+  touching UIDVALIDITY/UIDNEXT/EXISTS, are now refetched after 30 s.
+- **Renaming an account could split it across two names.** Each key was deleted right after being
+  copied. All keys are copied and verified before any original is removed.
+- `list` and `search` put subjects, senders and snippets inside the same `[EXTERNAL_EMAIL_…]`
+  boundary `read` uses. Sanitizing strips markers but leaves ordinary prose, which arrived
+  unmarked.
+- `create` and `replace` report the new draft's id, which `SKILL.md` already told callers to use.
+- `help draft` appeared in `SKILL.md` and the README; the topics are `create` and `replace`.
+
 ## [2.0.0] - 2026-09-07
 
 Everything below is relative to 1.0.0. The intermediate versions this work passed through were

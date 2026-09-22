@@ -15,18 +15,19 @@
 - [x] Snippet preview (`preview: true/false`) in list/search (v0.7.0) — `docs/imap-slim/plans/2026-02-24-list-search-snippet.md`
 - [x] Thread-aware read: truncate quoted replies to reduce token count (v0.6.1) — `docs/imap-slim/plans/2026-02-25-thread-aware-read.md`
 - [x] Depth-aware quote truncation: `:N` modifiers for progressive disclosure of reply chains (v0.7.1) — `docs/imap-slim/plans/2026-03-09-depth-aware-quote-truncation.md`
-- [ ] Preserve `multipart/related` MIME structure in `replace` (inline images lose `cid:` linkage)
-- [x] Draft body format made explicit and required (v1.1.0) - `format` is a top-level parameter
-- [x] Fenced code blocks and pipe tables (v1.1.0)
-- [x] Connection recovery: discard rather than interrogate a dead socket (v1.1.0)
-- [x] Skill-backed CLI alongside the MCP (v1.1.0)
+- [ ] Preserve `multipart/related` MIME structure in `replace` (inline images lose `cid:` linkage).
+      Since 2.0.1 such a draft is refused rather than written without it
+- [x] Draft body format made explicit and required (v2.0.0) - `format` is a top-level parameter
+- [x] Fenced code blocks and pipe tables (v2.0.0)
+- [x] Connection recovery: discard rather than interrogate a dead socket (v2.0.0)
+- [x] Skill-backed CLI alongside the MCP (v2.0.0)
 - [x] Action names match IMAP: create / replace, no edit (v2.0.0)
 - [ ] Inline spans crossing a newline: `**bold\ncontinued**` stays literal in the plain part while
       the HTML renders it. Known divergence, no decision to fix
 - [x] Attachments and cleanup exercised against a real server (2026-09-07)
 - [x] Multi-account switching verified across three accounts (2026-09-07)
-- [x] Read operations retry once on a fresh connection (v2.1.0)
-- [x] `setup.py`: remove and set-default in the menu, editable fields, default marked (v2.2.x)
+- [x] Read operations retry once on a fresh connection (v2.0.0)
+- [x] `setup.py`: remove and set-default in the menu, editable fields, default marked (v2.0.0)
 - [ ] Retry has never been proven against a connection that dies mid-command on a real server
 - [ ] `replace` rebuilds the To header from the envelope; a malformed address becomes
       `user@MISSING_DOMAIN`. Judged not worth fixing - the sending client composes the real header

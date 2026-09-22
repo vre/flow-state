@@ -134,7 +134,7 @@ class TestSearchMessagesFlagIntegration:
 
         search_messages("INBOX", "flagged")
 
-        mock_client.search.assert_called_once_with(["FLAGGED"])
+        mock_client.search.assert_called_once_with(["FLAGGED"], charset=None)
 
     @patch("session.get_session")
     def test_is_unread_query_sends_unseen(self, mock_get_session):
@@ -152,7 +152,7 @@ class TestSearchMessagesFlagIntegration:
 
         search_messages("INBOX", "is:unread")
 
-        mock_client.search.assert_called_once_with(["UNSEEN"])
+        mock_client.search.assert_called_once_with(["UNSEEN"], charset=None)
 
     @patch("session.get_session")
     def test_non_flag_query_unchanged(self, mock_get_session):
@@ -170,4 +170,4 @@ class TestSearchMessagesFlagIntegration:
 
         search_messages("INBOX", "from:test@example.com")
 
-        mock_client.search.assert_called_once_with(["FROM", "test@example.com"])
+        mock_client.search.assert_called_once_with(["FROM", "test@example.com"], charset=None)

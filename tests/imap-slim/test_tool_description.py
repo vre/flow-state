@@ -224,3 +224,25 @@ class TestDocumentationMatchesTheCode:
         assert set(actions.HELP_TOPICS) - {"overview"} <= valid, "a help topic names an action that does not exist"
         for name in ("create", "replace"):
             assert name in actions.HELP_TOPICS, f"no help topic for {name}"
+
+    def test_every_help_example_names_a_topic_that_exists(self):
+        """Both READMEs and the skill told the reader to run `help draft`,
+        which answers "Unknown topic 'draft'"."""
+        import re
+
+        import actions
+
+        patterns = (
+            re.compile(r"""help\s+["']?([a-z_]+)["']?""", re.IGNORECASE),
+            re.compile(r"""payload:\s*["']([a-z_]+)["']\s*\}"""),
+        )
+        for name, path in self.DOCS.items():
+            text = path.read_text()
+            for line in text.splitlines():
+                if "help" not in line.lower():
+                    continue
+                for pattern in patterns:
+                    for topic in pattern.findall(line):
+                        if topic in {"help", "for", "with", "the", "and", "topic", "topics"}:
+                            continue
+                        assert topic in actions.HELP_TOPICS, f"{name} points at help topic '{topic}', which does not exist"

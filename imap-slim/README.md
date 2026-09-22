@@ -203,7 +203,7 @@ mcp-server.json      # MCP config, named explicitly by the marketplace entry.
 
 # Help
 {action: "help"}
-{action: "help", payload: "draft"}
+{action: "help", payload: "create"}
 ```
 
 ### Multi-Account

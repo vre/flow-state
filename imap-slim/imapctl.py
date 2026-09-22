@@ -22,11 +22,9 @@ EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
 
-# run_action returns rendered markdown, so failure is detected from the text it
-# produced. Precise per-cause exit codes need structured results, which is a
-# separate change; until then an action that failed is exit 1 and nothing finer
-# is promised.
-_FAILURE_PREFIXES = ("Error:", "**Connection", "**Login rejected", "# IMAP Stream - Setup Required")
+# run_action marks a failed response by returning actions.Failure, a str
+# subclass, so the exit code does not depend on how the text happens to start.
+# One code for every failure: nothing finer is promised.
 
 
 def _add_account(parser: argparse.ArgumentParser) -> None:
@@ -150,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"action={params.action} folder={params.folder} account={params.account or '(default)'}", file=sys.stderr)
 
     result = actions.run_action(params)
-    failed = result.startswith(_FAILURE_PREFIXES)
+    failed = isinstance(result, actions.Failure)
 
     if not args.quiet:
         print(result, file=sys.stderr if failed else sys.stdout)
