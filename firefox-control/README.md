@@ -151,11 +151,33 @@ firefoxctl CLI / LLM agent / echo '{"cmd":"list"}' | nc -U <socket>
 | `start` | Connect to Firefox BiDi, listen on Unix socket |
 | `stop` | Stop daemon |
 | `list` | List open tabs |
-| `open <url>` | Open a new tab |
+| `open <url>` | Open a new tab — **may return a different context id**, see below |
 | `status` | Show daemon connection status |
 | `targets` | List all targets (tabs, iframes) |
 | `helpers` | List all DOM helper commands |
 | `bidi <method> [--params JSON]` | Send raw BiDi command |
+
+### Context swaps
+
+`open` and `navigate` may hand back a **different context id than the one they started
+with**. Firefox replaces a browsing context when a navigation crosses into a container:
+`userContext` cannot change in place, so the browser builds a new context and discards
+the old, reporting
+
+```
+browsingContext.navigate: unknown error — Error: Browsing context got discarded
+```
+
+on a navigation that **succeeded**. Both commands follow the replacement and return it,
+with `"context_swapped": true` alongside.
+
+**Read `context` back from the result.** For `open`, that means not assuming it is the
+tab you asked to be created.
+
+Adoption is deliberately narrow: the context must be new, at the **exact** requested
+address, and in the same window. A target that redirects, or an ambiguous match, lets
+the original error propagate instead. This only affects sites an extension assigns to a
+container, and only their first navigation.
 
 ### Target
 

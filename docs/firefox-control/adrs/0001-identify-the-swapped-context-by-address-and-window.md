@@ -63,3 +63,19 @@ satisfied it.
 - Creating the tab directly in the assigned container avoids the swap entirely. The
   container's BiDi id is generated per session; read it from
   `browser.getUserContexts`, never hardcode it.
+
+## Scope: every command that navigates, not just `navigate`
+
+Amended 2026-09-22, same day. The first implementation changed `cmd_navigate` only, and
+`cmd_open` kept navigating with a raw `conn.send`. That left the **most** exposed command
+unfixed: `open` creates a tab, so its navigation is always a context's first — precisely
+the one a container assignment replaces. `firefoxctl open https://www.reddit.com/` still
+raised.
+
+It was caught by watching a consumer work around it in its own code during a live run,
+minutes after the fix shipped — not by review, which read the diff that was there rather
+than the commands that were not in it.
+
+`cmd_open` now delegates to `cmd_navigate`. `grep` for `browsingContext.navigate` shows
+one remaining raw send, inside `cmd_navigate` itself. **Anything that navigates goes
+through `cmd_navigate`** — that invariant is what makes this decision hold.

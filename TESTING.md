@@ -72,7 +72,9 @@ tests/chrome-control/
 └── test_idle_shutdown.sh   # Daemon idle timeout tests (real Chrome)
 
 tests/firefox-control/
-└── test_integration.sh     # Integration tests against real Firefox
+├── test_firefoxctl_daemon.py  # Daemon unit tests
+├── test_navigate_swap.py      # Context-swap recovery for navigate and open
+└── test_integration.sh        # Integration tests against real Firefox
 ```
 
 ## Running Tests
@@ -88,6 +90,9 @@ cd tests && uv run pytest obsidian-slim-mcp/
 
 # chrome-control
 cd tests && uv run pytest chrome-control/
+
+# firefox-control
+cd tests && uv run pytest firefox-control/
 
 # chrome-control integration (requires Chrome with remote debugging enabled)
 cd tests/chrome-control && bash test_integration.sh
